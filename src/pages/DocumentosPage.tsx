@@ -69,6 +69,8 @@ const DocumentosPage = () => {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [uploading, setUploading] = useState(false);
   const [viewDoc, setViewDoc] = useState<Documento | null>(null);
+  const [scanningCarnes, setScanningCarnes] = useState(false);
+  const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     fetchDocumentos();
