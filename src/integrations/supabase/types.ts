@@ -323,6 +323,7 @@ export type Database = {
           created_at: string | null
           id: string
           nome_arquivo: string
+          processado: boolean | null
           tipo: string
           uploaded_by: string | null
           url_arquivo: string
@@ -333,6 +334,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           nome_arquivo: string
+          processado?: boolean | null
           tipo: string
           uploaded_by?: string | null
           url_arquivo: string
@@ -343,6 +345,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           nome_arquivo?: string
+          processado?: boolean | null
           tipo?: string
           uploaded_by?: string | null
           url_arquivo?: string
