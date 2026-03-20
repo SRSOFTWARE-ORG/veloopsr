@@ -20,11 +20,17 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
 
-    // Download the PDF and convert to base64
+    // Download the PDF and convert to base64 (chunked to avoid stack overflow)
     const pdfResponse = await fetch(pdf_url);
     if (!pdfResponse.ok) throw new Error("Erro ao baixar PDF");
     const pdfBuffer = await pdfResponse.arrayBuffer();
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+    const bytes = new Uint8Array(pdfBuffer);
+    let binary = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const pdfBase64 = btoa(binary);
     const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
