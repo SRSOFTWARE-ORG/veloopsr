@@ -29,6 +29,7 @@ export interface Produto {
   codigo_barras: string | null;
   categoria: string | null;
   subcategoria: string | null;
+  imagem_url: string | null;
 }
 
 export interface ProductFormData {
@@ -69,6 +70,7 @@ const ProdutosPage = () => {
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null);
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [selectedCategoria, setSelectedCategoria] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchProdutos();
@@ -116,6 +118,21 @@ const ProdutosPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let imagem_url = editingProduct?.imagem_url || null;
+
+    // Upload image if selected
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("produto_imagens")
+        .upload(path, imageFile, { upsert: true });
+      if (upErr) { toast.error("Erro ao enviar imagem"); return; }
+      const { data: urlData } = supabase.storage.from("produto_imagens").getPublicUrl(path);
+      imagem_url = urlData.publicUrl;
+    }
+
     const payload = {
       nome: form.nome.trim(),
       preco_custo: parseFloat(form.preco_custo) || 0,
@@ -130,6 +147,7 @@ const ProdutosPage = () => {
       categoria: form.categoria.trim() || null,
       subcategoria: form.subcategoria.trim() || null,
       atualizado_por: user?.id,
+      imagem_url,
     };
 
     if (editingProduct) {
@@ -144,6 +162,7 @@ const ProdutosPage = () => {
 
     setDialogOpen(false);
     resetForm();
+    setImageFile(null);
     fetchProdutos();
   };
 
@@ -193,7 +212,15 @@ const ProdutosPage = () => {
               <DialogHeader>
                 <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
               </DialogHeader>
-              <ProductForm form={form} setForm={setForm} onSubmit={handleSubmit} isEditing={!!editingProduct} />
+              <ProductForm
+                form={form}
+                setForm={setForm}
+                onSubmit={handleSubmit}
+                isEditing={!!editingProduct}
+                imageFile={imageFile}
+                setImageFile={setImageFile}
+                currentImageUrl={editingProduct?.imagem_url}
+              />
             </DialogContent>
           </Dialog>
         )}
