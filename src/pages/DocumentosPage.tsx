@@ -34,6 +34,7 @@ interface Documento {
 const tipoLabels: Record<string, string> = {
   nota_fiscal: "Nota Fiscal",
   carne: "Carnê",
+  boleto: "Boleto",
   contrato: "Contrato",
   recibo_garantia: "Recibo Garantia",
   outro: "Outro",
@@ -58,6 +59,7 @@ const detectTipoFromFileName = (fileName: string): string => {
   const upper = fileName.toUpperCase();
   if (upper.startsWith("NOTA") || upper.includes("NOTA FISCAL")) return "nota_fiscal";
   if (upper.startsWith("CARN") || upper.includes("CARNÊ") || upper.includes("CARNE")) return "carne";
+  if (upper.startsWith("BOLETO") || upper.includes("BOLETO")) return "boleto";
   if (upper.startsWith("CONTRATO") || upper.includes("CONTRATO")) return "contrato";
   if (upper.startsWith("RECIBO") || upper.includes("GARANTIA")) return "recibo_garantia";
   return "outro";
@@ -71,6 +73,7 @@ const DocumentosPage = () => {
   const [uploading, setUploading] = useState(false);
   const [viewDoc, setViewDoc] = useState<Documento | null>(null);
   const [scanningCarnes, setScanningCarnes] = useState(false);
+  const [scanningBoletos, setScanningBoletos] = useState(false);
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
