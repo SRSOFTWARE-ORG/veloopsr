@@ -31,33 +31,29 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um assistente especializado em extrair dados de documentos brasileiros (RG, CPF, CNH, comprovante de endereço, etc.) a partir de fotos.
-Analise a imagem e extraia todos os dados que conseguir identificar.
-Responda APENAS com um JSON válido com os seguintes campos (use string vazia "" para campos não encontrados):
-{
-  "nome": "",
-  "cpf": "",
-  "rg": "",
-  "rg_emissor": "",
-  "rg_data_emissao": "",
-  "data_nascimento": "",
-  "naturalidade": "",
-  "nome_pai": "",
-  "nome_mae": "",
-  "endereco": "",
-  "bairro": "",
-  "cidade": "",
-  "uf": "",
-  "cep": "",
-  "estado_civil": ""
-}
-Para datas use formato YYYY-MM-DD. Para CPF use formato 000.000.000-00.
-Extraia o máximo de informações possível da imagem.`
+            content: `Você é um assistente especializado em extrair TODOS os dados visíveis de documentos, fichas cadastrais e formulários brasileiros a partir de fotos.
+Analise a imagem com extremo cuidado e extraia ABSOLUTAMENTE TODOS os dados que conseguir identificar, incluindo:
+- Nome completo
+- CPF ou CNPJ (formato 000.000.000-00 ou 00.000.000/0001-00)
+- Telefone/Celular (formato (00) 00000-0000)
+- RG, emissor e data de emissão
+- Data de nascimento (formato YYYY-MM-DD)
+- Endereço completo (rua, número, CEP, bairro, cidade, UF)
+- Naturalidade
+- Estado civil
+- Nome do pai e da mãe
+- Tipo de pessoa (fisica ou juridica)
+- Inscrição estadual
+- E-mail
+- Qualquer outro dado visível
+
+IMPORTANTE: Não deixe NENHUM campo em branco se a informação estiver visível na imagem. Leia números de telefone com atenção, incluindo DDD.
+Para datas use formato YYYY-MM-DD. Para CPF use formato 000.000.000-00. Para telefone use formato (00) 00000-0000.`
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia os dados do cliente desta imagem de documento:" },
+              { type: "text", text: "Extraia TODOS os dados do cliente desta imagem. Preste atenção especial em números de telefone/celular, CPF e endereço. Não deixe nenhum campo em branco se a informação estiver visível." },
               { type: "image_url", image_url: { url: image } },
             ],
           },
@@ -71,21 +67,26 @@ Extraia o máximo de informações possível da imagem.`
               parameters: {
                 type: "object",
                 properties: {
-                  nome: { type: "string" },
-                  cpf: { type: "string" },
-                  rg: { type: "string" },
-                  rg_emissor: { type: "string" },
-                  rg_data_emissao: { type: "string" },
-                  data_nascimento: { type: "string" },
-                  naturalidade: { type: "string" },
-                  nome_pai: { type: "string" },
-                  nome_mae: { type: "string" },
-                  endereco: { type: "string" },
-                  bairro: { type: "string" },
-                  cidade: { type: "string" },
-                  uf: { type: "string" },
-                  cep: { type: "string" },
-                  estado_civil: { type: "string" },
+                  nome: { type: "string", description: "Nome completo do cliente" },
+                  cpf: { type: "string", description: "CPF ou CNPJ, formato 000.000.000-00" },
+                  telefone: { type: "string", description: "Telefone ou celular, formato (00) 00000-0000" },
+                  email: { type: "string", description: "E-mail do cliente" },
+                  rg: { type: "string", description: "Número do RG" },
+                  rg_emissor: { type: "string", description: "Órgão emissor do RG" },
+                  rg_data_emissao: { type: "string", description: "Data de emissão do RG, formato YYYY-MM-DD" },
+                  data_nascimento: { type: "string", description: "Data de nascimento, formato YYYY-MM-DD" },
+                  naturalidade: { type: "string", description: "Naturalidade" },
+                  nome_pai: { type: "string", description: "Nome do pai" },
+                  nome_mae: { type: "string", description: "Nome da mãe" },
+                  endereco: { type: "string", description: "Endereço completo (rua, número)" },
+                  complemento: { type: "string", description: "Complemento do endereço" },
+                  bairro: { type: "string", description: "Bairro" },
+                  cidade: { type: "string", description: "Cidade" },
+                  uf: { type: "string", description: "Estado (UF), 2 letras" },
+                  cep: { type: "string", description: "CEP, formato 00000-000" },
+                  estado_civil: { type: "string", description: "Estado civil: solteiro, casado, divorciado, viuvo ou outro" },
+                  tipo: { type: "string", description: "Tipo: fisica ou juridica" },
+                  inscricao_estadual: { type: "string", description: "Inscrição estadual" },
                 },
                 required: ["nome"],
               },
