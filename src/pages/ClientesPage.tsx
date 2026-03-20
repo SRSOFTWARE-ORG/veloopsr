@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +81,33 @@ const ClientesPage = () => {
   const [editing, setEditing] = useState<Cliente | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [showExtra, setShowExtra] = useState(false);
+  const [loadingCep, setLoadingCep] = useState(false);
+
+  const fetchCep = async (cep: string) => {
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    setLoadingCep(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      const data = await res.json();
+      if (data.erro) {
+        toast.error("CEP não encontrado");
+        return;
+      }
+      setForm((prev) => ({
+        ...prev,
+        endereco: data.logradouro || prev.endereco,
+        bairro: data.bairro || prev.bairro,
+        cidade: data.localidade || prev.cidade,
+        uf: data.uf || prev.uf,
+      }));
+      toast.success("Endereço preenchido automaticamente");
+    } catch {
+      toast.error("Erro ao buscar CEP");
+    } finally {
+      setLoadingCep(false);
+    }
+  };
 
   useEffect(() => {
     fetchClientes();
@@ -282,7 +309,20 @@ const ClientesPage = () => {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>CEP</Label>
-                        <Input placeholder="00000-000" value={form.cep} onChange={(e) => set("cep", e.target.value)} />
+                        <div className="relative">
+                          <Input
+                            placeholder="00000-000"
+                            value={form.cep}
+                            onChange={(e) => {
+                              set("cep", e.target.value);
+                              const clean = e.target.value.replace(/\D/g, "");
+                              if (clean.length === 8) fetchCep(clean);
+                            }}
+                          />
+                          {loadingCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
                       </div>
                       <div className="col-span-2 space-y-2">
                         <Label>Endereço</Label>
