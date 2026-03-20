@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -17,6 +18,7 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/vendas", icon: ShoppingCart, label: "Vendas" },
   { to: "/produtos", icon: Package, label: "Produtos" },
+  { to: "/clientes", icon: Users, label: "Clientes" },
   { to: "/documentos", icon: FileText, label: "Documentos" },
   { to: "/seguranca", icon: Shield, label: "Segurança" },
 ];

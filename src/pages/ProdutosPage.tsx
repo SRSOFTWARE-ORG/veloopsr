@@ -23,6 +23,7 @@ interface Produto {
   estoque_minimo: number;
   codigo_barras: string | null;
   categoria: string | null;
+  subcategoria: string | null;
 }
 
 const ProdutosPage = () => {
@@ -39,6 +40,7 @@ const ProdutosPage = () => {
     estoque_minimo: "5",
     codigo_barras: "",
     categoria: "",
+    subcategoria: "",
   });
 
   useEffect(() => {
@@ -58,7 +60,7 @@ const ProdutosPage = () => {
   );
 
   const resetForm = () => {
-    setForm({ nome: "", preco_custo: "", preco_venda: "", estoque_atual: "", estoque_minimo: "5", codigo_barras: "", categoria: "" });
+    setForm({ nome: "", preco_custo: "", preco_venda: "", estoque_atual: "", estoque_minimo: "5", codigo_barras: "", categoria: "", subcategoria: "" });
     setEditingProduct(null);
   };
 
@@ -72,6 +74,7 @@ const ProdutosPage = () => {
       estoque_minimo: p.estoque_minimo.toString(),
       codigo_barras: p.codigo_barras || "",
       categoria: p.categoria || "",
+      subcategoria: p.subcategoria || "",
     });
     setDialogOpen(true);
   };
@@ -86,6 +89,7 @@ const ProdutosPage = () => {
       estoque_minimo: parseInt(form.estoque_minimo) || 5,
       codigo_barras: form.codigo_barras.trim() || null,
       categoria: form.categoria.trim() || null,
+      subcategoria: form.subcategoria.trim() || null,
       atualizado_por: user?.id,
     };
 
@@ -160,6 +164,7 @@ const ProdutosPage = () => {
               </div>
               <Input placeholder="Código de barras" value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} />
               <Input placeholder="Categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
+              <Input placeholder="Subcategoria" value={form.subcategoria} onChange={(e) => setForm({ ...form, subcategoria: e.target.value })} />
               <Button type="submit" className="w-full">{editingProduct ? "Salvar" : "Cadastrar"}</Button>
             </form>
           </DialogContent>
