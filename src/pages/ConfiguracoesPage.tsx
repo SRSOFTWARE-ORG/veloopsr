@@ -58,7 +58,7 @@ const ConfiguracoesPage = () => {
     setUsers(merged);
   };
 
-  const updateRole = async (userId: string, newRole: string) => {
+  const updateRole = async (userId: string, newRole: "admin" | "vendedor") => {
     await supabase.from("user_roles").update({ role: newRole }).eq("user_id", userId);
     toast.success("Cargo atualizado!");
     fetchUsers();
