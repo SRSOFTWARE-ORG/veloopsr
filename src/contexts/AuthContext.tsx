@@ -70,6 +70,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // If user chose not to stay logged in, clear session on tab close
+    const handleBeforeUnload = () => {
+      const manterLogado = localStorage.getItem("veloop_manter_logado");
+      if (manterLogado !== "true" && session) {
+        supabase.auth.signOut();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
@@ -94,7 +104,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   const signOut = async () => {
