@@ -344,6 +344,9 @@ const DocumentosPage = () => {
                 <p className="font-semibold text-sm truncate">{d.nome_arquivo}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs bg-secondary px-1.5 py-0.5 rounded">{tipoLabels[d.tipo] || d.tipo}</span>
+                  {d.tipo === "carne" && d.processado && (
+                    <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">✓ Processado</span>
+                  )}
                   {d.cliente_nome && <span className="text-xs text-muted-foreground">{d.cliente_nome}</span>}
                   <span className="text-xs text-muted-foreground">
                     {new Date(d.created_at).toLocaleDateString("pt-BR")}
