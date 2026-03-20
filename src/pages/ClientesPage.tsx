@@ -128,6 +128,7 @@ const ClientesPage = () => {
         estado_civil: extracted.estado_civil || prev.estado_civil,
         tipo: extracted.tipo || prev.tipo,
         inscricao_estadual: extracted.inscricao_estadual || prev.inscricao_estadual,
+        observacoes: extracted.observacoes || prev.observacoes,
       }));
       setShowExtra(true);
       toast.success("Dados extraídos da foto com sucesso!");
