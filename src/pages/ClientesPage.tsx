@@ -134,6 +134,8 @@ const ClientesPage = () => {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const fetchCep = async (cep: string) => {
     const clean = cep.replace(/\D/g, "");
     if (clean.length !== 8) return;
     setLoadingCep(true);
