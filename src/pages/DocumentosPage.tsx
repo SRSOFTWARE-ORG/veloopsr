@@ -34,6 +34,7 @@ interface Documento {
 const tipoLabels: Record<string, string> = {
   nota_fiscal: "Nota Fiscal",
   carne: "Carnê",
+  boleto: "Boleto",
   contrato: "Contrato",
   recibo_garantia: "Recibo Garantia",
   outro: "Outro",
@@ -58,6 +59,7 @@ const detectTipoFromFileName = (fileName: string): string => {
   const upper = fileName.toUpperCase();
   if (upper.startsWith("NOTA") || upper.includes("NOTA FISCAL")) return "nota_fiscal";
   if (upper.startsWith("CARN") || upper.includes("CARNÊ") || upper.includes("CARNE")) return "carne";
+  if (upper.startsWith("BOLETO") || upper.includes("BOLETO")) return "boleto";
   if (upper.startsWith("CONTRATO") || upper.includes("CONTRATO")) return "contrato";
   if (upper.startsWith("RECIBO") || upper.includes("GARANTIA")) return "recibo_garantia";
   return "outro";
@@ -71,6 +73,7 @@ const DocumentosPage = () => {
   const [uploading, setUploading] = useState(false);
   const [viewDoc, setViewDoc] = useState<Documento | null>(null);
   const [scanningCarnes, setScanningCarnes] = useState(false);
+  const [scanningBoletos, setScanningBoletos] = useState(false);
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
@@ -235,6 +238,69 @@ const DocumentosPage = () => {
     fetchDocumentos();
   };
 
+  const scanBoletoAndCreateCobranca = async (docId: string, pdfUrl: string, nomeArquivo: string) => {
+    try {
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-boleto", {
+        body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
+      });
+
+      if (scanError) throw scanError;
+      if (scanResult?.error) throw new Error(scanResult.error);
+
+      const extracted = scanResult?.data;
+      if (!extracted?.cliente_nome || !extracted?.data_vencimento) throw new Error("Dados insuficientes");
+
+      const clienteNome = extracted.cliente_nome;
+      const dataVencimento = extracted.data_vencimento;
+
+      // Find or skip client
+      const { data: existingCliente } = await supabase
+        .from("clientes")
+        .select("id")
+        .ilike("nome", `%${clienteNome}%`)
+        .limit(1);
+
+      if (existingCliente?.[0]?.id) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: existingCliente[0].id,
+          cliente_nome: clienteNome,
+          valor_parcela: extracted.valor || 0,
+          data_inicio: dataVencimento,
+          data_fim: dataVencimento,
+          frequencia: "mes",
+          criado_por: user!.id,
+          observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+        });
+      } else {
+        // Create client first, then cobrança
+        const { data: newCliente } = await supabase.from("clientes").insert({
+          nome: clienteNome,
+          cpf: extracted.cliente_cpf || null,
+          criado_por: user!.id,
+        }).select("id").single();
+
+        if (newCliente?.id) {
+          await supabase.from("cobrancas").insert({
+            cliente_id: newCliente.id,
+            cliente_nome: clienteNome,
+            valor_parcela: extracted.valor || 0,
+            data_inicio: dataVencimento,
+            data_fim: dataVencimento,
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+          });
+        }
+      }
+
+      await supabase.from("documentos").update({ processado: true } as any).eq("id", docId);
+      return true;
+    } catch (err) {
+      console.error(`Erro ao escanear boleto ${nomeArquivo}:`, err);
+      return false;
+    }
+  };
+
   const handleScanAllCarnes = async () => {
     const carnes = documentos.filter((d) => d.tipo === "carne" && !d.processado);
     if (carnes.length === 0) {
@@ -263,6 +329,34 @@ const DocumentosPage = () => {
     fetchDocumentos();
   };
 
+  const handleScanAllBoletos = async () => {
+    const boletos = documentos.filter((d) => d.tipo === "boleto" && !d.processado);
+    if (boletos.length === 0) {
+      toast.info("Todos os boletos já foram processados!");
+      return;
+    }
+
+    if (!confirm(`Escanear ${boletos.length} boleto(s) pendente(s) e lançar na agenda?`)) return;
+
+    setScanningBoletos(true);
+    setScanProgress({ current: 0, total: boletos.length });
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < boletos.length; i++) {
+      const boleto = boletos[i];
+      setScanProgress({ current: i + 1, total: boletos.length });
+      const ok = await scanBoletoAndCreateCobranca(boleto.id, boleto.url_arquivo, boleto.nome_arquivo);
+      if (ok) successCount++;
+      else errorCount++;
+    }
+
+    setScanningBoletos(false);
+    if (successCount > 0) toast.success(`${successCount} boleto(s) lançado(s) na agenda!`);
+    if (errorCount > 0) toast.error(`${errorCount} boleto(s) com erro no processamento`);
+    fetchDocumentos();
+  };
+
   const filtered = documentos.filter((d) => {
     const matchSearch = d.nome_arquivo.toLowerCase().includes(search.toLowerCase()) ||
       d.cliente_nome?.toLowerCase().includes(search.toLowerCase());
@@ -286,8 +380,26 @@ const DocumentosPage = () => {
             <Button
               size="sm"
               variant="outline"
+              onClick={handleScanAllBoletos}
+              disabled={scanningBoletos || scanningCarnes}
+              className="gap-1"
+            >
+              {scanningBoletos ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ScanLine className="w-4 h-4" />
+              )}
+              {scanningBoletos
+                ? `${scanProgress.current}/${scanProgress.total}`
+                : "Escanear Boletos"}
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleScanAllCarnes}
-              disabled={scanningCarnes}
+              disabled={scanningCarnes || scanningBoletos}
               className="gap-1"
             >
               {scanningCarnes ? (
@@ -326,6 +438,7 @@ const DocumentosPage = () => {
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="nota_fiscal">Notas Fiscais</SelectItem>
             <SelectItem value="carne">Carnês</SelectItem>
+            <SelectItem value="boleto">Boletos</SelectItem>
             <SelectItem value="contrato">Contratos</SelectItem>
             <SelectItem value="recibo_garantia">Recibos</SelectItem>
             <SelectItem value="outro">Outros</SelectItem>
