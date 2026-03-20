@@ -164,6 +164,7 @@ const DocumentosPage = () => {
     let successCount = 0;
     let errorCount = 0;
     const carnesToScan: { id: string; url: string; nome: string }[] = [];
+    const boletosToScan: { id: string; url: string; nome: string }[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -194,9 +195,11 @@ const DocumentosPage = () => {
 
       successCount++;
 
-      // Queue carnês for automatic scanning
       if (tipo === "carne" && docData?.id) {
         carnesToScan.push({ id: docData.id, url: urlData.publicUrl, nome: file.name });
+      }
+      if (tipo === "boleto" && docData?.id) {
+        boletosToScan.push({ id: docData.id, url: urlData.publicUrl, nome: file.name });
       }
     }
 
@@ -225,8 +228,30 @@ const DocumentosPage = () => {
       setScanningCarnes(false);
       if (scanOk > 0) toast.success(`${scanOk} venda(s) criada(s) a partir dos carnês!`);
       if (scanFail > 0) toast.error(`${scanFail} carnê(s) não puderam ser processados`);
-      return;
     }
+
+    // Auto-scan boletos
+    if (boletosToScan.length > 0) {
+      setUploading(false);
+      setScanningBoletos(true);
+      setScanProgress({ current: 0, total: boletosToScan.length });
+      toast.info(`Escaneando ${boletosToScan.length} boleto(s) automaticamente...`);
+
+      let scanOk = 0;
+      let scanFail = 0;
+      for (let i = 0; i < boletosToScan.length; i++) {
+        setScanProgress({ current: i + 1, total: boletosToScan.length });
+        const ok = await scanBoletoAndCreateCobranca(boletosToScan[i].id, boletosToScan[i].url, boletosToScan[i].nome);
+        if (ok) scanOk++;
+        else scanFail++;
+      }
+
+      setScanningBoletos(false);
+      if (scanOk > 0) toast.success(`${scanOk} boleto(s) lançado(s) na agenda!`);
+      if (scanFail > 0) toast.error(`${scanFail} boleto(s) com erro no processamento`);
+    }
+
+    if (carnesToScan.length > 0 || boletosToScan.length > 0) return;
 
     setUploading(false);
   };
