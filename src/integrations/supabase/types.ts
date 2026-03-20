@@ -396,6 +396,7 @@ export type Database = {
           estoque_atual: number | null
           estoque_minimo: number | null
           id: string
+          imagem_url: string | null
           nome: string
           preco_boleto: number | null
           preco_carne: number | null
@@ -414,6 +415,7 @@ export type Database = {
           estoque_atual?: number | null
           estoque_minimo?: number | null
           id?: string
+          imagem_url?: string | null
           nome: string
           preco_boleto?: number | null
           preco_carne?: number | null
@@ -432,6 +434,7 @@ export type Database = {
           estoque_atual?: number | null
           estoque_minimo?: number | null
           id?: string
+          imagem_url?: string | null
           nome?: string
           preco_boleto?: number | null
           preco_carne?: number | null
