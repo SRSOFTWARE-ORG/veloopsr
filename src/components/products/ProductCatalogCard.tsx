@@ -88,6 +88,20 @@ const ProductCatalogCard = ({ produto: p, index, isAdmin, onEdit, onDelete, onAd
             R$ {Number(p.preco_venda).toFixed(2)}
           </span>
         </div>
+        {(p.preco_pix || p.preco_credito) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+            {p.preco_pix && (
+              <span className="text-[10px] text-green-600 font-medium">
+                Pix R$ {Number(p.preco_pix).toFixed(2)}
+              </span>
+            )}
+            {p.preco_credito && (
+              <span className="text-[10px] text-muted-foreground">
+                Créd R$ {Number(p.preco_credito).toFixed(2)}
+              </span>
+            )}
+          </div>
+        )}
         {isAdmin && margin && (
           <span className="text-[10px] text-muted-foreground">
             margem {margin}%
