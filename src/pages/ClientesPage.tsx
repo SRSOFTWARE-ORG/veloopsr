@@ -110,6 +110,8 @@ const ClientesPage = () => {
         ...prev,
         nome: extracted.nome || prev.nome,
         cpf: extracted.cpf || prev.cpf,
+        telefone: extracted.telefone || prev.telefone,
+        email: extracted.email || prev.email,
         rg: extracted.rg || prev.rg,
         rg_emissor: extracted.rg_emissor || prev.rg_emissor,
         rg_data_emissao: extracted.rg_data_emissao || prev.rg_data_emissao,
@@ -118,11 +120,14 @@ const ClientesPage = () => {
         nome_pai: extracted.nome_pai || prev.nome_pai,
         nome_mae: extracted.nome_mae || prev.nome_mae,
         endereco: extracted.endereco || prev.endereco,
+        complemento: extracted.complemento || prev.complemento,
         bairro: extracted.bairro || prev.bairro,
         cidade: extracted.cidade || prev.cidade,
         uf: extracted.uf || prev.uf,
         cep: extracted.cep || prev.cep,
         estado_civil: extracted.estado_civil || prev.estado_civil,
+        tipo: extracted.tipo || prev.tipo,
+        inscricao_estadual: extracted.inscricao_estadual || prev.inscricao_estadual,
       }));
       setShowExtra(true);
       toast.success("Dados extraídos da foto com sucesso!");
