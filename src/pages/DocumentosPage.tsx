@@ -77,36 +77,68 @@ const DocumentosPage = () => {
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
-    fetchDocumentos();
+    fetchDocumentos().then(() => {
+      autoScanPending();
+    });
   }, []);
 
   const autoScanPending = async () => {
-    const { data } = await supabase
+    // Scan pending carnês
+    const { data: carnesData } = await supabase
       .from("documentos")
       .select("*")
       .eq("tipo", "carne")
       .eq("processado", false)
       .order("created_at", { ascending: true });
 
-    const carnes = (data || []) as Documento[];
-    if (carnes.length === 0) return;
+    const carnes = (carnesData || []) as Documento[];
+    if (carnes.length > 0) {
+      setScanningCarnes(true);
+      setScanProgress({ current: 0, total: carnes.length });
+      toast.info(`Escaneando ${carnes.length} carnê(s) pendente(s)...`);
 
-    setScanningCarnes(true);
-    setScanProgress({ current: 0, total: carnes.length });
-    toast.info(`Escaneando ${carnes.length} carnê(s) pendente(s)...`);
+      let scanOk = 0;
+      let scanFail = 0;
+      for (let i = 0; i < carnes.length; i++) {
+        setScanProgress({ current: i + 1, total: carnes.length });
+        const ok = await scanCarneAndCreateVenda(carnes[i].id, carnes[i].url_arquivo, carnes[i].nome_arquivo);
+        if (ok) scanOk++;
+        else scanFail++;
+      }
 
-    let scanOk = 0;
-    let scanFail = 0;
-    for (let i = 0; i < carnes.length; i++) {
-      setScanProgress({ current: i + 1, total: carnes.length });
-      const ok = await scanCarneAndCreateVenda(carnes[i].id, carnes[i].url_arquivo, carnes[i].nome_arquivo);
-      if (ok) scanOk++;
-      else scanFail++;
+      setScanningCarnes(false);
+      if (scanOk > 0) toast.success(`${scanOk} carnê(s) processado(s)!`);
+      if (scanFail > 0) toast.error(`${scanFail} carnê(s) com erro`);
     }
 
-    setScanningCarnes(false);
-    if (scanOk > 0) toast.success(`${scanOk} carnê(s) processado(s) automaticamente!`);
-    if (scanFail > 0) toast.error(`${scanFail} carnê(s) com erro`);
+    // Scan pending boletos
+    const { data: boletosData } = await supabase
+      .from("documentos")
+      .select("*")
+      .eq("tipo", "boleto")
+      .eq("processado", false)
+      .order("created_at", { ascending: true });
+
+    const boletos = (boletosData || []) as Documento[];
+    if (boletos.length > 0) {
+      setScanningBoletos(true);
+      setScanProgress({ current: 0, total: boletos.length });
+      toast.info(`Escaneando ${boletos.length} boleto(s) pendente(s)...`);
+
+      let scanOk = 0;
+      let scanFail = 0;
+      for (let i = 0; i < boletos.length; i++) {
+        setScanProgress({ current: i + 1, total: boletos.length });
+        const ok = await scanBoletoAndCreateCobranca(boletos[i].id, boletos[i].url_arquivo, boletos[i].nome_arquivo);
+        if (ok) scanOk++;
+        else scanFail++;
+      }
+
+      setScanningBoletos(false);
+      if (scanOk > 0) toast.success(`${scanOk} boleto(s) lançado(s) na agenda!`);
+      if (scanFail > 0) toast.error(`${scanFail} boleto(s) com erro`);
+    }
+
     fetchDocumentos();
   };
 
