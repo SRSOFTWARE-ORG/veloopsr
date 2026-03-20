@@ -132,6 +132,108 @@ const DocumentosPage = () => {
     fetchDocumentos();
   };
 
+  const handleScanAllCarnes = async () => {
+    const carnes = documentos.filter((d) => d.tipo === "carne");
+    if (carnes.length === 0) {
+      toast.error("Nenhum carnê encontrado para escanear");
+      return;
+    }
+
+    if (!confirm(`Escanear ${carnes.length} carnê(s) e criar vendas + cobranças na agenda?`)) return;
+
+    setScanningCarnes(true);
+    setScanProgress({ current: 0, total: carnes.length });
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < carnes.length; i++) {
+      const carne = carnes[i];
+      setScanProgress({ current: i + 1, total: carnes.length });
+
+      try {
+        // Call AI to extract data from carnê
+        const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-carne", {
+          body: { pdf_url: carne.url_arquivo, nome_arquivo: carne.nome_arquivo },
+        });
+
+        if (scanError) throw scanError;
+        if (scanResult?.error) throw new Error(scanResult.error);
+
+        const extracted = scanResult?.data;
+        if (!extracted?.cliente_nome) throw new Error("Dados insuficientes extraídos");
+
+        // Find or use client name from extraction
+        const clienteNome = extracted.cliente_nome;
+        
+        // Look for existing client
+        const { data: existingCliente } = await supabase
+          .from("clientes")
+          .select("id")
+          .ilike("nome", `%${clienteNome}%`)
+          .limit(1);
+
+        const clienteId = existingCliente?.[0]?.id;
+
+        // Calculate end date based on parcelas and frequency
+        const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
+        let endDate = startDate;
+        const numParcelas = extracted.num_parcelas || 1;
+        const freq = extracted.frequencia || "mes";
+        
+        // Calculate end date
+        const start = new Date(startDate + "T00:00:00");
+        let end = new Date(start);
+        for (let p = 1; p < numParcelas; p++) {
+          if (freq === "semana") end.setDate(end.getDate() + 7);
+          else if (freq === "quinzena") end.setDate(end.getDate() + 15);
+          else end.setMonth(end.getMonth() + 1);
+        }
+        endDate = end.toISOString().split("T")[0];
+
+        // Create venda record (as admin)
+        const { data: vendaData, error: vendaError } = await supabase.from("vendas").insert({
+          cliente_nome: clienteNome,
+          cliente_cpf: extracted.cliente_cpf || null,
+          cliente_telefone: extracted.cliente_telefone || null,
+          valor_total: extracted.valor_total || 0,
+          valor_entrada: extracted.valor_entrada || 0,
+          num_parcelas: numParcelas,
+          valor_parcela: extracted.valor_parcela || 0,
+          vendedor_id: user!.id,
+          forma_pagamento: "parcelado",
+          frequencia_parcela: freq,
+          data_inicio_pagamento: startDate,
+          status: "concluida",
+        }).select("id").single();
+
+        if (vendaError) throw vendaError;
+
+        // Create cobrança if we have a client ID
+        if (clienteId) {
+          await supabase.from("cobrancas").insert({
+            cliente_id: clienteId,
+            cliente_nome: clienteNome,
+            valor_parcela: extracted.valor_parcela || 0,
+            data_inicio: startDate,
+            data_fim: endDate,
+            frequencia: freq,
+            criado_por: user!.id,
+            observacoes: `Importado do carnê: ${carne.nome_arquivo}`,
+          });
+        }
+
+        successCount++;
+      } catch (err: any) {
+        console.error(`Erro ao escanear ${carne.nome_arquivo}:`, err);
+        errorCount++;
+      }
+    }
+
+    setScanningCarnes(false);
+    if (successCount > 0) toast.success(`${successCount} carnê(s) processado(s) com sucesso!`);
+    if (errorCount > 0) toast.error(`${errorCount} carnê(s) com erro no processamento`);
+  };
+
   const filtered = documentos.filter((d) => {
     const matchSearch = d.nome_arquivo.toLowerCase().includes(search.toLowerCase()) ||
       d.cliente_nome?.toLowerCase().includes(search.toLowerCase());
