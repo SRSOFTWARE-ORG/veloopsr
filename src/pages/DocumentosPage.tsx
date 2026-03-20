@@ -280,6 +280,7 @@ const DocumentosPage = () => {
           </Button>
           <input type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple />
         </label>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4 slide-up delay-1">
