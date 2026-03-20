@@ -23,7 +23,13 @@ serve(async (req) => {
     const fileResponse = await fetch(pdf_url);
     if (!fileResponse.ok) throw new Error("Erro ao baixar arquivo");
     const fileBuffer = await fileResponse.arrayBuffer();
-    const fileBase64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+    const bytes = new Uint8Array(fileBuffer);
+    let binary = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const fileBase64 = btoa(binary);
     
     const isPdf = nome_arquivo.toLowerCase().endsWith(".pdf");
     const mimeType = isPdf ? "application/pdf" : "image/jpeg";
