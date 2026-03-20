@@ -289,6 +289,36 @@ const ClientesPage = () => {
             <DialogHeader>
               <DialogTitle>{editing ? "Editar Cliente" : "Cadastro de Cliente"}</DialogTitle>
             </DialogHeader>
+            
+            {/* Scan document button */}
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleScanDocument(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={scanning}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {scanning ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+                {scanning ? "Escaneando documento..." : "Escanear documento com foto"}
+              </Button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Required fields */}
               <div className="space-y-3">
