@@ -31,6 +31,21 @@ const tipoLabels: Record<string, string> = {
   outro: "Outro",
 };
 
+const buildSafeStorageKey = (file: File, index: number) => {
+  const normalizedName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const extension = normalizedName.includes(".") ? normalizedName.split(".").pop()?.toLowerCase() ?? "" : "";
+  const baseName = normalizedName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9-_ ]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .toLowerCase();
+
+  const safeBaseName = baseName || "documento";
+  return `${Date.now()}_${index}_${safeBaseName}${extension ? `.${extension}` : ""}`;
+};
+
 const DocumentosPage = () => {
   const { isAdmin, user } = useAuth();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
@@ -57,7 +72,7 @@ const DocumentosPage = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const fileName = `${Date.now()}_${i}_${file.name}`;
+      const fileName = buildSafeStorageKey(file, i);
       const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
 
       if (uploadError) {
@@ -68,12 +83,19 @@ const DocumentosPage = () => {
 
       const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
 
-      await supabase.from("documentos").insert({
+      const { error: insertError } = await supabase.from("documentos").insert({
         tipo: "outro",
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
       });
+
+      if (insertError) {
+        console.error("Document insert error:", insertError.message);
+        errorCount++;
+        continue;
+      }
+
       successCount++;
     }
 
