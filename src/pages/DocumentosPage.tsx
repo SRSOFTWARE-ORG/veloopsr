@@ -48,29 +48,36 @@ const DocumentosPage = () => {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setUploading(true);
-    const fileName = `${Date.now()}_${file.name}`;
-    const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
+    let successCount = 0;
+    let errorCount = 0;
 
-    if (uploadError) {
-      toast.error("Erro no upload");
-      setUploading(false);
-      return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = `${Date.now()}_${i}_${file.name}`;
+      const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
+
+      if (uploadError) {
+        errorCount++;
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
+
+      await supabase.from("documentos").insert({
+        tipo: "outro",
+        nome_arquivo: file.name,
+        url_arquivo: urlData.publicUrl,
+        uploaded_by: user?.id,
+      });
+      successCount++;
     }
 
-    const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
-
-    await supabase.from("documentos").insert({
-      tipo: "outro",
-      nome_arquivo: file.name,
-      url_arquivo: urlData.publicUrl,
-      uploaded_by: user?.id,
-    });
-
-    toast.success("Documento enviado!");
+    if (successCount > 0) toast.success(`${successCount} arquivo(s) enviado(s)!`);
+    if (errorCount > 0) toast.error(`${errorCount} arquivo(s) com erro`);
     setUploading(false);
     fetchDocumentos();
     e.target.value = "";
@@ -104,7 +111,7 @@ const DocumentosPage = () => {
               {uploading ? "Enviando..." : "Upload"}
             </span>
           </Button>
-          <input type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+          <input type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple />
         </label>
       </div>
 
