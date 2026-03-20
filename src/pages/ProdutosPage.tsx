@@ -61,17 +61,6 @@ const emptyForm: ProductFormData = {
   subcategoria: "",
 };
 
-const emptyForm: ProductFormData = {
-  nome: "",
-  preco_custo: "",
-  preco_venda: "",
-  estoque_atual: "",
-  estoque_minimo: "5",
-  codigo_barras: "",
-  categoria: "",
-  subcategoria: "",
-};
-
 const ProdutosPage = () => {
   const { isAdmin, user } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
