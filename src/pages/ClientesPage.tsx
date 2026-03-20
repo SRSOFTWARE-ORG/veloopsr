@@ -316,8 +316,9 @@ const ClientesPage = () => {
                             placeholder="00000-000"
                             value={form.cep}
                             onChange={(e) => {
-                              set("cep", e.target.value);
-                              const clean = e.target.value.replace(/\D/g, "");
+                              const masked = maskCEP(e.target.value);
+                              set("cep", masked);
+                              const clean = masked.replace(/\D/g, "");
                               if (clean.length === 8) fetchCep(clean);
                             }}
                           />
