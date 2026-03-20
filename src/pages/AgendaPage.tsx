@@ -1,11 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import {
   CalendarDays,
@@ -16,6 +15,9 @@ import {
   Clock,
   User,
   DollarSign,
+  CheckCircle2,
+  AlertCircle,
+  Filter,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,7 +42,6 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameDay,
-  isSameMonth,
   addMonths,
   subMonths,
   addWeeks,
@@ -48,6 +49,7 @@ import {
   isAfter,
   isBefore,
   parseISO,
+  startOfDay,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -64,10 +66,21 @@ interface Cobranca {
   created_at: string;
 }
 
+interface Pagamento {
+  id: string;
+  cobranca_id: string;
+  data_vencimento: string;
+  status: string;
+  pago_por: string | null;
+  pago_em: string | null;
+}
+
 interface Cliente {
   id: string;
   nome: string;
 }
+
+type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente";
 
 function generatePaymentDates(
   dataInicio: string,
@@ -98,14 +111,44 @@ const frequenciaLabels: Record<string, string> = {
   mes: "Mensal",
 };
 
+function getPaymentStatus(
+  dateKey: string,
+  cobrancaId: string,
+  pagamentosMap: Map<string, Pagamento>
+): string {
+  const key = `${cobrancaId}_${dateKey}`;
+  const pagamento = pagamentosMap.get(key);
+  if (pagamento?.status === "pago") return "pago";
+
+  const today = startOfDay(new Date());
+  const vencimento = parseISO(dateKey);
+  if (isBefore(vencimento, today)) return "pendente";
+  return "a_pagar";
+}
+
+const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle2 }> = {
+  pago: { label: "Pago", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", icon: CheckCircle2 },
+  pendente: { label: "Pendente", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: AlertCircle },
+  a_pagar: { label: "A pagar", color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Clock },
+};
+
+const filterOptions: { value: StatusFilter; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "a_pagar", label: "A pagar" },
+  { value: "pendente", label: "Pendentes" },
+  { value: "pago", label: "Pagos" },
+];
+
 const AgendaPage = () => {
   const { user, isAdmin } = useAuth();
   const [cobrancas, setCobrancas] = useState<Cobranca[]>([]);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
 
   const [form, setForm] = useState({
     cliente_id: "",
@@ -116,33 +159,34 @@ const AgendaPage = () => {
     observacoes: "",
   });
 
-  useEffect(() => {
-    fetchCobrancas();
-    fetchClientes();
+  const fetchAll = useCallback(async () => {
+    const [cobRes, pagRes, cliRes] = await Promise.all([
+      supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
+      supabase.from("cobranca_pagamentos").select("*"),
+      supabase.from("clientes").select("id, nome").order("nome"),
+    ]);
+    if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
+    if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
+    if (cliRes.data) setClientes(cliRes.data);
   }, []);
 
-  const fetchCobrancas = async () => {
-    const { data } = await supabase
-      .from("cobrancas")
-      .select("*")
-      .order("data_inicio", { ascending: true });
-    if (data) setCobrancas(data as Cobranca[]);
-  };
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
-  const fetchClientes = async () => {
-    const { data } = await supabase
-      .from("clientes")
-      .select("id, nome")
-      .order("nome");
-    if (data) setClientes(data);
-  };
+  const pagamentosMap = useMemo(() => {
+    const map = new Map<string, Pagamento>();
+    pagamentos.forEach((p) => {
+      map.set(`${p.cobranca_id}_${p.data_vencimento}`, p);
+    });
+    return map;
+  }, [pagamentos]);
 
   const handleSave = async () => {
     if (!form.cliente_id || !form.valor_parcela || !form.data_inicio || !form.data_fim) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-
     if (parseISO(form.data_fim) <= parseISO(form.data_inicio)) {
       toast.error("A data final deve ser posterior à data inicial");
       return;
@@ -163,28 +207,64 @@ const AgendaPage = () => {
     });
 
     setSaving(false);
-
     if (error) {
       toast.error("Erro ao salvar cobrança");
     } else {
       toast.success("Cobrança agendada!");
       setForm({ cliente_id: "", valor_parcela: "", frequencia: "mes", data_inicio: "", data_fim: "", observacoes: "" });
       setDialogOpen(false);
-      fetchCobrancas();
+      fetchAll();
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem excluir cobranças");
+      return;
+    }
     const { error } = await supabase.from("cobrancas").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir cobrança");
     } else {
       toast.success("Cobrança removida");
-      fetchCobrancas();
+      fetchAll();
     }
   };
 
-  // Build a map of dates -> cobrancas for the calendar
+  const handleMarkPaid = async (cobrancaId: string, dateKey: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem marcar como pago");
+      return;
+    }
+
+    const existing = pagamentosMap.get(`${cobrancaId}_${dateKey}`);
+    if (existing) {
+      const { error } = await supabase
+        .from("cobranca_pagamentos")
+        .update({ status: "pago", pago_por: user!.id, pago_em: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (error) {
+        toast.error("Erro ao atualizar pagamento");
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("cobranca_pagamentos").insert({
+        cobranca_id: cobrancaId,
+        data_vencimento: dateKey,
+        status: "pago",
+        pago_por: user!.id,
+        pago_em: new Date().toISOString(),
+      });
+      if (error) {
+        toast.error("Erro ao registrar pagamento");
+        return;
+      }
+    }
+    toast.success("Pagamento registrado!");
+    fetchAll();
+  };
+
+  // Build date -> cobrancas map
   const dateMap = useMemo(() => {
     const map = new Map<string, Cobranca[]>();
     cobrancas.forEach((c) => {
@@ -204,16 +284,50 @@ const AgendaPage = () => {
   });
 
   const selectedDateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
-  const selectedCobrancas = selectedDateKey ? dateMap.get(selectedDateKey) || [] : [];
+  const selectedCobrancas = useMemo(() => {
+    if (!selectedDateKey) return [];
+    const items = dateMap.get(selectedDateKey) || [];
+    if (statusFilter === "todos") return items;
+    return items.filter((c) => {
+      const status = getPaymentStatus(selectedDateKey, c.id, pagamentosMap);
+      return status === statusFilter;
+    });
+  }, [selectedDateKey, dateMap, statusFilter, pagamentosMap]);
 
-  // Days with markers
-  const markedDays = useMemo(() => {
-    const set = new Set<string>();
-    dateMap.forEach((_, key) => set.add(key));
-    return set;
-  }, [dateMap]);
+  // Calendar day status colors
+  const dayStatusMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    dateMap.forEach((cobList, key) => {
+      const statuses = new Set<string>();
+      cobList.forEach((c) => {
+        statuses.add(getPaymentStatus(key, c.id, pagamentosMap));
+      });
+      map.set(key, statuses);
+    });
+    return map;
+  }, [dateMap, pagamentosMap]);
 
   const startPadding = startOfMonth(currentMonth).getDay();
+
+  // Upcoming list with filter
+  const upcomingItems = useMemo(() => {
+    if (statusFilter === "todos") return cobrancas.slice(0, 10);
+    return cobrancas.filter((c) => {
+      const dates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
+      return dates.some((d) => {
+        const key = format(d, "yyyy-MM-dd");
+        return getPaymentStatus(key, c.id, pagamentosMap) === statusFilter;
+      });
+    }).slice(0, 10);
+  }, [cobrancas, statusFilter, pagamentosMap]);
+
+  function getDotColor(key: string): string {
+    const statuses = dayStatusMap.get(key);
+    if (!statuses) return "";
+    if (statuses.has("pendente")) return "bg-red-500";
+    if (statuses.has("a_pagar")) return "bg-blue-500";
+    return "bg-emerald-500";
+  }
 
   return (
     <div className="page-container pb-24 md:pb-8">
@@ -236,44 +350,24 @@ const AgendaPage = () => {
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <Select
-                  value={form.cliente_id}
-                  onValueChange={(v) => setForm((p) => ({ ...p, cliente_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
+                <Select value={form.cliente_id} onValueChange={(v) => setForm((p) => ({ ...p, cliente_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
                     {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Valor da parcela (R$) *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="0,00"
-                  value={form.valor_parcela}
-                  onChange={(e) => setForm((p) => ({ ...p, valor_parcela: e.target.value }))}
-                />
+                <Input type="number" min={0} step="0.01" placeholder="0,00" value={form.valor_parcela}
+                  onChange={(e) => setForm((p) => ({ ...p, valor_parcela: e.target.value }))} />
               </div>
-
               <div className="space-y-2">
                 <Label>Frequência *</Label>
-                <Select
-                  value={form.frequencia}
-                  onValueChange={(v) => setForm((p) => ({ ...p, frequencia: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={form.frequencia} onValueChange={(v) => setForm((p) => ({ ...p, frequencia: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="semana">Semanal</SelectItem>
                     <SelectItem value="quinzena">Quinzenal</SelectItem>
@@ -281,26 +375,18 @@ const AgendaPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Data início *</Label>
-                  <Input
-                    type="date"
-                    value={form.data_inicio}
-                    onChange={(e) => setForm((p) => ({ ...p, data_inicio: e.target.value }))}
-                  />
+                  <Input type="date" value={form.data_inicio}
+                    onChange={(e) => setForm((p) => ({ ...p, data_inicio: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Data fim *</Label>
-                  <Input
-                    type="date"
-                    value={form.data_fim}
-                    onChange={(e) => setForm((p) => ({ ...p, data_fim: e.target.value }))}
-                  />
+                  <Input type="date" value={form.data_fim}
+                    onChange={(e) => setForm((p) => ({ ...p, data_fim: e.target.value }))} />
                 </div>
               </div>
-
               {form.data_inicio && form.data_fim && parseISO(form.data_fim) > parseISO(form.data_inicio) && (
                 <div className="rounded-lg bg-muted/50 p-3 text-sm">
                   <p className="font-medium text-foreground">
@@ -311,17 +397,11 @@ const AgendaPage = () => {
                   </p>
                 </div>
               )}
-
               <div className="space-y-2">
                 <Label>Observações</Label>
-                <Textarea
-                  placeholder="Ex: Carnê referente à compra do iPhone..."
-                  value={form.observacoes}
-                  onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))}
-                  rows={2}
-                />
+                <Textarea placeholder="Ex: Carnê referente à compra do iPhone..." value={form.observacoes}
+                  onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} rows={2} />
               </div>
-
               <Button onClick={handleSave} disabled={saving} className="w-full">
                 {saving ? "Salvando..." : "Agendar Cobrança"}
               </Button>
@@ -330,25 +410,32 @@ const AgendaPage = () => {
         </Dialog>
       </div>
 
+      {/* Filter */}
+      <div className="flex gap-2 mb-4 slide-up overflow-x-auto">
+        {filterOptions.map((opt) => (
+          <Button
+            key={opt.value}
+            variant={statusFilter === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter(opt.value)}
+            className="shrink-0"
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
       {/* Calendar */}
       <Card className="slide-up delay-1 mb-4">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <CardTitle className="text-base capitalize">
               {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
             </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -356,9 +443,7 @@ const AgendaPage = () => {
         <CardContent>
           <div className="grid grid-cols-7 text-center mb-1">
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
-              <div key={d} className="text-xs font-medium text-muted-foreground py-2">
-                {d}
-              </div>
+              <div key={d} className="text-xs font-medium text-muted-foreground py-2">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7">
@@ -367,9 +452,10 @@ const AgendaPage = () => {
             ))}
             {daysInMonth.map((day) => {
               const key = format(day, "yyyy-MM-dd");
-              const hasEvents = markedDays.has(key);
+              const hasEvents = dayStatusMap.has(key);
               const isSelected = selectedDate && isSameDay(day, selectedDate);
               const isToday = isSameDay(day, new Date());
+              const dotColor = getDotColor(key);
 
               return (
                 <button
@@ -389,13 +475,20 @@ const AgendaPage = () => {
                     <span
                       className={cn(
                         "absolute bottom-0.5 w-1.5 h-1.5 rounded-full",
-                        isSelected ? "bg-primary-foreground" : "bg-primary"
+                        isSelected ? "bg-primary-foreground" : dotColor
                       )}
                     />
                   )}
                 </button>
               );
             })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-3 pt-3 border-t text-xs text-muted-foreground">
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pago</div>
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> A pagar</div>
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Pendente</div>
           </div>
         </CardContent>
       </Card>
@@ -420,53 +513,81 @@ const AgendaPage = () => {
               </CardContent>
             </Card>
           ) : (
-            selectedCobrancas.map((c) => (
-              <Card key={c.id}>
-                <CardContent className="py-4 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{c.cliente_nome}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />
-                            R$ {Number(c.valor_parcela).toFixed(2)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {frequenciaLabels[c.frequencia]}
-                          </span>
+            selectedCobrancas.map((c) => {
+              const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
+              const config = statusConfig[status];
+              const StatusIcon = config.icon;
+              const isPaid = status === "pago";
+
+              return (
+                <Card key={c.id} className={cn("border", isPaid && "opacity-75")}>
+                  <CardContent className="py-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{c.cliente_nome}</p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              R$ {Number(c.valor_parcela).toFixed(2)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {frequenciaLabels[c.frequencia]}
+                            </span>
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className={cn("text-xs border", config.color)}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {config.label}
+                        </Badge>
+                      </div>
                     </div>
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive h-8 w-8"
-                        onClick={() => handleDelete(c.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+
+                    <div className="text-xs text-muted-foreground pl-10">
+                      De {format(parseISO(c.data_inicio), "dd/MM/yyyy")} até{" "}
+                      {format(parseISO(c.data_fim), "dd/MM/yyyy")}
+                      {" · "}
+                      {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
+                    </div>
+                    {c.observacoes && (
+                      <p className="text-xs text-muted-foreground pl-10 italic">{c.observacoes}</p>
                     )}
-                  </div>
-                  <div className="text-xs text-muted-foreground pl-10">
-                    De {format(parseISO(c.data_inicio), "dd/MM/yyyy")} até{" "}
-                    {format(parseISO(c.data_fim), "dd/MM/yyyy")}
-                    {" · "}
-                    {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
-                  </div>
-                  {c.observacoes && (
-                    <p className="text-xs text-muted-foreground pl-10 italic">
-                      {c.observacoes}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pl-10 pt-1">
+                      {isAdmin && !isPaid && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                          onClick={() => handleMarkPaid(c.id, selectedDateKey!)}
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          Marcar como pago
+                        </Button>
+                      )}
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 gap-1 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(c.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Excluir
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       )}
@@ -477,15 +598,15 @@ const AgendaPage = () => {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
             Próximas cobranças
           </h2>
-          {cobrancas.length === 0 ? (
+          {upcomingItems.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Nenhuma cobrança cadastrada</p>
+                <p className="text-sm">Nenhuma cobrança encontrada</p>
               </CardContent>
             </Card>
           ) : (
-            cobrancas.slice(0, 10).map((c) => (
+            upcomingItems.map((c) => (
               <Card key={c.id}>
                 <CardContent className="py-3 flex items-center justify-between">
                   <div>
