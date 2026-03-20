@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileText, Upload, Download, Trash2, Search, Filter } from "lucide-react";
+import { FileText, Upload, Download, Trash2, Search, Filter, ScanLine, Loader2 } from "lucide-react";
 import { Eye, X } from "lucide-react";
 import {
   Select,
