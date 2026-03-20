@@ -210,6 +210,11 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
+      {/* Cobranças Resumo - Pie Chart */}
+      <div className="mb-6">
+        <CobrancaResumo />
+      </div>
+
       {/* Admin: Recent completed sales from all vendors */}
       {isAdmin && recentVendas.length > 0 && (
         <div className="slide-up delay-6">
