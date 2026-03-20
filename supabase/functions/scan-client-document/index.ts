@@ -87,6 +87,7 @@ Para datas use formato YYYY-MM-DD. Para CPF use formato 000.000.000-00. Para tel
                   estado_civil: { type: "string", description: "Estado civil: solteiro, casado, divorciado, viuvo ou outro" },
                   tipo: { type: "string", description: "Tipo: fisica ou juridica" },
                   inscricao_estadual: { type: "string", description: "Inscrição estadual" },
+                  observacoes: { type: "string", description: "Observações, anotações ou informações adicionais visíveis no documento" },
                 },
                 required: ["nome"],
               },
