@@ -143,6 +143,9 @@ const DocumentosPage = () => {
         });
       }
 
+      // Mark as processed
+      await supabase.from("documentos").update({ processado: true } as any).eq("id", docId);
+
       return true;
     } catch (err) {
       console.error(`Erro ao escanear carnê ${nomeArquivo}:`, err);
@@ -211,7 +214,7 @@ const DocumentosPage = () => {
       let scanFail = 0;
       for (let i = 0; i < carnesToScan.length; i++) {
         setScanProgress({ current: i + 1, total: carnesToScan.length });
-        const ok = await scanCarneAndCreateVenda(carnesToScan[i].url, carnesToScan[i].nome);
+        const ok = await scanCarneAndCreateVenda(carnesToScan[i].id, carnesToScan[i].url, carnesToScan[i].nome);
         if (ok) scanOk++;
         else scanFail++;
       }
