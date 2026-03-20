@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -83,6 +83,57 @@ const ClientesPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [showExtra, setShowExtra] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleScanDocument = async (file: File) => {
+    setScanning(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("scan-client-document", {
+        body: { image: base64 },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const extracted = data?.data;
+      if (!extracted) throw new Error("Nenhum dado extraído");
+
+      setForm((prev) => ({
+        ...prev,
+        nome: extracted.nome || prev.nome,
+        cpf: extracted.cpf || prev.cpf,
+        rg: extracted.rg || prev.rg,
+        rg_emissor: extracted.rg_emissor || prev.rg_emissor,
+        rg_data_emissao: extracted.rg_data_emissao || prev.rg_data_emissao,
+        data_nascimento: extracted.data_nascimento || prev.data_nascimento,
+        naturalidade: extracted.naturalidade || prev.naturalidade,
+        nome_pai: extracted.nome_pai || prev.nome_pai,
+        nome_mae: extracted.nome_mae || prev.nome_mae,
+        endereco: extracted.endereco || prev.endereco,
+        bairro: extracted.bairro || prev.bairro,
+        cidade: extracted.cidade || prev.cidade,
+        uf: extracted.uf || prev.uf,
+        cep: extracted.cep || prev.cep,
+        estado_civil: extracted.estado_civil || prev.estado_civil,
+      }));
+      setShowExtra(true);
+      toast.success("Dados extraídos da foto com sucesso!");
+    } catch (err: any) {
+      console.error("Scan error:", err);
+      toast.error(err.message || "Erro ao escanear documento");
+    } finally {
+      setScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const fetchCep = async (cep: string) => {
     const clean = cep.replace(/\D/g, "");
@@ -238,6 +289,36 @@ const ClientesPage = () => {
             <DialogHeader>
               <DialogTitle>{editing ? "Editar Cliente" : "Cadastro de Cliente"}</DialogTitle>
             </DialogHeader>
+            
+            {/* Scan document button */}
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleScanDocument(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={scanning}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {scanning ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+                {scanning ? "Escaneando documento..." : "Escanear documento com foto"}
+              </Button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Required fields */}
               <div className="space-y-3">
