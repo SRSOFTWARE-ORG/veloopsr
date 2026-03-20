@@ -47,7 +47,21 @@ const ProductForm = ({ form, setForm, onSubmit, isEditing }: Props) => (
       <Input placeholder="Estoque atual" type="number" value={form.estoque_atual} onChange={(e) => setForm({ ...form, estoque_atual: e.target.value })} />
       <Input placeholder="Estoque mínimo" type="number" value={form.estoque_minimo} onChange={(e) => setForm({ ...form, estoque_minimo: e.target.value })} />
     </div>
-    <Input placeholder="Código de barras" value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} />
+    <div className="flex gap-2">
+      <Input placeholder="Código de barras" value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} className="flex-1" />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="shrink-0 self-center"
+        onClick={() => {
+          const code = Array.from({ length: 13 }, () => Math.floor(Math.random() * 10)).join("");
+          setForm({ ...form, codigo_barras: code });
+        }}
+      >
+        Gerar
+      </Button>
+    </div>
     <Input placeholder="Categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
     <Input placeholder="Subcategoria" value={form.subcategoria} onChange={(e) => setForm({ ...form, subcategoria: e.target.value })} />
     <Button type="submit" className="w-full">{isEditing ? "Salvar" : "Cadastrar"}</Button>
