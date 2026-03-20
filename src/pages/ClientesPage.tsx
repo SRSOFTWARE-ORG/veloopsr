@@ -83,8 +83,57 @@ const ClientesPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [showExtra, setShowExtra] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchCep = async (cep: string) => {
+  const handleScanDocument = async (file: File) => {
+    setScanning(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("scan-client-document", {
+        body: { image: base64 },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const extracted = data?.data;
+      if (!extracted) throw new Error("Nenhum dado extraído");
+
+      setForm((prev) => ({
+        ...prev,
+        nome: extracted.nome || prev.nome,
+        cpf: extracted.cpf || prev.cpf,
+        rg: extracted.rg || prev.rg,
+        rg_emissor: extracted.rg_emissor || prev.rg_emissor,
+        rg_data_emissao: extracted.rg_data_emissao || prev.rg_data_emissao,
+        data_nascimento: extracted.data_nascimento || prev.data_nascimento,
+        naturalidade: extracted.naturalidade || prev.naturalidade,
+        nome_pai: extracted.nome_pai || prev.nome_pai,
+        nome_mae: extracted.nome_mae || prev.nome_mae,
+        endereco: extracted.endereco || prev.endereco,
+        bairro: extracted.bairro || prev.bairro,
+        cidade: extracted.cidade || prev.cidade,
+        uf: extracted.uf || prev.uf,
+        cep: extracted.cep || prev.cep,
+        estado_civil: extracted.estado_civil || prev.estado_civil,
+      }));
+      setShowExtra(true);
+      toast.success("Dados extraídos da foto com sucesso!");
+    } catch (err: any) {
+      console.error("Scan error:", err);
+      toast.error(err.message || "Erro ao escanear documento");
+    } finally {
+      setScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
     const clean = cep.replace(/\D/g, "");
     if (clean.length !== 8) return;
     setLoadingCep(true);
