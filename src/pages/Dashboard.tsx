@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import CobrancaResumo from "@/components/dashboard/CobrancaResumo";
 
 const frequenciaLabels: Record<string, string> = {
   semana: "Semanal",
@@ -208,6 +209,11 @@ const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cobranças Resumo - Pie Chart */}
+      <div className="mb-6">
+        <CobrancaResumo />
+      </div>
 
       {/* Admin: Recent completed sales from all vendors */}
       {isAdmin && recentVendas.length > 0 && (
