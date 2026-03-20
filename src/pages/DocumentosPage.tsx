@@ -81,6 +81,74 @@ const DocumentosPage = () => {
     setDocumentos((data as Documento[]) || []);
   };
 
+  const scanCarneAndCreateVenda = async (pdfUrl: string, nomeArquivo: string) => {
+    try {
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-carne", {
+        body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
+      });
+
+      if (scanError) throw scanError;
+      if (scanResult?.error) throw new Error(scanResult.error);
+
+      const extracted = scanResult?.data;
+      if (!extracted?.cliente_nome) throw new Error("Dados insuficientes");
+
+      const clienteNome = extracted.cliente_nome;
+      const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
+      const numParcelas = extracted.num_parcelas || 1;
+      const freq = extracted.frequencia || "mes";
+
+      const start = new Date(startDate + "T00:00:00");
+      const end = new Date(start);
+      for (let p = 1; p < numParcelas; p++) {
+        if (freq === "semana") end.setDate(end.getDate() + 7);
+        else if (freq === "quinzena") end.setDate(end.getDate() + 15);
+        else end.setMonth(end.getMonth() + 1);
+      }
+      const endDate = end.toISOString().split("T")[0];
+
+      await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        cliente_telefone: extracted.cliente_telefone || null,
+        valor_total: extracted.valor_total || 0,
+        valor_entrada: extracted.valor_entrada || 0,
+        num_parcelas: numParcelas,
+        valor_parcela: extracted.valor_parcela || 0,
+        vendedor_id: user!.id,
+        forma_pagamento: "parcelado",
+        frequencia_parcela: freq,
+        data_inicio_pagamento: startDate,
+        status: "concluida",
+      });
+
+      // Create cobrança if client exists
+      const { data: existingCliente } = await supabase
+        .from("clientes")
+        .select("id")
+        .ilike("nome", `%${clienteNome}%`)
+        .limit(1);
+
+      if (existingCliente?.[0]?.id) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: existingCliente[0].id,
+          cliente_nome: clienteNome,
+          valor_parcela: extracted.valor_parcela || 0,
+          data_inicio: startDate,
+          data_fim: endDate,
+          frequencia: freq,
+          criado_por: user!.id,
+          observacoes: `Importado do carnê: ${nomeArquivo}`,
+        });
+      }
+
+      return true;
+    } catch (err) {
+      console.error(`Erro ao escanear carnê ${nomeArquivo}:`, err);
+      return false;
+    }
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -88,6 +156,7 @@ const DocumentosPage = () => {
     setUploading(true);
     let successCount = 0;
     let errorCount = 0;
+    const carnesToScan: { url: string; nome: string }[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -101,9 +170,10 @@ const DocumentosPage = () => {
       }
 
       const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
+      const tipo = detectTipoFromFileName(file.name);
 
       const { error: insertError } = await supabase.from("documentos").insert({
-        tipo: detectTipoFromFileName(file.name),
+        tipo,
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
@@ -116,13 +186,42 @@ const DocumentosPage = () => {
       }
 
       successCount++;
+
+      // Queue carnês for automatic scanning
+      if (tipo === "carne") {
+        carnesToScan.push({ url: urlData.publicUrl, nome: file.name });
+      }
     }
 
     if (successCount > 0) toast.success(`${successCount} arquivo(s) enviado(s)!`);
     if (errorCount > 0) toast.error(`${errorCount} arquivo(s) com erro`);
-    setUploading(false);
+    
     fetchDocumentos();
     e.target.value = "";
+
+    // Auto-scan carnês
+    if (carnesToScan.length > 0) {
+      setUploading(false);
+      setScanningCarnes(true);
+      setScanProgress({ current: 0, total: carnesToScan.length });
+      toast.info(`Escaneando ${carnesToScan.length} carnê(s) automaticamente...`);
+
+      let scanOk = 0;
+      let scanFail = 0;
+      for (let i = 0; i < carnesToScan.length; i++) {
+        setScanProgress({ current: i + 1, total: carnesToScan.length });
+        const ok = await scanCarneAndCreateVenda(carnesToScan[i].url, carnesToScan[i].nome);
+        if (ok) scanOk++;
+        else scanFail++;
+      }
+
+      setScanningCarnes(false);
+      if (scanOk > 0) toast.success(`${scanOk} venda(s) criada(s) a partir dos carnês!`);
+      if (scanFail > 0) toast.error(`${scanFail} carnê(s) não puderam ser processados`);
+      return;
+    }
+
+    setUploading(false);
   };
 
   const handleDelete = async (id: string) => {
