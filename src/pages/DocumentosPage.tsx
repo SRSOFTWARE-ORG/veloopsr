@@ -61,6 +61,7 @@ const DocumentosPage = () => {
       const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
 
       if (uploadError) {
+        console.error("Upload error:", uploadError.message);
         errorCount++;
         continue;
       }
