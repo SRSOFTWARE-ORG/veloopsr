@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      assistencias: {
+        Row: {
+          cliente_nome: string
+          cliente_telefone: string | null
+          created_at: string | null
+          defeito: string
+          id: string
+          imei_serial: string | null
+          modelo: string | null
+          observacoes: string | null
+          status: string
+          updated_at: string | null
+          vendedor_id: string
+        }
+        Insert: {
+          cliente_nome: string
+          cliente_telefone?: string | null
+          created_at?: string | null
+          defeito: string
+          id?: string
+          imei_serial?: string | null
+          modelo?: string | null
+          observacoes?: string | null
+          status?: string
+          updated_at?: string | null
+          vendedor_id: string
+        }
+        Update: {
+          cliente_nome?: string
+          cliente_telefone?: string | null
+          created_at?: string | null
+          defeito?: string
+          id?: string
+          imei_serial?: string | null
+          modelo?: string | null
+          observacoes?: string | null
+          status?: string
+          updated_at?: string | null
+          vendedor_id?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           acao: string
