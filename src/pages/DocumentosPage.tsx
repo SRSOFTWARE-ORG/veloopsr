@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { FileText, Upload, Download, Trash2, Search, Filter } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Documento {
   id: string;
@@ -61,6 +68,7 @@ const DocumentosPage = () => {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [uploading, setUploading] = useState(false);
+  const [viewDoc, setViewDoc] = useState<Documento | null>(null);
 
   useEffect(() => {
     fetchDocumentos();
@@ -129,6 +137,10 @@ const DocumentosPage = () => {
     return matchSearch && matchTipo;
   });
 
+  const isImageFile = (name: string) => /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+  const isPdfFile = (name: string) => /\.pdf$/i.test(name);
+  const canPreview = (name: string) => isImageFile(name) || isPdfFile(name);
+
   return (
     <div className="page-container">
       <div className="flex items-center justify-between mb-4 slide-up">
@@ -186,6 +198,11 @@ const DocumentosPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {canPreview(d.nome_arquivo) && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewDoc(d)}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                   <a href={d.url_arquivo} target="_blank" rel="noopener noreferrer">
                     <Download className="w-4 h-4" />
@@ -208,6 +225,32 @@ const DocumentosPage = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={!!viewDoc} onOpenChange={(open) => !open && setViewDoc(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2 flex-row items-center justify-between">
+            <DialogTitle className="text-sm font-semibold truncate pr-4">
+              {viewDoc?.nome_arquivo}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto px-4 pb-4 h-full">
+            {viewDoc && isPdfFile(viewDoc.nome_arquivo) && (
+              <iframe
+                src={viewDoc.url_arquivo}
+                className="w-full h-full min-h-[70vh] rounded-lg border"
+                title={viewDoc.nome_arquivo}
+              />
+            )}
+            {viewDoc && isImageFile(viewDoc.nome_arquivo) && (
+              <img
+                src={viewDoc.url_arquivo}
+                alt={viewDoc.nome_arquivo}
+                className="max-w-full max-h-[75vh] mx-auto rounded-lg object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
