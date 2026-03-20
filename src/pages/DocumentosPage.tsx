@@ -160,7 +160,7 @@ const DocumentosPage = () => {
     setUploading(true);
     let successCount = 0;
     let errorCount = 0;
-    const carnesToScan: { url: string; nome: string }[] = [];
+    const carnesToScan: { id: string; url: string; nome: string }[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -176,12 +176,12 @@ const DocumentosPage = () => {
       const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
       const tipo = detectTipoFromFileName(file.name);
 
-      const { error: insertError } = await supabase.from("documentos").insert({
+      const { data: docData, error: insertError } = await supabase.from("documentos").insert({
         tipo,
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
-      });
+      }).select("id").single();
 
       if (insertError) {
         console.error("Document insert error:", insertError.message);
@@ -192,8 +192,8 @@ const DocumentosPage = () => {
       successCount++;
 
       // Queue carnês for automatic scanning
-      if (tipo === "carne") {
-        carnesToScan.push({ url: urlData.publicUrl, nome: file.name });
+      if (tipo === "carne" && docData?.id) {
+        carnesToScan.push({ id: docData.id, url: urlData.publicUrl, nome: file.name });
       }
     }
 
