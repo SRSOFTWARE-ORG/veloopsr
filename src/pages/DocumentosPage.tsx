@@ -238,6 +238,69 @@ const DocumentosPage = () => {
     fetchDocumentos();
   };
 
+  const scanBoletoAndCreateCobranca = async (docId: string, pdfUrl: string, nomeArquivo: string) => {
+    try {
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-boleto", {
+        body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
+      });
+
+      if (scanError) throw scanError;
+      if (scanResult?.error) throw new Error(scanResult.error);
+
+      const extracted = scanResult?.data;
+      if (!extracted?.cliente_nome || !extracted?.data_vencimento) throw new Error("Dados insuficientes");
+
+      const clienteNome = extracted.cliente_nome;
+      const dataVencimento = extracted.data_vencimento;
+
+      // Find or skip client
+      const { data: existingCliente } = await supabase
+        .from("clientes")
+        .select("id")
+        .ilike("nome", `%${clienteNome}%`)
+        .limit(1);
+
+      if (existingCliente?.[0]?.id) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: existingCliente[0].id,
+          cliente_nome: clienteNome,
+          valor_parcela: extracted.valor || 0,
+          data_inicio: dataVencimento,
+          data_fim: dataVencimento,
+          frequencia: "mes",
+          criado_por: user!.id,
+          observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+        });
+      } else {
+        // Create client first, then cobrança
+        const { data: newCliente } = await supabase.from("clientes").insert({
+          nome: clienteNome,
+          cpf: extracted.cliente_cpf || null,
+          criado_por: user!.id,
+        }).select("id").single();
+
+        if (newCliente?.id) {
+          await supabase.from("cobrancas").insert({
+            cliente_id: newCliente.id,
+            cliente_nome: clienteNome,
+            valor_parcela: extracted.valor || 0,
+            data_inicio: dataVencimento,
+            data_fim: dataVencimento,
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+          });
+        }
+      }
+
+      await supabase.from("documentos").update({ processado: true } as any).eq("id", docId);
+      return true;
+    } catch (err) {
+      console.error(`Erro ao escanear boleto ${nomeArquivo}:`, err);
+      return false;
+    }
+  };
+
   const handleScanAllCarnes = async () => {
     const carnes = documentos.filter((d) => d.tipo === "carne" && !d.processado);
     if (carnes.length === 0) {
@@ -263,6 +326,34 @@ const DocumentosPage = () => {
     setScanningCarnes(false);
     if (successCount > 0) toast.success(`${successCount} carnê(s) processado(s) com sucesso!`);
     if (errorCount > 0) toast.error(`${errorCount} carnê(s) com erro no processamento`);
+    fetchDocumentos();
+  };
+
+  const handleScanAllBoletos = async () => {
+    const boletos = documentos.filter((d) => d.tipo === "boleto" && !d.processado);
+    if (boletos.length === 0) {
+      toast.info("Todos os boletos já foram processados!");
+      return;
+    }
+
+    if (!confirm(`Escanear ${boletos.length} boleto(s) pendente(s) e lançar na agenda?`)) return;
+
+    setScanningBoletos(true);
+    setScanProgress({ current: 0, total: boletos.length });
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < boletos.length; i++) {
+      const boleto = boletos[i];
+      setScanProgress({ current: i + 1, total: boletos.length });
+      const ok = await scanBoletoAndCreateCobranca(boleto.id, boleto.url_arquivo, boleto.nome_arquivo);
+      if (ok) successCount++;
+      else errorCount++;
+    }
+
+    setScanningBoletos(false);
+    if (successCount > 0) toast.success(`${successCount} boleto(s) lançado(s) na agenda!`);
+    if (errorCount > 0) toast.error(`${errorCount} boleto(s) com erro no processamento`);
     fetchDocumentos();
   };
 
