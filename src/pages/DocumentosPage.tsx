@@ -46,6 +46,15 @@ const buildSafeStorageKey = (file: File, index: number) => {
   return `${Date.now()}_${index}_${safeBaseName}${extension ? `.${extension}` : ""}`;
 };
 
+const detectTipoFromFileName = (fileName: string): string => {
+  const upper = fileName.toUpperCase();
+  if (upper.startsWith("NOTA") || upper.includes("NOTA FISCAL")) return "nota_fiscal";
+  if (upper.startsWith("CARN") || upper.includes("CARNÊ") || upper.includes("CARNE")) return "carne";
+  if (upper.startsWith("CONTRATO") || upper.includes("CONTRATO")) return "contrato";
+  if (upper.startsWith("RECIBO") || upper.includes("GARANTIA")) return "recibo_garantia";
+  return "outro";
+};
+
 const DocumentosPage = () => {
   const { isAdmin, user } = useAuth();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
@@ -84,7 +93,7 @@ const DocumentosPage = () => {
       const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
 
       const { error: insertError } = await supabase.from("documentos").insert({
-        tipo: "outro",
+        tipo: detectTipoFromFileName(file.name),
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
