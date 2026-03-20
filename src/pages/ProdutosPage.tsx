@@ -189,7 +189,7 @@ const ProdutosPage = () => {
                 <Plus className="w-4 h-4 mr-1" /> Novo
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
               </DialogHeader>
