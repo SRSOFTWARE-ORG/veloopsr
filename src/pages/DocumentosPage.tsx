@@ -28,6 +28,7 @@ interface Documento {
   url_arquivo: string;
   cliente_nome: string | null;
   created_at: string;
+  processado: boolean | null;
 }
 
 const tipoLabels: Record<string, string> = {
