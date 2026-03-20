@@ -133,6 +133,56 @@ export type Database = {
         }
         Relationships: []
       }
+      cobrancas: {
+        Row: {
+          cliente_id: string
+          cliente_nome: string
+          created_at: string | null
+          criado_por: string
+          data_fim: string
+          data_inicio: string
+          frequencia: string
+          id: string
+          observacoes: string | null
+          updated_at: string | null
+          valor_parcela: number
+        }
+        Insert: {
+          cliente_id: string
+          cliente_nome: string
+          created_at?: string | null
+          criado_por: string
+          data_fim: string
+          data_inicio: string
+          frequencia?: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string | null
+          valor_parcela: number
+        }
+        Update: {
+          cliente_id?: string
+          cliente_nome?: string
+          created_at?: string | null
+          criado_por?: string
+          data_fim?: string
+          data_inicio?: string
+          frequencia?: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string | null
+          valor_parcela?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispositivos: {
         Row: {
           cliente_nome: string | null
