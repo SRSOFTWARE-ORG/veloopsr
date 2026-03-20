@@ -20,6 +20,10 @@ export interface Produto {
   nome: string;
   preco_custo: number;
   preco_venda: number;
+  preco_credito: number | null;
+  preco_boleto: number | null;
+  preco_pix: number | null;
+  preco_carne: number | null;
   estoque_atual: number;
   estoque_minimo: number;
   codigo_barras: string | null;
@@ -31,12 +35,31 @@ export interface ProductFormData {
   nome: string;
   preco_custo: string;
   preco_venda: string;
+  preco_credito: string;
+  preco_boleto: string;
+  preco_pix: string;
+  preco_carne: string;
   estoque_atual: string;
   estoque_minimo: string;
   codigo_barras: string;
   categoria: string;
   subcategoria: string;
 }
+
+const emptyForm: ProductFormData = {
+  nome: "",
+  preco_custo: "",
+  preco_venda: "",
+  preco_credito: "",
+  preco_boleto: "",
+  preco_pix: "",
+  preco_carne: "",
+  estoque_atual: "",
+  estoque_minimo: "5",
+  codigo_barras: "",
+  categoria: "",
+  subcategoria: "",
+};
 
 const emptyForm: ProductFormData = {
   nome: "",
@@ -89,6 +112,10 @@ const ProdutosPage = () => {
       nome: p.nome,
       preco_custo: p.preco_custo.toString(),
       preco_venda: p.preco_venda.toString(),
+      preco_credito: p.preco_credito?.toString() || "",
+      preco_boleto: p.preco_boleto?.toString() || "",
+      preco_pix: p.preco_pix?.toString() || "",
+      preco_carne: p.preco_carne?.toString() || "",
       estoque_atual: p.estoque_atual.toString(),
       estoque_minimo: p.estoque_minimo.toString(),
       codigo_barras: p.codigo_barras || "",
@@ -104,6 +131,10 @@ const ProdutosPage = () => {
       nome: form.nome.trim(),
       preco_custo: parseFloat(form.preco_custo) || 0,
       preco_venda: parseFloat(form.preco_venda),
+      preco_credito: parseFloat(form.preco_credito) || null,
+      preco_boleto: parseFloat(form.preco_boleto) || null,
+      preco_pix: parseFloat(form.preco_pix) || null,
+      preco_carne: parseFloat(form.preco_carne) || null,
       estoque_atual: parseInt(form.estoque_atual) || 0,
       estoque_minimo: parseInt(form.estoque_minimo) || 5,
       codigo_barras: form.codigo_barras.trim() || null,
