@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Plus, Search, Package, Edit, Trash2, BarChart3 } from "lucide-react";
+import { Plus, Search, Package, Edit, Trash2, BarChart3, Grid3X3, List } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,8 +12,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import ProductCatalogCard from "@/components/products/ProductCatalogCard";
+import ProductForm from "@/components/products/ProductForm";
 
-interface Produto {
+export interface Produto {
   id: string;
   nome: string;
   preco_custo: number;
@@ -26,22 +27,36 @@ interface Produto {
   subcategoria: string | null;
 }
 
+export interface ProductFormData {
+  nome: string;
+  preco_custo: string;
+  preco_venda: string;
+  estoque_atual: string;
+  estoque_minimo: string;
+  codigo_barras: string;
+  categoria: string;
+  subcategoria: string;
+}
+
+const emptyForm: ProductFormData = {
+  nome: "",
+  preco_custo: "",
+  preco_venda: "",
+  estoque_atual: "",
+  estoque_minimo: "5",
+  codigo_barras: "",
+  categoria: "",
+  subcategoria: "",
+};
+
 const ProdutosPage = () => {
   const { isAdmin, user } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null);
-  const [form, setForm] = useState({
-    nome: "",
-    preco_custo: "",
-    preco_venda: "",
-    estoque_atual: "",
-    estoque_minimo: "5",
-    codigo_barras: "",
-    categoria: "",
-    subcategoria: "",
-  });
+  const [form, setForm] = useState<ProductFormData>(emptyForm);
+  const [selectedCategoria, setSelectedCategoria] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProdutos();
@@ -52,15 +67,19 @@ const ProdutosPage = () => {
     setProdutos((data as Produto[]) || []);
   };
 
-  const filtered = produtos.filter(
-    (p) =>
+  const categorias = [...new Set(produtos.map((p) => p.categoria).filter(Boolean))] as string[];
+
+  const filtered = produtos.filter((p) => {
+    const matchesSearch =
       p.nome.toLowerCase().includes(search.toLowerCase()) ||
       p.codigo_barras?.includes(search) ||
-      p.categoria?.toLowerCase().includes(search.toLowerCase())
-  );
+      p.categoria?.toLowerCase().includes(search.toLowerCase());
+    const matchesCategoria = !selectedCategoria || p.categoria === selectedCategoria;
+    return matchesSearch && matchesCategoria;
+  });
 
   const resetForm = () => {
-    setForm({ nome: "", preco_custo: "", preco_venda: "", estoque_atual: "", estoque_minimo: "5", codigo_barras: "", categoria: "", subcategoria: "" });
+    setForm(emptyForm);
     setEditingProduct(null);
   };
 
@@ -120,7 +139,7 @@ const ProdutosPage = () => {
     const qty = prompt("Quantidade a adicionar:");
     if (!qty || isNaN(Number(qty))) return;
     const newQty = produto.estoque_atual + parseInt(qty);
-    
+
     await Promise.all([
       supabase.from("produtos").update({ estoque_atual: newQty, atualizado_por: user?.id }).eq("id", produto.id),
       supabase.from("estoque_movimentacao").insert({
@@ -136,89 +155,94 @@ const ProdutosPage = () => {
   };
 
   return (
-    <div className="page-container">
-      <div className="flex items-center justify-between mb-4 slide-up">
+    <div className="page-container pb-24">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 slide-up">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight">Produtos</h1>
-          <p className="text-sm text-muted-foreground">{produtos.length} itens cadastrados</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Catálogo</h1>
+          <p className="text-sm text-muted-foreground">{produtos.length} produtos</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-1" /> Novo
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <Input placeholder="Nome do produto" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Preço custo" type="number" step="0.01" value={form.preco_custo} onChange={(e) => setForm({ ...form, preco_custo: e.target.value })} />
-                <Input placeholder="Preço venda" type="number" step="0.01" value={form.preco_venda} onChange={(e) => setForm({ ...form, preco_venda: e.target.value })} required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Estoque atual" type="number" value={form.estoque_atual} onChange={(e) => setForm({ ...form, estoque_atual: e.target.value })} />
-                <Input placeholder="Estoque mínimo" type="number" value={form.estoque_minimo} onChange={(e) => setForm({ ...form, estoque_minimo: e.target.value })} />
-              </div>
-              <Input placeholder="Código de barras" value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} />
-              <Input placeholder="Categoria" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
-              <Input placeholder="Subcategoria" value={form.subcategoria} onChange={(e) => setForm({ ...form, subcategoria: e.target.value })} />
-              <Button type="submit" className="w-full">{editingProduct ? "Salvar" : "Cadastrar"}</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="relative mb-4 slide-up delay-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nome, código ou categoria..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
-      </div>
-
-      <div className="space-y-2">
-        {filtered.map((p, i) => (
-          <Card key={p.id} className={`slide-up delay-${Math.min(i + 2, 6)}`}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${p.estoque_atual <= p.estoque_minimo ? "bg-destructive/10" : "bg-primary/10"}`}>
-                <Package className={`w-5 h-5 ${p.estoque_atual <= p.estoque_minimo ? "text-destructive" : "text-primary"}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{p.nome}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-muted-foreground">
-                    R$ {Number(p.preco_venda).toFixed(2)}
-                  </span>
-                  <span className={`text-xs font-medium ${p.estoque_atual <= p.estoque_minimo ? "text-destructive" : "text-primary"}`}>
-                    Est: {p.estoque_atual}
-                  </span>
-                  {p.categoria && <span className="text-xs bg-secondary px-1.5 py-0.5 rounded">{p.categoria}</span>}
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddStock(p)}>
-                  <BarChart3 className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
-                  <Edit className="w-4 h-4" />
-                </Button>
-                {isAdmin && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(p.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Nenhum produto encontrado</p>
-            <p className="text-sm">Cadastre seu primeiro produto</p>
-          </div>
+        {isAdmin && (
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-1" /> Novo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+              </DialogHeader>
+              <ProductForm form={form} setForm={setForm} onSubmit={handleSubmit} isEditing={!!editingProduct} />
+            </DialogContent>
+          </Dialog>
         )}
       </div>
+
+      {/* Search */}
+      <div className="relative mb-4 slide-up delay-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar produto..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Category filter chips */}
+      {categorias.length > 0 && (
+        <div className="flex gap-2 mb-5 overflow-x-auto pb-1 slide-up delay-2 scrollbar-hide">
+          <button
+            onClick={() => setSelectedCategoria(null)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 ${
+              !selectedCategoria
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Todos
+          </button>
+          {categorias.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategoria(selectedCategoria === cat ? null : cat)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 ${
+                selectedCategoria === cat
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Catalog Grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {filtered.map((p, i) => (
+          <ProductCatalogCard
+            key={p.id}
+            produto={p}
+            index={i}
+            isAdmin={isAdmin}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onAddStock={handleAddStock}
+          />
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground slide-up delay-2">
+          <Package className="w-14 h-14 mx-auto mb-3 opacity-20" />
+          <p className="font-semibold text-sm">Nenhum produto encontrado</p>
+          <p className="text-xs mt-1">
+            {isAdmin ? "Cadastre seu primeiro produto" : "Nenhum item no catálogo"}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
