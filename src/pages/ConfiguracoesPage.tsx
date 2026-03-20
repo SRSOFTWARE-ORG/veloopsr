@@ -100,7 +100,7 @@ const ConfiguracoesPage = () => {
                 </div>
                 <select
                   value={u.role}
-                  onChange={(e) => updateRole(u.id, e.target.value)}
+                  onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
                   className="text-xs border rounded-md px-2 py-1 bg-background"
                 >
                   <option value="vendedor">Vendedor</option>
