@@ -220,6 +220,44 @@ export type Database = {
         }
         Relationships: []
       }
+      cobranca_pagamentos: {
+        Row: {
+          cobranca_id: string
+          created_at: string | null
+          data_vencimento: string
+          id: string
+          pago_em: string | null
+          pago_por: string | null
+          status: string
+        }
+        Insert: {
+          cobranca_id: string
+          created_at?: string | null
+          data_vencimento: string
+          id?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          status?: string
+        }
+        Update: {
+          cobranca_id?: string
+          created_at?: string | null
+          data_vencimento?: string
+          id?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_pagamentos_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cobrancas: {
         Row: {
           cliente_id: string
