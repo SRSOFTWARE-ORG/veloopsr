@@ -12,6 +12,7 @@ import {
   X,
   Users,
   CalendarDays,
+  Wrench,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +21,7 @@ const navItems = [
   { to: "/vendas", icon: ShoppingCart, label: "Vendas" },
   { to: "/produtos", icon: Package, label: "Produtos" },
   { to: "/clientes", icon: Users, label: "Clientes" },
+  { to: "/assistencia", icon: Wrench, label: "Assistência" },
   { to: "/documentos", icon: FileText, label: "Documentos" },
   { to: "/agenda", icon: CalendarDays, label: "Agenda" },
   { to: "/seguranca", icon: Shield, label: "Segurança" },
