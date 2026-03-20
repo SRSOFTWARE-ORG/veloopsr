@@ -82,7 +82,7 @@ const DocumentosPage = () => {
     setDocumentos((data as Documento[]) || []);
   };
 
-  const scanCarneAndCreateVenda = async (pdfUrl: string, nomeArquivo: string) => {
+  const scanCarneAndCreateVenda = async (docId: string, pdfUrl: string, nomeArquivo: string) => {
     try {
       const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-carne", {
         body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
