@@ -77,10 +77,7 @@ const DocumentosPage = () => {
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
-    fetchDocumentos().then(() => {
-      // Auto-scan unprocessed carnês on page load
-      autoScanPending();
-    });
+    fetchDocumentos();
   }, []);
 
   const autoScanPending = async () => {
