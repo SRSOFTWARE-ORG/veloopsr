@@ -96,39 +96,84 @@ export type Database = {
       }
       clientes: {
         Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
           cpf: string | null
           created_at: string | null
           criado_por: string | null
+          data_nascimento: string | null
           email: string | null
           endereco: string | null
+          estado_civil: string | null
           id: string
+          inscricao_estadual: string | null
+          naturalidade: string | null
           nome: string
+          nome_mae: string | null
+          nome_pai: string | null
           observacoes: string | null
+          rg: string | null
+          rg_data_emissao: string | null
+          rg_emissor: string | null
           telefone: string | null
+          tipo: string | null
+          uf: string | null
           updated_at: string | null
         }
         Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           cpf?: string | null
           created_at?: string | null
           criado_por?: string | null
+          data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado_civil?: string | null
           id?: string
+          inscricao_estadual?: string | null
+          naturalidade?: string | null
           nome: string
+          nome_mae?: string | null
+          nome_pai?: string | null
           observacoes?: string | null
+          rg?: string | null
+          rg_data_emissao?: string | null
+          rg_emissor?: string | null
           telefone?: string | null
+          tipo?: string | null
+          uf?: string | null
           updated_at?: string | null
         }
         Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           cpf?: string | null
           created_at?: string | null
           criado_por?: string | null
+          data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado_civil?: string | null
           id?: string
+          inscricao_estadual?: string | null
+          naturalidade?: string | null
           nome?: string
+          nome_mae?: string | null
+          nome_pai?: string | null
           observacoes?: string | null
+          rg?: string | null
+          rg_data_emissao?: string | null
+          rg_emissor?: string | null
           telefone?: string | null
+          tipo?: string | null
+          uf?: string | null
           updated_at?: string | null
         }
         Relationships: []

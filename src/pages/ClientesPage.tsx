@@ -4,8 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Cliente {
   id: string;
@@ -23,7 +32,46 @@ interface Cliente {
   endereco: string | null;
   observacoes: string | null;
   created_at: string;
+  tipo: string | null;
+  rg: string | null;
+  rg_emissor: string | null;
+  rg_data_emissao: string | null;
+  inscricao_estadual: string | null;
+  cep: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  naturalidade: string | null;
+  data_nascimento: string | null;
+  estado_civil: string | null;
+  nome_pai: string | null;
+  nome_mae: string | null;
 }
+
+const emptyForm = {
+  nome: "",
+  cpf: "",
+  telefone: "",
+  email: "",
+  endereco: "",
+  observacoes: "",
+  tipo: "",
+  rg: "",
+  rg_emissor: "",
+  rg_data_emissao: "",
+  inscricao_estadual: "",
+  cep: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "",
+  naturalidade: "",
+  data_nascimento: "",
+  estado_civil: "",
+  nome_pai: "",
+  nome_mae: "",
+};
 
 const ClientesPage = () => {
   const { isAdmin, user } = useAuth();
@@ -31,14 +79,8 @@ const ClientesPage = () => {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Cliente | null>(null);
-  const [form, setForm] = useState({
-    nome: "",
-    cpf: "",
-    telefone: "",
-    email: "",
-    endereco: "",
-    observacoes: "",
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [showExtra, setShowExtra] = useState(false);
 
   useEffect(() => {
     fetchClientes();
@@ -50,8 +92,9 @@ const ClientesPage = () => {
   };
 
   const resetForm = () => {
-    setForm({ nome: "", cpf: "", telefone: "", email: "", endereco: "", observacoes: "" });
+    setForm(emptyForm);
     setEditing(null);
+    setShowExtra(false);
   };
 
   const openEdit = (c: Cliente) => {
@@ -63,21 +106,60 @@ const ClientesPage = () => {
       email: c.email || "",
       endereco: c.endereco || "",
       observacoes: c.observacoes || "",
+      tipo: c.tipo || "",
+      rg: c.rg || "",
+      rg_emissor: c.rg_emissor || "",
+      rg_data_emissao: c.rg_data_emissao || "",
+      inscricao_estadual: c.inscricao_estadual || "",
+      cep: c.cep || "",
+      complemento: c.complemento || "",
+      bairro: c.bairro || "",
+      cidade: c.cidade || "",
+      uf: c.uf || "",
+      naturalidade: c.naturalidade || "",
+      data_nascimento: c.data_nascimento || "",
+      estado_civil: c.estado_civil || "",
+      nome_pai: c.nome_pai || "",
+      nome_mae: c.nome_mae || "",
     });
+    setShowExtra(true);
     setDialogOpen(true);
   };
 
+  const set = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
+
+    if (!form.nome.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (!form.telefone.trim()) { toast.error("Telefone é obrigatório"); return; }
+    if (!form.cpf.trim()) { toast.error("CPF é obrigatório"); return; }
+
+    const payload: any = {
       nome: form.nome.trim(),
-      cpf: form.cpf.trim() || null,
-      telefone: form.telefone.trim() || null,
+      cpf: form.cpf.trim(),
+      telefone: form.telefone.trim(),
       email: form.email.trim() || null,
       endereco: form.endereco.trim() || null,
       observacoes: form.observacoes.trim() || null,
-      criado_por: user?.id,
+      tipo: form.tipo || null,
+      rg: form.rg.trim() || null,
+      rg_emissor: form.rg_emissor.trim() || null,
+      rg_data_emissao: form.rg_data_emissao || null,
+      inscricao_estadual: form.inscricao_estadual.trim() || null,
+      cep: form.cep.trim() || null,
+      complemento: form.complemento.trim() || null,
+      bairro: form.bairro.trim() || null,
+      cidade: form.cidade.trim() || null,
+      uf: form.uf.trim() || null,
+      naturalidade: form.naturalidade.trim() || null,
+      data_nascimento: form.data_nascimento || null,
+      estado_civil: form.estado_civil || null,
+      nome_pai: form.nome_pai.trim() || null,
+      nome_mae: form.nome_mae.trim() || null,
     };
+
+    if (!editing) payload.criado_por = user?.id;
 
     if (editing) {
       const { error } = await supabase.from("clientes").update(payload).eq("id", editing.id);
@@ -111,7 +193,7 @@ const ClientesPage = () => {
   );
 
   return (
-    <div className="page-container">
+    <div className="page-container pb-24 md:pb-8">
       <div className="flex items-center justify-between mb-4 slide-up">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Clientes</h1>
@@ -123,20 +205,165 @@ const ClientesPage = () => {
               <Plus className="w-4 h-4 mr-1" /> Novo
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editing ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
+              <DialogTitle>{editing ? "Editar Cliente" : "Cadastro de Cliente"}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <Input placeholder="Nome completo" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="CPF" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} />
-                <Input placeholder="Telefone" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Required fields */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados obrigatórios</p>
+                <div className="space-y-2">
+                  <Label>Nome completo *</Label>
+                  <Input placeholder="Nome do cliente" value={form.nome} onChange={(e) => set("nome", e.target.value)} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Celular *</Label>
+                    <Input placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CPF / CNPJ *</Label>
+                    <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", e.target.value)} required />
+                  </div>
+                </div>
               </div>
-              <Input placeholder="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              <Input placeholder="Endereço" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} />
-              <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
-              <Button type="submit" className="w-full">{editing ? "Salvar" : "Cadastrar"}</Button>
+
+              {/* Toggle extra fields */}
+              <button
+                type="button"
+                onClick={() => setShowExtra(!showExtra)}
+                className="flex items-center gap-2 text-sm text-primary font-medium w-full justify-center py-2 rounded-lg hover:bg-primary/5 transition-colors"
+              >
+                {showExtra ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {showExtra ? "Ocultar dados adicionais" : "Mostrar dados adicionais"}
+              </button>
+
+              {showExtra && (
+                <div className="space-y-4">
+                  {/* Tipo & Documentos */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Documentos</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Tipo</Label>
+                        <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fisica">Pessoa Física</SelectItem>
+                            <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Inscrição Estadual</Label>
+                        <Input placeholder="Inscrição Estadual" value={form.inscricao_estadual} onChange={(e) => set("inscricao_estadual", e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>RG</Label>
+                        <Input placeholder="RG" value={form.rg} onChange={(e) => set("rg", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Emissor</Label>
+                        <Input placeholder="SSP/UF" value={form.rg_emissor} onChange={(e) => set("rg_emissor", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Dt. Emissão</Label>
+                        <Input type="date" value={form.rg_data_emissao} onChange={(e) => set("rg_data_emissao", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Endereço */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Endereço</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>CEP</Label>
+                        <Input placeholder="00000-000" value={form.cep} onChange={(e) => set("cep", e.target.value)} />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Label>Endereço</Label>
+                        <Input placeholder="Rua, número" value={form.endereco} onChange={(e) => set("endereco", e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Complemento</Label>
+                        <Input placeholder="Apto, bloco..." value={form.complemento} onChange={(e) => set("complemento", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Bairro</Label>
+                        <Input placeholder="Bairro" value={form.bairro} onChange={(e) => set("bairro", e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>Cidade</Label>
+                        <Input placeholder="Cidade" value={form.cidade} onChange={(e) => set("cidade", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>UF</Label>
+                        <Input placeholder="UF" maxLength={2} value={form.uf} onChange={(e) => set("uf", e.target.value.toUpperCase())} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Naturalidade</Label>
+                        <Input placeholder="Naturalidade" value={form.naturalidade} onChange={(e) => set("naturalidade", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dados pessoais */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados pessoais</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Data de Nascimento</Label>
+                        <Input type="date" value={form.data_nascimento} onChange={(e) => set("data_nascimento", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Estado Civil</Label>
+                        <Select value={form.estado_civil} onValueChange={(v) => set("estado_civil", v)}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                            <SelectItem value="casado">Casado(a)</SelectItem>
+                            <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                            <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>E-mail</Label>
+                      <Input type="email" placeholder="email@exemplo.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Nome do Pai</Label>
+                        <Input placeholder="Nome do pai" value={form.nome_pai} onChange={(e) => set("nome_pai", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Nome da Mãe</Label>
+                        <Input placeholder="Nome da mãe" value={form.nome_mae} onChange={(e) => set("nome_mae", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Observações */}
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Textarea placeholder="Observações sobre o cliente..." value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3} />
+                  </div>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full">
+                {editing ? "Salvar Alterações" : "Cadastrar Cliente"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -151,8 +378,8 @@ const ClientesPage = () => {
         {filtered.map((c, i) => (
           <Card key={c.id} className={`slide-up delay-${Math.min(i + 2, 6)}`}>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-sm font-bold text-primary">{c.nome.charAt(0).toUpperCase()}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">{c.nome}</p>
@@ -160,9 +387,10 @@ const ClientesPage = () => {
                   {c.cpf && <span className="text-xs text-muted-foreground">CPF: {c.cpf}</span>}
                   {c.telefone && <span className="text-xs text-muted-foreground">Tel: {c.telefone}</span>}
                   {c.email && <span className="text-xs text-muted-foreground">{c.email}</span>}
+                  {c.cidade && c.uf && <span className="text-xs text-muted-foreground">{c.cidade}/{c.uf}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}>
                   <Edit className="w-4 h-4" />
                 </Button>
