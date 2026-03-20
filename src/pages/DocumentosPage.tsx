@@ -380,8 +380,26 @@ const DocumentosPage = () => {
             <Button
               size="sm"
               variant="outline"
+              onClick={handleScanAllBoletos}
+              disabled={scanningBoletos || scanningCarnes}
+              className="gap-1"
+            >
+              {scanningBoletos ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ScanLine className="w-4 h-4" />
+              )}
+              {scanningBoletos
+                ? `${scanProgress.current}/${scanProgress.total}`
+                : "Escanear Boletos"}
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleScanAllCarnes}
-              disabled={scanningCarnes}
+              disabled={scanningCarnes || scanningBoletos}
               className="gap-1"
             >
               {scanningCarnes ? (
@@ -420,6 +438,7 @@ const DocumentosPage = () => {
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="nota_fiscal">Notas Fiscais</SelectItem>
             <SelectItem value="carne">Carnês</SelectItem>
+            <SelectItem value="boleto">Boletos</SelectItem>
             <SelectItem value="contrato">Contratos</SelectItem>
             <SelectItem value="recibo_garantia">Recibos</SelectItem>
             <SelectItem value="outro">Outros</SelectItem>
