@@ -134,6 +134,9 @@ const DocumentosPage = () => {
       const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
       const numParcelas = extracted.num_parcelas || 1;
       const freq = extracted.frequencia || "mes";
+      const valorParcela = extracted.valor_parcela || 0;
+      const valorTotal = extracted.valor_total || (valorParcela * numParcelas);
+      const valorEntrada = extracted.valor_entrada || 0;
 
       const start = new Date(startDate + "T00:00:00");
       const end = new Date(start);
@@ -144,14 +147,15 @@ const DocumentosPage = () => {
       }
       const endDate = end.toISOString().split("T")[0];
 
+      // Create venda
       await supabase.from("vendas").insert({
         cliente_nome: clienteNome,
         cliente_cpf: extracted.cliente_cpf || null,
         cliente_telefone: extracted.cliente_telefone || null,
-        valor_total: extracted.valor_total || 0,
-        valor_entrada: extracted.valor_entrada || 0,
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
         num_parcelas: numParcelas,
-        valor_parcela: extracted.valor_parcela || 0,
+        valor_parcela: valorParcela,
         vendedor_id: user!.id,
         forma_pagamento: "parcelado",
         frequencia_parcela: freq,
@@ -159,7 +163,8 @@ const DocumentosPage = () => {
         status: "concluida",
       });
 
-      // Create cobrança if client exists
+      // Find or create client
+      let clienteId: string | null = null;
       const { data: existingCliente } = await supabase
         .from("clientes")
         .select("id")
@@ -167,10 +172,23 @@ const DocumentosPage = () => {
         .limit(1);
 
       if (existingCliente?.[0]?.id) {
+        clienteId = existingCliente[0].id;
+      } else {
+        const { data: newCliente } = await supabase.from("clientes").insert({
+          nome: clienteNome,
+          cpf: extracted.cliente_cpf || null,
+          telefone: extracted.cliente_telefone || null,
+          criado_por: user!.id,
+        }).select("id").single();
+        clienteId = newCliente?.id || null;
+      }
+
+      // Always create cobrança
+      if (clienteId) {
         await supabase.from("cobrancas").insert({
-          cliente_id: existingCliente[0].id,
+          cliente_id: clienteId,
           cliente_nome: clienteNome,
-          valor_parcela: extracted.valor_parcela || 0,
+          valor_parcela: valorParcela,
           data_inicio: startDate,
           data_fim: endDate,
           frequencia: freq,
