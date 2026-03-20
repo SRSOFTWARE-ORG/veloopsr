@@ -474,7 +474,10 @@ export type Database = {
           cliente_nome: string
           cliente_telefone: string | null
           created_at: string | null
+          data_inicio_pagamento: string | null
           desconto_percentual: number | null
+          forma_pagamento: string | null
+          frequencia_parcela: string | null
           id: string
           num_parcelas: number | null
           observacoes: string | null
@@ -490,7 +493,10 @@ export type Database = {
           cliente_nome: string
           cliente_telefone?: string | null
           created_at?: string | null
+          data_inicio_pagamento?: string | null
           desconto_percentual?: number | null
+          forma_pagamento?: string | null
+          frequencia_parcela?: string | null
           id?: string
           num_parcelas?: number | null
           observacoes?: string | null
@@ -506,7 +512,10 @@ export type Database = {
           cliente_nome?: string
           cliente_telefone?: string | null
           created_at?: string | null
+          data_inicio_pagamento?: string | null
           desconto_percentual?: number | null
+          forma_pagamento?: string | null
+          frequencia_parcela?: string | null
           id?: string
           num_parcelas?: number | null
           observacoes?: string | null
