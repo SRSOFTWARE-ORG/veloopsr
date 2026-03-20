@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Smartphone, Lock, Mail, User } from "lucide-react";
 
@@ -11,6 +12,9 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
+  const [manterLogado, setManterLogado] = useState(() => {
+    return localStorage.getItem("veloop_manter_logado") === "true";
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +22,7 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
+        localStorage.setItem("veloop_manter_logado", manterLogado.toString());
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
@@ -89,6 +94,20 @@ const LoginPage = () => {
                 minLength={6}
               />
             </div>
+
+            {isLogin && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="manter-logado"
+                  checked={manterLogado}
+                  onCheckedChange={(checked) => setManterLogado(checked === true)}
+                />
+                <label htmlFor="manter-logado" className="text-sm text-muted-foreground cursor-pointer select-none">
+                  Manter conectado
+                </label>
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
             </Button>
