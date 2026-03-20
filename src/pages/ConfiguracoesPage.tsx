@@ -5,8 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Settings, Users, Shield, Save } from "lucide-react";
+import { Shield, UserPlus, Eye, EyeOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface UserWithPermissions {
   id: string;
@@ -23,6 +31,10 @@ interface UserWithPermissions {
 const ConfiguracoesPage = () => {
   const { isAdmin } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [newVendor, setNewVendor] = useState({ nome: "", email: "", password: "" });
 
   useEffect(() => {
     if (isAdmin) fetchUsers();
@@ -58,6 +70,42 @@ const ConfiguracoesPage = () => {
     setUsers(merged);
   };
 
+  const handleCreateVendor = async () => {
+    if (!newVendor.nome || !newVendor.email || !newVendor.password) {
+      toast.error("Preencha todos os campos");
+      return;
+    }
+    if (newVendor.password.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("create-vendor", {
+        body: {
+          email: newVendor.email,
+          password: newVendor.password,
+          nome: newVendor.nome,
+        },
+      });
+
+      if (res.error || res.data?.error) {
+        toast.error(res.data?.error || res.error?.message || "Erro ao criar vendedor");
+      } else {
+        toast.success(`Vendedor "${newVendor.nome}" criado com sucesso!`);
+        setNewVendor({ nome: "", email: "", password: "" });
+        setDialogOpen(false);
+        setTimeout(fetchUsers, 1000);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro inesperado");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const updateRole = async (userId: string, newRole: "admin" | "vendedor") => {
     await supabase.from("user_roles").update({ role: newRole }).eq("user_id", userId);
     toast.success("Cargo atualizado!");
@@ -82,9 +130,64 @@ const ConfiguracoesPage = () => {
 
   return (
     <div className="page-container">
-      <div className="mb-6 slide-up">
-        <h1 className="text-xl font-extrabold tracking-tight">Configurações</h1>
-        <p className="text-sm text-muted-foreground">Gerenciar usuários e permissões</p>
+      <div className="mb-6 slide-up flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight">Gerenciar Equipe</h1>
+          <p className="text-sm text-muted-foreground">Adicionar vendedores e gerenciar permissões</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-2">
+              <UserPlus className="w-4 h-4" />
+              Novo Vendedor
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Adicionar Vendedor</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input
+                  placeholder="Nome do vendedor"
+                  value={newVendor.nome}
+                  onChange={(e) => setNewVendor((p) => ({ ...p, nome: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={newVendor.email}
+                  onChange={(e) => setNewVendor((p) => ({ ...p, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Senha</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 6 caracteres"
+                    value={newVendor.password}
+                    onChange={(e) => setNewVendor((p) => ({ ...p, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button onClick={handleCreateVendor} disabled={creating} className="w-full">
+                {creating ? "Criando..." : "Criar Vendedor"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="space-y-4">
@@ -96,7 +199,10 @@ const ConfiguracoesPage = () => {
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                     {u.nome.charAt(0).toUpperCase()}
                   </div>
-                  <span>{u.nome}</span>
+                  <div>
+                    <span className="block">{u.nome}</span>
+                    <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
+                  </div>
                 </div>
                 <select
                   value={u.role}
@@ -111,18 +217,12 @@ const ConfiguracoesPage = () => {
             <CardContent className="space-y-3">
               {u.role === "vendedor" && (
                 <>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Permissões</p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Pode editar preço</span>
                     <Switch
                       checked={u.permissions.pode_editar_preco}
                       onCheckedChange={(v) => updatePermission(u.id, "pode_editar_preco", v)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Pode excluir venda</span>
-                    <Switch
-                      checked={u.permissions.pode_excluir_venda}
-                      onCheckedChange={(v) => updatePermission(u.id, "pode_excluir_venda", v)}
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -133,7 +233,7 @@ const ConfiguracoesPage = () => {
                     />
                   </div>
                   {u.permissions.pode_dar_desconto && (
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3 pl-4">
                       <span className="text-sm text-muted-foreground">Limite de desconto (%)</span>
                       <Input
                         type="number"
@@ -147,11 +247,23 @@ const ConfiguracoesPage = () => {
                       />
                     </div>
                   )}
+                  <div className="pt-2 border-t border-border/40">
+                    <p className="text-xs text-muted-foreground italic">
+                      Vendedores não podem excluir registros (vendas, produtos, clientes ou documentos).
+                    </p>
+                  </div>
                 </>
               )}
             </CardContent>
           </Card>
         ))}
+
+        {users.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Nenhum usuário cadastrado ainda.</p>
+          </div>
+        )}
       </div>
     </div>
   );
