@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { maskCPFOrCNPJ, maskPhone, maskCEP, validateCPFOrCNPJ } from "@/lib/masks";
 
 interface Cliente {
   id: string;
@@ -161,6 +162,7 @@ const ClientesPage = () => {
     if (!form.nome.trim()) { toast.error("Nome é obrigatório"); return; }
     if (!form.telefone.trim()) { toast.error("Telefone é obrigatório"); return; }
     if (!form.cpf.trim()) { toast.error("CPF é obrigatório"); return; }
+    if (!validateCPFOrCNPJ(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
 
     const payload: any = {
       nome: form.nome.trim(),
@@ -247,11 +249,11 @@ const ClientesPage = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Celular *</Label>
-                    <Input placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} required />
+                    <Input placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} required />
                   </div>
                   <div className="space-y-2">
                     <Label>CPF / CNPJ *</Label>
-                    <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", e.target.value)} required />
+                    <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", maskCPFOrCNPJ(e.target.value))} required />
                   </div>
                 </div>
               </div>
