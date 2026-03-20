@@ -77,8 +77,41 @@ const DocumentosPage = () => {
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
-    fetchDocumentos();
+    fetchDocumentos().then(() => {
+      // Auto-scan unprocessed carnês on page load
+      autoScanPending();
+    });
   }, []);
+
+  const autoScanPending = async () => {
+    const { data } = await supabase
+      .from("documentos")
+      .select("*")
+      .eq("tipo", "carne")
+      .eq("processado", false)
+      .order("created_at", { ascending: true });
+
+    const carnes = (data || []) as Documento[];
+    if (carnes.length === 0) return;
+
+    setScanningCarnes(true);
+    setScanProgress({ current: 0, total: carnes.length });
+    toast.info(`Escaneando ${carnes.length} carnê(s) pendente(s)...`);
+
+    let scanOk = 0;
+    let scanFail = 0;
+    for (let i = 0; i < carnes.length; i++) {
+      setScanProgress({ current: i + 1, total: carnes.length });
+      const ok = await scanCarneAndCreateVenda(carnes[i].id, carnes[i].url_arquivo, carnes[i].nome_arquivo);
+      if (ok) scanOk++;
+      else scanFail++;
+    }
+
+    setScanningCarnes(false);
+    if (scanOk > 0) toast.success(`${scanOk} carnê(s) processado(s) automaticamente!`);
+    if (scanFail > 0) toast.error(`${scanFail} carnê(s) com erro`);
+    fetchDocumentos();
+  };
 
   const fetchDocumentos = async () => {
     const { data } = await supabase.from("documentos").select("*").order("created_at", { ascending: false });
