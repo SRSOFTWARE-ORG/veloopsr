@@ -397,7 +397,11 @@ export type Database = {
           estoque_minimo: number | null
           id: string
           nome: string
+          preco_boleto: number | null
+          preco_carne: number | null
+          preco_credito: number | null
           preco_custo: number | null
+          preco_pix: number | null
           preco_venda: number
           subcategoria: string | null
           updated_at: string | null
@@ -411,7 +415,11 @@ export type Database = {
           estoque_minimo?: number | null
           id?: string
           nome: string
+          preco_boleto?: number | null
+          preco_carne?: number | null
+          preco_credito?: number | null
           preco_custo?: number | null
+          preco_pix?: number | null
           preco_venda: number
           subcategoria?: string | null
           updated_at?: string | null
@@ -425,7 +433,11 @@ export type Database = {
           estoque_minimo?: number | null
           id?: string
           nome?: string
+          preco_boleto?: number | null
+          preco_carne?: number | null
+          preco_credito?: number | null
           preco_custo?: number | null
+          preco_pix?: number | null
           preco_venda?: number
           subcategoria?: string | null
           updated_at?: string | null
