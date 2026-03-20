@@ -94,6 +94,45 @@ export type Database = {
           },
         ]
       }
+      clientes: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          criado_por: string | null
+          email: string | null
+          endereco: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       dispositivos: {
         Row: {
           cliente_nome: string | null
@@ -265,6 +304,7 @@ export type Database = {
           nome: string
           preco_custo: number | null
           preco_venda: number
+          subcategoria: string | null
           updated_at: string | null
         }
         Insert: {
@@ -278,6 +318,7 @@ export type Database = {
           nome: string
           preco_custo?: number | null
           preco_venda: number
+          subcategoria?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -291,6 +332,7 @@ export type Database = {
           nome?: string
           preco_custo?: number | null
           preco_venda?: number
+          subcategoria?: string | null
           updated_at?: string | null
         }
         Relationships: []
