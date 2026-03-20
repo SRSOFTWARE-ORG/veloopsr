@@ -27,9 +27,13 @@ const ProductCatalogCard = ({ produto: p, index, isAdmin, onEdit, onDelete, onAd
           lowStock ? "bg-destructive/5" : "bg-primary/5"
         }`}
       >
-        <Package
-          className={`w-10 h-10 ${lowStock ? "text-destructive/40" : "text-primary/30"}`}
-        />
+        {p.imagem_url ? (
+          <img src={p.imagem_url} alt={p.nome} className="h-full w-full object-contain p-2" />
+        ) : (
+          <Package
+            className={`w-10 h-10 ${lowStock ? "text-destructive/40" : "text-primary/30"}`}
+          />
+        )}
 
         {/* Stock badge */}
         <span
