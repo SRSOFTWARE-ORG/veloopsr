@@ -144,20 +144,20 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       )}
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/60 z-30 flex justify-around py-2 px-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border/60 z-30 flex py-1.5 px-0.5 overflow-hidden">
         {navItems.slice(0, 5).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === "/"}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-xs transition-colors ${
+              `flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 py-1 rounded-lg text-xs transition-colors ${
                 isActive ? "text-primary" : "text-muted-foreground"
               }`
             }
           >
-            <item.icon className="w-5 h-5" />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <item.icon className="w-5 h-5 shrink-0" />
+            <span className="text-[10px] font-medium truncate max-w-full px-0.5">{item.label}</span>
           </NavLink>
         ))}
       </nav>
