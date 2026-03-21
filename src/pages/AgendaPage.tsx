@@ -271,16 +271,14 @@ const AgendaPage = () => {
         return;
       }
     } else {
-      const insertData: Record<string, unknown> = {
+      const isPaidOrExempt = newStatus === "pago" || newStatus === "isento";
+      const { error } = await supabase.from("cobranca_pagamentos").insert({
         cobranca_id: cobrancaId,
         data_vencimento: dateKey,
         status: newStatus,
-      };
-      if (newStatus === "pago" || newStatus === "isento") {
-        insertData.pago_por = user!.id;
-        insertData.pago_em = new Date().toISOString();
-      }
-      const { error } = await supabase.from("cobranca_pagamentos").insert(insertData);
+        pago_por: isPaidOrExempt ? user!.id : null,
+        pago_em: isPaidOrExempt ? new Date().toISOString() : null,
+      });
       if (error) {
         toast.error("Erro ao registrar pagamento");
         return;
