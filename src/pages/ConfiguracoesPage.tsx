@@ -15,6 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
+import { Pencil } from "lucide-react";
 
 interface UserWithPermissions {
   id: string;
@@ -35,6 +37,8 @@ const ConfiguracoesPage = () => {
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({ nome: "", email: "", password: "" });
+  const [editVendedor, setEditVendedor] = useState<{ id: string; nome: string } | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (isAdmin) fetchUsers();
@@ -204,14 +208,24 @@ const ConfiguracoesPage = () => {
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
-                <select
-                  value={u.role}
-                  onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
-                  className="text-xs border rounded-md px-2 py-1 bg-background"
-                >
-                  <option value="vendedor">Vendedor</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => { setEditVendedor({ id: u.id, nome: u.nome }); setEditDialogOpen(true); }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <select
+                    value={u.role}
+                    onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
+                    className="text-xs border rounded-md px-2 py-1 bg-background"
+                  >
+                    <option value="vendedor">Vendedor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -265,6 +279,12 @@ const ConfiguracoesPage = () => {
           </div>
         )}
       </div>
+      <EditVendedorDialog
+        vendedor={editVendedor}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSaved={fetchUsers}
+      />
     </div>
   );
 };
