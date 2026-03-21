@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronLeft,
   CalendarDays,
+  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -35,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import EditVendaDialog from "@/components/vendas/EditVendaDialog";
 
 interface CartItem {
   produto_id: string;
@@ -77,6 +79,8 @@ const VendasPage = () => {
   const { user, isAdmin, permissions } = useAuth();
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editVenda, setEditVenda] = useState<Venda | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [step, setStep] = useState(1); // 1=produtos, 2=cliente, 3=pagamento, 4=resumo
 
@@ -360,6 +364,16 @@ const VendasPage = () => {
                 {v.cliente_telefone && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => sendWhatsApp(v)}>
                     <MessageCircle className="w-4 h-4" />
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => { setEditVenda(v); setEditDialogOpen(true); }}
+                  >
+                    <Pencil className="w-4 h-4" />
                   </Button>
                 )}
                 {isAdmin && (
@@ -764,6 +778,13 @@ const VendasPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EditVendaDialog
+        venda={editVenda}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSaved={() => { fetchVendas(); }}
+      />
     </div>
   );
 };
