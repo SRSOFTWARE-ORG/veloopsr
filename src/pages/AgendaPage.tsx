@@ -17,7 +17,9 @@ import {
   DollarSign,
   CheckCircle2,
   AlertCircle,
-  Filter,
+  Undo2,
+  ShieldOff,
+  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -80,7 +82,7 @@ interface Cliente {
   nome: string;
 }
 
-type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente";
+type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente" | "isento";
 
 function generatePaymentDates(
   dataInicio: string,
@@ -119,6 +121,7 @@ function getPaymentStatus(
   const key = `${cobrancaId}_${dateKey}`;
   const pagamento = pagamentosMap.get(key);
   if (pagamento?.status === "pago") return "pago";
+  if (pagamento?.status === "isento") return "isento";
 
   const today = startOfDay(new Date());
   const vencimento = parseISO(dateKey);
@@ -130,6 +133,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   pago: { label: "Pago", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", icon: CheckCircle2 },
   pendente: { label: "Pendente", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: AlertCircle },
   a_pagar: { label: "A pagar", color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Clock },
+  isento: { label: "Isento", color: "bg-amber-500/10 text-amber-600 border-amber-500/20", icon: ShieldOff },
 };
 
 const filterOptions: { value: StatusFilter; label: string }[] = [
@@ -137,6 +141,7 @@ const filterOptions: { value: StatusFilter; label: string }[] = [
   { value: "a_pagar", label: "A pagar" },
   { value: "pendente", label: "Pendentes" },
   { value: "pago", label: "Pagos" },
+  { value: "isento", label: "Isentos" },
 ];
 
 const AgendaPage = () => {
@@ -147,11 +152,21 @@ const AgendaPage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCobranca, setEditingCobranca] = useState<Cobranca | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
 
   const [form, setForm] = useState({
     cliente_id: "",
+    valor_parcela: "",
+    frequencia: "mes",
+    data_inicio: "",
+    data_fim: "",
+    observacoes: "",
+  });
+
+  const [editForm, setEditForm] = useState({
     valor_parcela: "",
     frequencia: "mes",
     data_inicio: "",
@@ -231,37 +246,100 @@ const AgendaPage = () => {
     }
   };
 
-  const handleMarkPaid = async (cobrancaId: string, dateKey: string) => {
+  const handleSetPaymentStatus = async (cobrancaId: string, dateKey: string, newStatus: string) => {
     if (!isAdmin) {
-      toast.error("Apenas administradores podem marcar como pago");
+      toast.error("Apenas administradores podem alterar status de pagamento");
       return;
     }
 
     const existing = pagamentosMap.get(`${cobrancaId}_${dateKey}`);
     if (existing) {
+      const updateData: Record<string, unknown> = { status: newStatus };
+      if (newStatus === "pago" || newStatus === "isento") {
+        updateData.pago_por = user!.id;
+        updateData.pago_em = new Date().toISOString();
+      } else {
+        updateData.pago_por = null;
+        updateData.pago_em = null;
+      }
       const { error } = await supabase
         .from("cobranca_pagamentos")
-        .update({ status: "pago", pago_por: user!.id, pago_em: new Date().toISOString() })
+        .update(updateData)
         .eq("id", existing.id);
       if (error) {
         toast.error("Erro ao atualizar pagamento");
         return;
       }
     } else {
-      const { error } = await supabase.from("cobranca_pagamentos").insert({
+      const insertData: Record<string, unknown> = {
         cobranca_id: cobrancaId,
         data_vencimento: dateKey,
-        status: "pago",
-        pago_por: user!.id,
-        pago_em: new Date().toISOString(),
-      });
+        status: newStatus,
+      };
+      if (newStatus === "pago" || newStatus === "isento") {
+        insertData.pago_por = user!.id;
+        insertData.pago_em = new Date().toISOString();
+      }
+      const { error } = await supabase.from("cobranca_pagamentos").insert(insertData);
       if (error) {
         toast.error("Erro ao registrar pagamento");
         return;
       }
     }
-    toast.success("Pagamento registrado!");
+
+    const labels: Record<string, string> = {
+      pago: "Pagamento registrado!",
+      isento: "Parcela marcada como isenta!",
+      a_pagar: "Status revertido para a pagar!",
+    };
+    toast.success(labels[newStatus] || "Status atualizado!");
     fetchAll();
+  };
+
+  const openEditDialog = (c: Cobranca) => {
+    setEditingCobranca(c);
+    setEditForm({
+      valor_parcela: String(c.valor_parcela),
+      frequencia: c.frequencia,
+      data_inicio: c.data_inicio,
+      data_fim: c.data_fim,
+      observacoes: c.observacoes || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingCobranca) return;
+    if (!editForm.valor_parcela || !editForm.data_inicio || !editForm.data_fim) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+    if (parseISO(editForm.data_fim) <= parseISO(editForm.data_inicio)) {
+      toast.error("A data final deve ser posterior à data inicial");
+      return;
+    }
+
+    setSaving(true);
+    const { error } = await supabase
+      .from("cobrancas")
+      .update({
+        valor_parcela: parseFloat(editForm.valor_parcela),
+        frequencia: editForm.frequencia,
+        data_inicio: editForm.data_inicio,
+        data_fim: editForm.data_fim,
+        observacoes: editForm.observacoes || null,
+      })
+      .eq("id", editingCobranca.id);
+
+    setSaving(false);
+    if (error) {
+      toast.error("Erro ao atualizar cobrança");
+    } else {
+      toast.success("Cobrança atualizada!");
+      setEditDialogOpen(false);
+      setEditingCobranca(null);
+      fetchAll();
+    }
   };
 
   // Build date -> cobrancas map
@@ -294,7 +372,6 @@ const AgendaPage = () => {
     });
   }, [selectedDateKey, dateMap, statusFilter, pagamentosMap]);
 
-  // Calendar day status colors
   const dayStatusMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     dateMap.forEach((cobList, key) => {
@@ -309,7 +386,6 @@ const AgendaPage = () => {
 
   const startPadding = startOfMonth(currentMonth).getDay();
 
-  // Upcoming list with filter
   const upcomingItems = useMemo(() => {
     if (statusFilter === "todos") return cobrancas.slice(0, 10);
     return cobrancas.filter((c) => {
@@ -326,6 +402,7 @@ const AgendaPage = () => {
     if (!statuses) return "";
     if (statuses.has("pendente")) return "bg-red-500";
     if (statuses.has("a_pagar")) return "bg-blue-500";
+    if (statuses.has("isento")) return "bg-amber-500";
     return "bg-emerald-500";
   }
 
@@ -485,10 +562,11 @@ const AgendaPage = () => {
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t text-xs text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pago</div>
             <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> A pagar</div>
             <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Pendente</div>
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> Isento</div>
           </div>
         </CardContent>
       </Card>
@@ -517,10 +595,10 @@ const AgendaPage = () => {
               const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
               const config = statusConfig[status];
               const StatusIcon = config.icon;
-              const isPaid = status === "pago";
+              const isPaidOrExempt = status === "pago" || status === "isento";
 
               return (
-                <Card key={c.id} className={cn("border", isPaid && "opacity-75")}>
+                <Card key={c.id} className={cn("border", isPaidOrExempt && "opacity-75")}>
                   <CardContent className="py-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
@@ -541,12 +619,10 @@ const AgendaPage = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className={cn("text-xs border", config.color)}>
-                          <StatusIcon className="w-3 h-3 mr-1" />
-                          {config.label}
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className={cn("text-xs border", config.color)}>
+                        <StatusIcon className="w-3 h-3 mr-1" />
+                        {config.label}
+                      </Badge>
                     </div>
 
                     <div className="text-xs text-muted-foreground pl-10">
@@ -560,28 +636,61 @@ const AgendaPage = () => {
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 pl-10 pt-1">
-                      {isAdmin && !isPaid && (
+                    <div className="flex items-center gap-2 pl-10 pt-1 flex-wrap">
+                      {isAdmin && !isPaidOrExempt && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "pago")}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            Pago
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "isento")}
+                          >
+                            <ShieldOff className="w-3 h-3" />
+                            Isentar
+                          </Button>
+                        </>
+                      )}
+                      {isAdmin && isPaidOrExempt && (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                          onClick={() => handleMarkPaid(c.id, selectedDateKey!)}
+                          className="text-xs h-7 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
+                          onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "a_pagar")}
                         >
-                          <CheckCircle2 className="w-3 h-3" />
-                          Marcar como pago
+                          <Undo2 className="w-3 h-3" />
+                          Desfazer
                         </Button>
                       )}
                       {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-7 gap-1 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(c.id)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Excluir
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-foreground"
+                            onClick={() => openEditDialog(c)}
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(c.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Excluir
+                          </Button>
+                        </>
                       )}
                     </div>
                   </CardContent>
@@ -625,6 +734,63 @@ const AgendaPage = () => {
           )}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cobrança — {editingCobranca?.cliente_nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Valor da parcela (R$) *</Label>
+              <Input type="number" min={0} step="0.01" value={editForm.valor_parcela}
+                onChange={(e) => setEditForm((p) => ({ ...p, valor_parcela: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Frequência *</Label>
+              <Select value={editForm.frequencia} onValueChange={(v) => setEditForm((p) => ({ ...p, frequencia: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semana">Semanal</SelectItem>
+                  <SelectItem value="quinzena">Quinzenal</SelectItem>
+                  <SelectItem value="mes">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Data início *</Label>
+                <Input type="date" value={editForm.data_inicio}
+                  onChange={(e) => setEditForm((p) => ({ ...p, data_inicio: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Data fim *</Label>
+                <Input type="date" value={editForm.data_fim}
+                  onChange={(e) => setEditForm((p) => ({ ...p, data_fim: e.target.value }))} />
+              </div>
+            </div>
+            {editForm.data_inicio && editForm.data_fim && parseISO(editForm.data_fim) > parseISO(editForm.data_inicio) && (
+              <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                <p className="font-medium text-foreground">
+                  {generatePaymentDates(editForm.data_inicio, editForm.data_fim, editForm.frequencia).length} parcelas
+                </p>
+                <p className="text-muted-foreground">
+                  de R$ {parseFloat(editForm.valor_parcela || "0").toFixed(2)} · {frequenciaLabels[editForm.frequencia]}
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea value={editForm.observacoes}
+                onChange={(e) => setEditForm((p) => ({ ...p, observacoes: e.target.value }))} rows={2} />
+            </div>
+            <Button onClick={handleEditSave} disabled={saving} className="w-full">
+              {saving ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

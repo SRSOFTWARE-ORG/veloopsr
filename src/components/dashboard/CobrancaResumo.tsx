@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { DollarSign, Clock, CheckCircle2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
@@ -56,19 +55,11 @@ const CobrancaResumo = () => {
       .lte("data_vencimento", end);
 
     if (!pagamentos || pagamentos.length === 0) {
-      // Fall back: calculate from cobrancas directly
-      const { data: cobrancas } = await supabase
-        .from("cobrancas")
-        .select("*")
-        .gte("data_inicio", start)
-        .lte("data_inicio", end);
-
       setRecebido(0);
       setPendente(0);
       return;
     }
 
-    // Get cobranca values
     const cobrancaIds = [...new Set(pagamentos.map((p) => p.cobranca_id))];
     const { data: cobrancas } = await supabase
       .from("cobrancas")
@@ -82,14 +73,14 @@ const CobrancaResumo = () => {
 
     let totalRecebido = 0;
     let totalPendente = 0;
-    const today = new Date().toISOString().split("T")[0];
 
     pagamentos.forEach((p) => {
       const valor = valorMap[p.cobranca_id] || 0;
       if (p.status === "pago") {
         totalRecebido += valor;
+      } else if (p.status === "isento") {
+        // Isento não conta em nenhum dos totais
       } else {
-        // a_pagar or overdue
         totalPendente += valor;
       }
     });
@@ -131,7 +122,6 @@ const CobrancaResumo = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -153,7 +143,6 @@ const CobrancaResumo = () => {
           </div>
         </div>
 
-        {/* Pie Chart */}
         {total > 0 ? (
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
