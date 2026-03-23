@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
           const { data: existingProfile } = await supabaseAdmin.from("profiles").select("id").eq("id", existing.id).single();
           if (!existingProfile) {
             // Recreate profile, role, and permissions for orphaned auth user
-            await supabaseAdmin.auth.admin.updateUser(existing.id, { password, user_metadata: { nome } });
+            await supabaseAdmin.auth.admin.updateUserById(existing.id, { password, user_metadata: { nome } });
             await supabaseAdmin.from("profiles").insert({ id: existing.id, nome });
             await supabaseAdmin.from("user_roles").insert({ user_id: existing.id, role: "vendedor" });
             await supabaseAdmin.from("permissions").insert({ user_id: existing.id });
