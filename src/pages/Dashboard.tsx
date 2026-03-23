@@ -36,13 +36,14 @@ const Dashboard = () => {
     vendasConcluidas: 0,
   });
   const [chartData, setChartData] = useState<any[]>([]);
+  const [chartPeriodo, setChartPeriodo] = useState<"semana" | "quinzena" | "mes" | "ano">("semana");
   const [recentVendas, setRecentVendas] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStats();
-    fetchChartData();
+    fetchChartData(chartPeriodo);
     if (isAdmin) fetchRecentVendas();
-  }, [isAdmin]);
+  }, [isAdmin, chartPeriodo]);
 
   const fetchStats = async () => {
     const today = new Date().toISOString().split("T")[0];
@@ -62,9 +63,10 @@ const Dashboard = () => {
     });
   };
 
-  const fetchChartData = async () => {
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
+  const fetchChartData = async (periodo: "semana" | "quinzena" | "mes" | "ano") => {
+    const numDays = periodo === "semana" ? 7 : periodo === "quinzena" ? 15 : periodo === "mes" ? 30 : 365;
+    const days: string[] = [];
+    for (let i = numDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       days.push(d.toISOString().split("T")[0]);
@@ -76,15 +78,29 @@ const Dashboard = () => {
       .eq("status", "concluida")
       .gte("created_at", days[0]);
 
-    const mapped = days.map((day) => {
-      const dayName = new Date(day + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
-      const total = data
-        ?.filter((v) => v.created_at?.startsWith(day))
-        .reduce((sum, v) => sum + Number(v.valor_total), 0) || 0;
-      return { dia: dayName, vendas: total };
-    });
-
-    setChartData(mapped);
+    if (periodo === "ano") {
+      const months: Record<string, number> = {};
+      data?.forEach((v) => {
+        const month = v.created_at?.substring(0, 7) || "";
+        months[month] = (months[month] || 0) + Number(v.valor_total);
+      });
+      const sorted = Object.keys(months).sort();
+      setChartData(sorted.map((m) => ({
+        dia: new Date(m + "-15").toLocaleDateString("pt-BR", { month: "short" }),
+        vendas: months[m],
+      })));
+    } else {
+      const mapped = days.map((day) => {
+        const fmt = periodo === "mes" || periodo === "quinzena"
+          ? new Date(day + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+          : new Date(day + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
+        const total = data
+          ?.filter((v) => v.created_at?.startsWith(day))
+          .reduce((sum, v) => sum + Number(v.valor_total), 0) || 0;
+        return { dia: fmt, vendas: total };
+      });
+      setChartData(mapped);
+    }
   };
 
   const fetchRecentVendas = async () => {
@@ -182,10 +198,27 @@ const Dashboard = () => {
       {/* Chart */}
       <Card className="mb-6 slide-up delay-6">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            Vendas da Semana
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              Vendas
+            </CardTitle>
+          </div>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {(["semana", "quinzena", "mes", "ano"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setChartPeriodo(p)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  chartPeriodo === p
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {{ semana: "Semanal", quinzena: "Quinzenal", mes: "Mensal", ano: "Anual" }[p]}
+              </button>
+            ))}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-48">
