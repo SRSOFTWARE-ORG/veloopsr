@@ -221,6 +221,12 @@ const Dashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 p-3 rounded-lg bg-primary/10 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">Total do período</span>
+            <span className="text-sm font-extrabold tabular-nums text-primary">
+              R$ {chartData.reduce((sum, d) => sum + (d.vendas || 0), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
