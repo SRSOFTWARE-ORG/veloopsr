@@ -62,7 +62,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Delete related data first
+    // Reassign vendas, assistencias, cobrancas, saidas to the admin before deleting
+    await supabaseAdmin.from("vendas").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);
+    await supabaseAdmin.from("assistencias").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);
+    await supabaseAdmin.from("cobrancas").update({ criado_por: caller.id }).eq("criado_por", user_id);
+    await supabaseAdmin.from("saidas_caixa").update({ responsavel_id: caller.id }).eq("responsavel_id", user_id);
+    await supabaseAdmin.from("saidas_caixa").update({ registrado_por: caller.id }).eq("registrado_por", user_id);
+
+    // Delete related data
     await supabaseAdmin.from("permissions").delete().eq("user_id", user_id);
     await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
     await supabaseAdmin.from("profiles").delete().eq("id", user_id);
