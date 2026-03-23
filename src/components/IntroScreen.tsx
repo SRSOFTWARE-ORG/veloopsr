@@ -17,10 +17,11 @@ const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
   return (
     <div
       className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-700 ${
-        phase === "exit" ? "opacity-0" : "opacity-100"
+        phase === "exit" ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
       style={{
         background: "linear-gradient(135deg, #f8f9fa 0%, #e8ecf1 50%, #f0f2f5 100%)",
+        isolation: "isolate",
       }}
     >
       <div className="relative flex flex-col items-center">
