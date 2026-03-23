@@ -82,57 +82,22 @@ const CobrancaResumo = () => {
       });
     }
 
-    // 2) Vendas parceladas concluídas — entradas e parcelas projetadas
+    // 2) Vendas concluídas — apenas entradas (valor_entrada)
+    // Parcelas de vendas já são rastreadas via cobranca_pagamentos na agenda,
+    // então NÃO projetamos parcelas aqui para evitar duplicação.
     const { data: vendas } = await supabase
       .from("vendas")
-      .select("id, valor_total, valor_entrada, num_parcelas, valor_parcela, frequencia_parcela, data_inicio_pagamento, created_at, status")
+      .select("valor_entrada, created_at")
       .eq("status", "concluida");
 
     if (vendas) {
-      const today = new Date().toISOString().split("T")[0];
-
       vendas.forEach((v) => {
-        // Entrada: conta como recebido na data da venda
         const vendaDate = v.created_at?.split("T")[0] || "";
         const entrada = Number(v.valor_entrada) || 0;
         if (entrada > 0 && vendaDate >= start && vendaDate <= end) {
           totalRecebido += entrada;
         }
-
-        // Parcelas projetadas
-        const numParcelas = v.num_parcelas || 1;
-        const valorParcela = Number(v.valor_parcela) || 0;
-        if (numParcelas <= 1 || valorParcela <= 0 || !v.data_inicio_pagamento) return;
-
-        const freq = v.frequencia_parcela || "mes";
-
-        for (let i = 0; i < numParcelas; i++) {
-          const dataVenc = new Date(v.data_inicio_pagamento + "T12:00:00");
-          if (freq === "semana") {
-            dataVenc.setDate(dataVenc.getDate() + i * 7);
-          } else if (freq === "quinzena") {
-            dataVenc.setDate(dataVenc.getDate() + i * 15);
-          } else {
-            dataVenc.setMonth(dataVenc.getMonth() + i);
-          }
-          const vencStr = dataVenc.toISOString().split("T")[0];
-
-          if (vencStr >= start && vencStr <= end) {
-            // Se já venceu, é pendente; caso contrário, é "a pagar" (pendente futuro)
-            // Verificar se existe cobrança correspondente na agenda que já foi paga
-            if (vencStr <= today) {
-              totalPendente += valorParcela;
-            } else {
-              totalPendente += valorParcela;
-            }
-          }
-        }
       });
-
-      // Descontar do pendente de vendas as parcelas que já foram pagas via cobranca_pagamentos
-      // (para evitar duplicação com cobranças já registradas na agenda)
-      // Cobranças da agenda já foram contabilizadas acima, então verificamos se há overlap
-      // Para isso, buscamos cobranças vinculadas a vendas
     }
 
     setRecebido(totalRecebido);
