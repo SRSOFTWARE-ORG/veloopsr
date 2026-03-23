@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create user with admin API (auto-confirms email)
+    // Try to create user
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -58,6 +58,26 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
+      // If user already exists in auth (orphaned from failed delete), try to reuse
+      if (createError.message?.includes("already been registered")) {
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+        const existing = users?.find((u: any) => u.email === email);
+        if (existing) {
+          // Check if profile exists
+          const { data: existingProfile } = await supabaseAdmin.from("profiles").select("id").eq("id", existing.id).single();
+          if (!existingProfile) {
+            // Recreate profile, role, and permissions for orphaned auth user
+            await supabaseAdmin.auth.admin.updateUser(existing.id, { password, user_metadata: { nome } });
+            await supabaseAdmin.from("profiles").insert({ id: existing.id, nome });
+            await supabaseAdmin.from("user_roles").insert({ user_id: existing.id, role: "vendedor" });
+            await supabaseAdmin.from("permissions").insert({ user_id: existing.id });
+            return new Response(JSON.stringify({ user: existing }), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      }
       return new Response(JSON.stringify({ error: createError.message }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
