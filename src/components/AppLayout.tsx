@@ -13,6 +13,7 @@ import {
   Users,
   CalendarDays,
   Wrench,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 
