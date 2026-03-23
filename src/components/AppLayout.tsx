@@ -13,6 +13,7 @@ import {
   Users,
   CalendarDays,
   Wrench,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/assistencia", icon: Wrench, label: "Assistência" },
   { to: "/documentos", icon: FileText, label: "Documentos" },
   { to: "/agenda", icon: CalendarDays, label: "Agenda" },
+  { to: "/caixa", icon: Wallet, label: "Caixa" },
   { to: "/seguranca", icon: Shield, label: "Segurança" },
 ];
 

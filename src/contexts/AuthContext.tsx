@@ -9,6 +9,9 @@ interface UserPermissions {
   pode_excluir_venda: boolean;
   pode_dar_desconto: boolean;
   limite_desconto: number;
+  pode_ver_faturamento: boolean;
+  tipo_comissao: string;
+  valor_comissao: number;
 }
 
 interface AuthContextType {
@@ -27,6 +30,9 @@ const defaultPermissions: UserPermissions = {
   pode_excluir_venda: false,
   pode_dar_desconto: false,
   limite_desconto: 0,
+  pode_ver_faturamento: false,
+  tipo_comissao: "percentual",
+  valor_comissao: 0,
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -65,6 +71,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pode_excluir_venda: permRes.data.pode_excluir_venda ?? false,
         pode_dar_desconto: permRes.data.pode_dar_desconto ?? false,
         limite_desconto: Number(permRes.data.limite_desconto) || 0,
+        pode_ver_faturamento: (permRes.data as any).pode_ver_faturamento ?? false,
+        tipo_comissao: (permRes.data as any).tipo_comissao || "percentual",
+        valor_comissao: Number((permRes.data as any).valor_comissao) || 0,
       });
     }
   };

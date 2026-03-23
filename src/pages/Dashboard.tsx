@@ -27,7 +27,8 @@ const frequenciaLabels: Record<string, string> = {
 };
 
 const Dashboard = () => {
-  const { isAdmin, profile, role } = useAuth();
+  const { isAdmin, profile, role, permissions } = useAuth();
+  const canSeeFaturamento = isAdmin || permissions.pode_ver_faturamento;
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     vendasHoje: 0,
@@ -151,7 +152,7 @@ const Dashboard = () => {
           Olá, {profile?.nome?.split(" ")[0] || "Usuário"} 👋
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {isAdmin ? "Painel administrativo — todas as vendas dos vendedores" : "Resumo das suas vendas de hoje"}
+          {isAdmin ? "Painel administrativo — todas as vendas dos vendedores" : canSeeFaturamento ? "Resumo geral de vendas" : "Resumo das suas vendas de hoje"}
         </p>
       </div>
 

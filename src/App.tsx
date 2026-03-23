@@ -15,6 +15,7 @@ import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
 import ClientesPage from "@/pages/ClientesPage";
 import AgendaPage from "@/pages/AgendaPage";
 import AssistenciaPage from "@/pages/AssistenciaPage";
+import CaixaPage from "@/pages/CaixaPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/assistencia" element={<ProtectedRoute><AssistenciaPage /></ProtectedRoute>} />
             <Route path="/seguranca" element={<ProtectedRoute><SegurancaPage /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute><ConfiguracoesPage /></ProtectedRoute>} />
+            <Route path="/caixa" element={<ProtectedRoute><CaixaPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
