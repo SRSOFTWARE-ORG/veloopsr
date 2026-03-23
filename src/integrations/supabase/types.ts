@@ -445,8 +445,11 @@ export type Database = {
           pode_dar_desconto: boolean | null
           pode_editar_preco: boolean | null
           pode_excluir_venda: boolean | null
+          pode_ver_faturamento: boolean | null
+          tipo_comissao: string | null
           updated_at: string | null
           user_id: string
+          valor_comissao: number | null
         }
         Insert: {
           created_at?: string | null
@@ -455,8 +458,11 @@ export type Database = {
           pode_dar_desconto?: boolean | null
           pode_editar_preco?: boolean | null
           pode_excluir_venda?: boolean | null
+          pode_ver_faturamento?: boolean | null
+          tipo_comissao?: string | null
           updated_at?: string | null
           user_id: string
+          valor_comissao?: number | null
         }
         Update: {
           created_at?: string | null
@@ -465,8 +471,11 @@ export type Database = {
           pode_dar_desconto?: boolean | null
           pode_editar_preco?: boolean | null
           pode_excluir_venda?: boolean | null
+          pode_ver_faturamento?: boolean | null
+          tipo_comissao?: string | null
           updated_at?: string | null
           user_id?: string
+          valor_comissao?: number | null
         }
         Relationships: []
       }
@@ -548,6 +557,33 @@ export type Database = {
           id?: string
           nome?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      saidas_caixa: {
+        Row: {
+          created_at: string | null
+          id: string
+          motivo: string
+          registrado_por: string
+          responsavel_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          motivo: string
+          registrado_por: string
+          responsavel_id: string
+          valor: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          motivo?: string
+          registrado_por?: string
+          responsavel_id?: string
+          valor?: number
         }
         Relationships: []
       }
