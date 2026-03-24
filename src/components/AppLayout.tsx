@@ -34,11 +34,11 @@ const adminItems = [
 ];
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile, isAdmin, signOut, role } = useAuth();
+  const { profile, isAdmin, isPrimaryAdmin, isReadOnly, signOut, role } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const allItems = isAdmin ? [...navItems, ...adminItems] : navItems;
+  const allItems = isPrimaryAdmin ? [...navItems, ...adminItems] : navItems;
 
   return (
     <div className="min-h-screen bg-background flex">

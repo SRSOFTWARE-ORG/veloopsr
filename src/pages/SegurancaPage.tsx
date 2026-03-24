@@ -5,21 +5,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, Search, Plus, Smartphone, Edit } from "lucide-react";
+import { Shield, Search, Plus, Smartphone } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Dispositivo {
   id: string;
@@ -27,8 +27,14 @@ interface Dispositivo {
   modelo: string | null;
   status_seguranca: string;
   cliente_nome: string | null;
+  cliente_id: string | null;
   observacoes: string | null;
   data_ativacao: string;
+}
+
+interface Cliente {
+  id: string;
+  nome: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -44,19 +50,31 @@ const statusLabels: Record<string, string> = {
 };
 
 const SegurancaPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isPrimaryAdmin, isReadOnly } = useAuth();
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [form, setForm] = useState({
     imei_serial: "",
     modelo: "",
-    cliente_nome: "",
+    cliente_id: "",
     observacoes: "",
   });
 
   useEffect(() => {
     fetchDispositivos();
+    fetchClientes();
+
+    const channel = supabase
+      .channel("dispositivos-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "dispositivos" }, () => {
+        fetchDispositivos();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchDispositivos = async () => {
@@ -64,23 +82,33 @@ const SegurancaPage = () => {
     setDispositivos((data as Dispositivo[]) || []);
   };
 
+  const fetchClientes = async () => {
+    const { data } = await supabase.from("clientes").select("id, nome").order("nome");
+    setClientes((data as Cliente[]) || []);
+  };
+
+  const selectedCliente = clientes.find((c) => c.id === form.cliente_id);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cliente = clientes.find((c) => c.id === form.cliente_id);
     const { error } = await supabase.from("dispositivos").insert({
       imei_serial: form.imei_serial.trim(),
       modelo: form.modelo.trim() || null,
-      cliente_nome: form.cliente_nome.trim() || null,
+      cliente_id: form.cliente_id || null,
+      cliente_nome: cliente?.nome || null,
       observacoes: form.observacoes.trim() || null,
     });
     if (error) { toast.error(error.message); return; }
     toast.success("Dispositivo cadastrado!");
     setDialogOpen(false);
-    setForm({ imei_serial: "", modelo: "", cliente_nome: "", observacoes: "" });
+    setForm({ imei_serial: "", modelo: "", cliente_id: "", observacoes: "" });
     fetchDispositivos();
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
-    if (!isAdmin) { toast.error("Apenas o admin pode alterar o status"); return; }
+    if (isReadOnly) { toast.error("Acesso somente leitura"); return; }
+    if (!isPrimaryAdmin) { toast.error("Apenas o admin primário pode alterar o status"); return; }
     await supabase.from("dispositivos").update({ status_seguranca: newStatus }).eq("id", id);
     toast.success("Status atualizado");
     fetchDispositivos();
@@ -100,23 +128,58 @@ const SegurancaPage = () => {
           <h1 className="text-xl font-extrabold tracking-tight">Segurança SR</h1>
           <p className="text-sm text-muted-foreground">{dispositivos.length} dispositivos</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Cadastrar Dispositivo</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <Input placeholder="IMEI / Serial *" value={form.imei_serial} onChange={(e) => setForm({ ...form, imei_serial: e.target.value })} required />
-              <Input placeholder="Modelo" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
-              <Input placeholder="Nome do cliente" value={form.cliente_nome} onChange={(e) => setForm({ ...form, cliente_nome: e.target.value })} />
-              <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
-              <Button type="submit" className="w-full">Cadastrar</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {!isReadOnly && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Cadastrar Dispositivo</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <Input placeholder="IMEI / Serial *" value={form.imei_serial} onChange={(e) => setForm({ ...form, imei_serial: e.target.value })} required />
+                <Input placeholder="Modelo" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+
+                {/* Client search dropdown */}
+                <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {selectedCliente ? selectedCliente.nome : "Selecionar cliente..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {clientes.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              value={c.nome}
+                              onSelect={() => {
+                                setForm({ ...form, cliente_id: c.id });
+                                setClientePopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", form.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
+                              {c.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+                <Button type="submit" className="w-full">Cadastrar</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="relative mb-4 slide-up delay-1">
@@ -141,7 +204,7 @@ const SegurancaPage = () => {
                   {d.cliente_nome && <span className="text-xs text-muted-foreground">{d.cliente_nome}</span>}
                 </div>
               </div>
-              {isAdmin && (
+              {isPrimaryAdmin && (
                 <Select value={d.status_seguranca} onValueChange={(val) => updateStatus(d.id, val)}>
                   <SelectTrigger className="w-28 h-8 text-xs">
                     <SelectValue />

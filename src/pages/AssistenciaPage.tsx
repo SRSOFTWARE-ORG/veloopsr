@@ -7,19 +7,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Wrench, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Wrench, Edit, Trash2, ChevronsUpDown, Check } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { maskPhone } from "@/lib/masks";
 
 interface Assistencia {
   id: string;
   cliente_nome: string;
   cliente_telefone: string | null;
+  cliente_id: string | null;
+  dispositivo_id: string | null;
   modelo: string | null;
   imei_serial: string | null;
   defeito: string;
@@ -29,9 +38,24 @@ interface Assistencia {
   created_at: string;
 }
 
+interface Cliente {
+  id: string;
+  nome: string;
+  telefone: string | null;
+}
+
+interface Dispositivo {
+  id: string;
+  modelo: string | null;
+  imei_serial: string;
+  cliente_id: string | null;
+}
+
 const emptyForm = {
+  cliente_id: "",
   cliente_nome: "",
   cliente_telefone: "",
+  dispositivo_id: "",
   modelo: "",
   imei_serial: "",
   defeito: "",
@@ -46,39 +70,98 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 };
 
 const AssistenciaPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [items, setItems] = useState<Assistencia[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteDevices, setClienteDevices] = useState<Dispositivo[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Assistencia | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => {
+    fetchItems();
+    fetchClientes();
+
+    const channel = supabase
+      .channel("assistencias-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "assistencias" }, () => {
+        fetchItems();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Fetch devices when client changes
+  useEffect(() => {
+    if (form.cliente_id) {
+      fetchClienteDevices(form.cliente_id);
+    } else {
+      setClienteDevices([]);
+    }
+  }, [form.cliente_id]);
 
   const fetchItems = async () => {
-    const { data } = await supabase
-      .from("assistencias")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("assistencias").select("*").order("created_at", { ascending: false });
     setItems((data as Assistencia[]) || []);
+  };
+
+  const fetchClientes = async () => {
+    const { data } = await supabase.from("clientes").select("id, nome, telefone").order("nome");
+    setClientes((data as Cliente[]) || []);
+  };
+
+  const fetchClienteDevices = async (clienteId: string) => {
+    const { data } = await supabase.from("dispositivos").select("id, modelo, imei_serial, cliente_id").eq("cliente_id", clienteId);
+    setClienteDevices((data as Dispositivo[]) || []);
   };
 
   const set = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
 
-  const resetForm = () => { setForm(emptyForm); setEditing(null); };
+  const resetForm = () => { setForm(emptyForm); setEditing(null); setClienteDevices([]); };
+
+  const selectCliente = (cliente: Cliente) => {
+    setForm((prev) => ({
+      ...prev,
+      cliente_id: cliente.id,
+      cliente_nome: cliente.nome,
+      cliente_telefone: cliente.telefone || "",
+      dispositivo_id: "",
+      modelo: "",
+      imei_serial: "",
+    }));
+    setClientePopoverOpen(false);
+  };
+
+  const selectDevice = (deviceId: string) => {
+    const device = clienteDevices.find((d) => d.id === deviceId);
+    if (device) {
+      setForm((prev) => ({
+        ...prev,
+        dispositivo_id: device.id,
+        modelo: device.modelo || "",
+        imei_serial: device.imei_serial || "",
+      }));
+    }
+  };
 
   const openEdit = (a: Assistencia) => {
     setEditing(a);
     setForm({
+      cliente_id: a.cliente_id || "",
       cliente_nome: a.cliente_nome,
       cliente_telefone: a.cliente_telefone || "",
+      dispositivo_id: a.dispositivo_id || "",
       modelo: a.modelo || "",
       imei_serial: a.imei_serial || "",
       defeito: a.defeito,
       observacoes: a.observacoes || "",
       status: a.status,
     });
+    if (a.cliente_id) fetchClienteDevices(a.cliente_id);
     setDialogOpen(true);
   };
 
@@ -92,6 +175,8 @@ const AssistenciaPage = () => {
     const payload = {
       cliente_nome: form.cliente_nome.trim(),
       cliente_telefone: form.cliente_telefone.trim() || null,
+      cliente_id: form.cliente_id || null,
+      dispositivo_id: form.dispositivo_id || null,
       modelo: form.modelo.trim() || null,
       imei_serial: form.imei_serial.trim() || null,
       defeito: form.defeito.trim(),
@@ -123,6 +208,8 @@ const AssistenciaPage = () => {
     fetchItems();
   };
 
+  const selectedCliente = clientes.find((c) => c.id === form.cliente_id);
+
   const filtered = items.filter((a) => {
     const matchSearch =
       a.cliente_nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -140,56 +227,106 @@ const AssistenciaPage = () => {
           <h1 className="text-xl font-extrabold tracking-tight">Assistências</h1>
           <p className="text-sm text-muted-foreground">{items.length} registros</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nova</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editing ? "Editar Assistência" : "Nova Assistência"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Cliente *</Label>
-                <Input placeholder="Nome do cliente" value={form.cliente_nome} onChange={(e) => set("cliente_nome", e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input placeholder="(00) 00000-0000" value={form.cliente_telefone} onChange={(e) => set("cliente_telefone", maskPhone(e.target.value))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+        {!isReadOnly && (
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nova</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editing ? "Editar Assistência" : "Nova Assistência"}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Client search */}
                 <div className="space-y-2">
-                  <Label>Modelo</Label>
-                  <Input placeholder="Ex: iPhone 14" value={form.modelo} onChange={(e) => set("modelo", e.target.value)} />
+                  <Label>Cliente *</Label>
+                  <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                        {selectedCliente ? selectedCliente.nome : form.cliente_nome || "Selecionar cliente..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar cliente..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {clientes.map((c) => (
+                              <CommandItem key={c.id} value={c.nome} onSelect={() => selectCliente(c)}>
+                                <Check className={cn("mr-2 h-4 w-4", form.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
+                                {c.nome}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input placeholder="(00) 00000-0000" value={form.cliente_telefone} onChange={(e) => set("cliente_telefone", maskPhone(e.target.value))} />
+                </div>
+
+                {/* Device selection filtered by client */}
+                <div className="space-y-2">
+                  <Label>Dispositivo vinculado</Label>
+                  {form.cliente_id && clienteDevices.length > 0 ? (
+                    <Select value={form.dispositivo_id} onValueChange={selectDevice}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar dispositivo..." /></SelectTrigger>
+                      <SelectContent>
+                        {clienteDevices.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.modelo || "Dispositivo"} — {d.imei_serial}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : form.cliente_id ? (
+                    <p className="text-xs text-muted-foreground">Nenhum dispositivo vinculado a este cliente.</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Selecione um cliente primeiro.</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Modelo</Label>
+                    <Input placeholder="Ex: iPhone 14" value={form.modelo} onChange={(e) => set("modelo", e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IMEI / Serial</Label>
+                    <Input placeholder="IMEI ou Serial" value={form.imei_serial} onChange={(e) => set("imei_serial", e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Defeito *</Label>
+                  <Textarea placeholder="Descreva o defeito..." value={form.defeito} onChange={(e) => set("defeito", e.target.value)} rows={3} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>IMEI / Serial</Label>
-                  <Input placeholder="IMEI ou Serial" value={form.imei_serial} onChange={(e) => set("imei_serial", e.target.value)} />
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aberto">Aberto</SelectItem>
+                      <SelectItem value="em_andamento">Em andamento</SelectItem>
+                      <SelectItem value="concluido">Concluído</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Defeito *</Label>
-                <Textarea placeholder="Descreva o defeito..." value={form.defeito} onChange={(e) => set("defeito", e.target.value)} rows={3} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="aberto">Aberto</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
-                    <SelectItem value="concluido">Concluído</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea placeholder="Observações adicionais..." value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={2} />
-              </div>
-              <Button type="submit" className="w-full">{editing ? "Salvar" : "Cadastrar"}</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea placeholder="Observações adicionais..." value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={2} />
+                </div>
+                <Button type="submit" className="w-full">{editing ? "Salvar" : "Cadastrar"}</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Search */}
@@ -246,16 +383,18 @@ const AssistenciaPage = () => {
                     {new Date(a.created_at).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(a)}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  {isAdmin && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(a.id)}>
-                      <Trash2 className="w-4 h-4" />
+                {!isReadOnly && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(a)}>
+                      <Edit className="w-4 h-4" />
                     </Button>
-                  )}
-                </div>
+                    {isPrimaryAdmin && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(a.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
