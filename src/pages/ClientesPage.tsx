@@ -649,10 +649,15 @@ const ClientesPage = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{c.nome}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
                         {parent?.nome || "Cliente removido"}
                       </span>
+                      {(c as any).grau_parentesco && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground capitalize">
+                          {(c as any).grau_parentesco}
+                        </span>
+                      )}
                       {c.observacoes && <span className="text-xs text-muted-foreground truncate">{c.observacoes}</span>}
                     </div>
                   </div>
