@@ -75,7 +75,7 @@ const ClientesPage = () => {
   const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   // Subcliente form state
-  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" });
+  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "", cpf: "", telefone: "" });
   const [subParentPopoverOpen, setSubParentPopoverOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Cliente | null>(null);
 
@@ -164,7 +164,7 @@ const ClientesPage = () => {
   };
 
   const resetForm = () => { setForm(emptyForm); setEditing(null); setShowExtra(false); };
-  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" }); setEditingSub(null); };
+  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "", cpf: "", telefone: "" }); setEditingSub(null); };
 
   const openEdit = (c: Cliente) => {
     setEditing(c);
@@ -184,7 +184,7 @@ const ClientesPage = () => {
 
   const openEditSub = (c: Cliente) => {
     setEditingSub(c);
-    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", grau_parentesco: (c as any).grau_parentesco || "", observacoes: c.observacoes || "" });
+    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", grau_parentesco: (c as any).grau_parentesco || "", observacoes: c.observacoes || "", cpf: c.cpf || "", telefone: c.telefone || "" });
     setSubDialogOpen(true);
   };
 
@@ -238,6 +238,8 @@ const ClientesPage = () => {
       parent_id: subForm.parent_id,
       grau_parentesco: subForm.grau_parentesco || null,
       observacoes: subForm.observacoes.trim() || null,
+      cpf: subForm.cpf.trim() || null,
+      telefone: subForm.telefone.trim() || null,
     };
     if (!editingSub) payload.criado_por = user?.id;
 
@@ -661,6 +663,19 @@ const ClientesPage = () => {
                       </Popover>
                     );
                   })()}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>CPF (opcional)</Label>
+                    <Input placeholder="000.000.000-00" value={subForm.cpf}
+                      onChange={(e) => setSubForm({ ...subForm, cpf: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone (opcional)</Label>
+                    <Input placeholder="(00) 00000-0000" value={subForm.telefone}
+                      onChange={(e) => setSubForm({ ...subForm, telefone: e.target.value })} />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
