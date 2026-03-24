@@ -353,7 +353,60 @@ const ClientesPage = () => {
                   <div className="space-y-2">
                     <Label>CPF / CNPJ *</Label>
                     <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", maskCPFOrCNPJ(e.target.value))} required />
-                  </div>
+              </div>
+
+              {/* Cliente Principal (Parent) */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-primary" /> Cliente Principal (opcional)
+                </Label>
+                <p className="text-[11px] text-muted-foreground">Se este cliente for um subcliente, selecione o cliente principal.</p>
+                <Popover open={parentPopoverOpen} onOpenChange={setParentPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+                      {form.parent_id
+                        ? clientes.find((c) => c.id === form.parent_id)?.nome || "Cliente removido"
+                        : "Nenhum (cliente principal)"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente principal..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__none__"
+                            onSelect={() => {
+                              set("parent_id", "");
+                              setParentPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !form.parent_id ? "opacity-100" : "opacity-0")} />
+                            Nenhum (cliente principal)
+                          </CommandItem>
+                          {clientes
+                            .filter((c) => !c.parent_id && c.id !== editing?.id)
+                            .map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={c.nome}
+                                onSelect={() => {
+                                  set("parent_id", c.id);
+                                  setParentPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", form.parent_id === c.id ? "opacity-100" : "opacity-0")} />
+                                {c.nome}
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
                 </div>
               </div>
 
