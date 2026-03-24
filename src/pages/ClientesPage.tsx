@@ -80,6 +80,7 @@ const emptyForm = {
   estado_civil: "",
   nome_pai: "",
   nome_mae: "",
+  parent_id: "",
 };
 
 const ClientesPage = () => {
