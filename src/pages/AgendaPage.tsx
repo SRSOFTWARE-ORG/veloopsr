@@ -145,7 +145,7 @@ const filterOptions: { value: StatusFilter; label: string }[] = [
 ];
 
 const AgendaPage = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPrimaryAdmin, isReadOnly } = useAuth();
   const [cobrancas, setCobrancas] = useState<Cobranca[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);

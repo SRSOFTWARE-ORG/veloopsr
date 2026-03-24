@@ -73,7 +73,7 @@ interface Saida {
 }
 
 const CaixaPage = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPrimaryAdmin, isReadOnly } = useAuth();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [entradaTotal, setEntradaTotal] = useState(0);
   const [saidas, setSaidas] = useState<Saida[]>([]);

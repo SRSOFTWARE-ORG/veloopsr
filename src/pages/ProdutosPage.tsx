@@ -63,7 +63,7 @@ const emptyForm: ProductFormData = {
 };
 
 const ProdutosPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);

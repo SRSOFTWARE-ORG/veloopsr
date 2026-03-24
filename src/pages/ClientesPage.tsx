@@ -75,7 +75,7 @@ const emptyForm = {
 };
 
 const ClientesPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);

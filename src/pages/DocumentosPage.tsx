@@ -66,7 +66,7 @@ const detectTipoFromFileName = (fileName: string): string => {
 };
 
 const DocumentosPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
