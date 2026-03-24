@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -44,6 +44,14 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const App = () => {
   const [showIntro, setShowIntro] = useState(true);
   const handleIntroFinish = useCallback(() => setShowIntro(false), []);
+
+  useEffect(() => {
+    const introFailsafeTimer = window.setTimeout(() => {
+      setShowIntro(false);
+    }, 4500);
+
+    return () => window.clearTimeout(introFailsafeTimer);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
