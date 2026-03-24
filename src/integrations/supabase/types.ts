@@ -170,6 +170,7 @@ export type Database = {
           email: string | null
           endereco: string | null
           estado_civil: string | null
+          grau_parentesco: string | null
           id: string
           inscricao_estadual: string | null
           naturalidade: string | null
@@ -198,6 +199,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado_civil?: string | null
+          grau_parentesco?: string | null
           id?: string
           inscricao_estadual?: string | null
           naturalidade?: string | null
@@ -226,6 +228,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado_civil?: string | null
+          grau_parentesco?: string | null
           id?: string
           inscricao_estadual?: string | null
           naturalidade?: string | null
