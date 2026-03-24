@@ -14,7 +14,7 @@ const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
       clearTimeout(exitTimer);
       clearTimeout(finishTimer);
     };
-  }, [onFinish]);
+  }, []);
 
   const showLogo = phase !== "enter";
   const showText = phase === "text" || phase === "exit";
