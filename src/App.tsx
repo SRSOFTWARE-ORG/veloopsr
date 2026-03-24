@@ -22,14 +22,15 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; requirePrimaryAdmin?: boolean }> = ({ children, requirePrimaryAdmin }) => {
+  const { user, loading, isPrimaryAdmin } = useAuth();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
   if (!user) return <Navigate to="/login" replace />;
+  if (requirePrimaryAdmin && !isPrimaryAdmin) return <Navigate to="/" replace />;
   return <AppLayout>{children}</AppLayout>;
 };
 
@@ -62,7 +63,7 @@ const App = () => {
             <Route path="/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
             <Route path="/assistencia" element={<ProtectedRoute><AssistenciaPage /></ProtectedRoute>} />
             <Route path="/seguranca" element={<ProtectedRoute><SegurancaPage /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute><ConfiguracoesPage /></ProtectedRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute requirePrimaryAdmin><ConfiguracoesPage /></ProtectedRoute>} />
             <Route path="/caixa" element={<ProtectedRoute><CaixaPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
