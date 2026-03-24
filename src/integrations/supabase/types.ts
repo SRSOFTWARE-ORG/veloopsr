@@ -16,10 +16,12 @@ export type Database = {
     Tables: {
       assistencias: {
         Row: {
+          cliente_id: string | null
           cliente_nome: string
           cliente_telefone: string | null
           created_at: string | null
           defeito: string
+          dispositivo_id: string | null
           id: string
           imei_serial: string | null
           modelo: string | null
@@ -29,10 +31,12 @@ export type Database = {
           vendedor_id: string
         }
         Insert: {
+          cliente_id?: string | null
           cliente_nome: string
           cliente_telefone?: string | null
           created_at?: string | null
           defeito: string
+          dispositivo_id?: string | null
           id?: string
           imei_serial?: string | null
           modelo?: string | null
@@ -42,10 +46,12 @@ export type Database = {
           vendedor_id: string
         }
         Update: {
+          cliente_id?: string | null
           cliente_nome?: string
           cliente_telefone?: string | null
           created_at?: string | null
           defeito?: string
+          dispositivo_id?: string | null
           id?: string
           imei_serial?: string | null
           modelo?: string | null
@@ -54,7 +60,22 @@ export type Database = {
           updated_at?: string | null
           vendedor_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assistencias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistencias_dispositivo_id_fkey"
+            columns: ["dispositivo_id"]
+            isOneToOne: false
+            referencedRelation: "dispositivos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_log: {
         Row: {
@@ -310,6 +331,7 @@ export type Database = {
       }
       dispositivos: {
         Row: {
+          cliente_id: string | null
           cliente_nome: string | null
           created_at: string | null
           data_ativacao: string | null
@@ -322,6 +344,7 @@ export type Database = {
           venda_id: string | null
         }
         Insert: {
+          cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string | null
           data_ativacao?: string | null
@@ -334,6 +357,7 @@ export type Database = {
           venda_id?: string | null
         }
         Update: {
+          cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string | null
           data_ativacao?: string | null
@@ -346,6 +370,13 @@ export type Database = {
           venda_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "dispositivos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dispositivos_venda_id_fkey"
             columns: ["venda_id"]
