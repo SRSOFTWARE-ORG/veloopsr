@@ -49,6 +49,7 @@ interface Cliente {
   nome_pai: string | null;
   nome_mae: string | null;
   parent_id: string | null;
+  grau_parentesco: string | null;
 }
 
 const emptyForm = {
@@ -74,7 +75,7 @@ const ClientesPage = () => {
   const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   // Subcliente form state
-  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", observacoes: "" });
+  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" });
   const [subParentPopoverOpen, setSubParentPopoverOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Cliente | null>(null);
 
@@ -163,7 +164,7 @@ const ClientesPage = () => {
   };
 
   const resetForm = () => { setForm(emptyForm); setEditing(null); setShowExtra(false); };
-  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", observacoes: "" }); setEditingSub(null); };
+  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" }); setEditingSub(null); };
 
   const openEdit = (c: Cliente) => {
     setEditing(c);
@@ -183,7 +184,7 @@ const ClientesPage = () => {
 
   const openEditSub = (c: Cliente) => {
     setEditingSub(c);
-    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", observacoes: c.observacoes || "" });
+    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", grau_parentesco: (c as any).grau_parentesco || "", observacoes: c.observacoes || "" });
     setSubDialogOpen(true);
   };
 
@@ -235,6 +236,7 @@ const ClientesPage = () => {
     const payload: any = {
       nome: subForm.nome.trim(),
       parent_id: subForm.parent_id,
+      grau_parentesco: subForm.grau_parentesco || null,
       observacoes: subForm.observacoes.trim() || null,
     };
     if (!editingSub) payload.criado_por = user?.id;
@@ -594,6 +596,35 @@ const ClientesPage = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Grau de Parentesco</Label>
+                  <Select value={subForm.grau_parentesco} onValueChange={(v) => setSubForm({ ...subForm, grau_parentesco: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o grau" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="esposa">Esposa</SelectItem>
+                      <SelectItem value="marido">Marido</SelectItem>
+                      <SelectItem value="filho">Filho(a)</SelectItem>
+                      <SelectItem value="pai">Pai</SelectItem>
+                      <SelectItem value="mae">Mãe</SelectItem>
+                      <SelectItem value="irmao">Irmão(ã)</SelectItem>
+                      <SelectItem value="primo">Primo(a)</SelectItem>
+                      <SelectItem value="tio">Tio(a)</SelectItem>
+                      <SelectItem value="sobrinho">Sobrinho(a)</SelectItem>
+                      <SelectItem value="avo">Avô/Avó</SelectItem>
+                      <SelectItem value="neto">Neto(a)</SelectItem>
+                      <SelectItem value="cunhado">Cunhado(a)</SelectItem>
+                      <SelectItem value="sogro">Sogro(a)</SelectItem>
+                      <SelectItem value="genro">Genro/Nora</SelectItem>
+                      <SelectItem value="amigo">Amigo(a)</SelectItem>
+                      <SelectItem value="conhecido">Conhecido(a)</SelectItem>
+                      <SelectItem value="vizinho">Vizinho(a)</SelectItem>
+                      <SelectItem value="funcionario">Funcionário(a)</SelectItem>
+                      <SelectItem value="socio">Sócio(a)</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Observações (opcional)</Label>
                   <Textarea placeholder="Observações..." value={subForm.observacoes}
                     onChange={(e) => setSubForm({ ...subForm, observacoes: e.target.value })} rows={2} />
@@ -618,10 +649,15 @@ const ClientesPage = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{c.nome}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
                         {parent?.nome || "Cliente removido"}
                       </span>
+                      {(c as any).grau_parentesco && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground capitalize">
+                          {(c as any).grau_parentesco}
+                        </span>
+                      )}
                       {c.observacoes && <span className="text-xs text-muted-foreground truncate">{c.observacoes}</span>}
                     </div>
                   </div>

@@ -1,0 +1,1 @@
+ALTER TABLE public.clientes ADD COLUMN grau_parentesco text DEFAULT NULL;
