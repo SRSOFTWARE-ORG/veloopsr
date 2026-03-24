@@ -577,7 +577,14 @@ const ClientesPage = () => {
                 <span className="text-sm font-bold text-primary">{c.nome.charAt(0).toUpperCase()}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{c.nome}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{c.nome}</p>
+                  {c.parent_id && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground shrink-0">
+                      Sub: {clientes.find((p) => p.id === c.parent_id)?.nome || "—"}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {c.cpf && <span className="text-xs text-muted-foreground">CPF: {c.cpf}</span>}
                   {c.telefone && <span className="text-xs text-muted-foreground">Tel: {c.telefone}</span>}
