@@ -12,7 +12,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronsUpDown, Check } from "lucide-react";
+import { ChevronsUpDown, Check, Smartphone, Hash, HardDrive, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -47,16 +47,11 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
     observacoes: "",
   });
 
-  // Main clients = those without parent_id
   const mainClientes = clientes.filter((c) => !c.parent_id);
-
-  // Subclientes filtered by selected cliente
   const subclientes = clientes.filter((c) => c.parent_id === form.cliente_id);
-
   const selectedCliente = clientes.find((c) => c.id === form.cliente_id);
   const selectedSubcliente = clientes.find((c) => c.id === form.subcliente_id);
 
-  // Reset subcliente when cliente changes
   useEffect(() => {
     setForm((prev) => ({ ...prev, subcliente_id: "" }));
   }, [form.cliente_id]);
@@ -105,11 +100,25 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Nome do Dispositivo - full width */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium flex items-center gap-1.5">
+          <Smartphone className="w-3.5 h-3.5 text-primary" /> Nome do Dispositivo
+        </Label>
+        <Input
+          placeholder="Ex: iPhone 15 Pro - Marketing"
+          value={form.nome_dispositivo}
+          onChange={(e) => setForm({ ...form, nome_dispositivo: e.target.value })}
+        />
+      </div>
+
       {/* Grid 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* IMEI 1 */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">IMEI 1 *</Label>
+          <Label className="text-xs font-medium flex items-center gap-1.5">
+            <Hash className="w-3.5 h-3.5 text-primary" /> IMEI 1 *
+          </Label>
           <Input
             placeholder="000000000000000"
             value={form.imei_serial}
@@ -122,7 +131,9 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
 
         {/* IMEI 2 */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">IMEI 2</Label>
+          <Label className="text-xs font-medium flex items-center gap-1.5">
+            <Hash className="w-3.5 h-3.5 text-primary" /> IMEI 2 (Opcional)
+          </Label>
           <Input
             placeholder="000000000000000"
             value={form.imei2}
@@ -142,16 +153,6 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
           />
         </div>
 
-        {/* Nome do Dispositivo */}
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Nome do Dispositivo</Label>
-          <Input
-            placeholder="Ex: iPhone 15 Pro Max"
-            value={form.nome_dispositivo}
-            onChange={(e) => setForm({ ...form, nome_dispositivo: e.target.value })}
-          />
-        </div>
-
         {/* Modelo */}
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Modelo</Label>
@@ -164,10 +165,12 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
 
         {/* Memória */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Memória</Label>
+          <Label className="text-xs font-medium flex items-center gap-1.5">
+            <HardDrive className="w-3.5 h-3.5 text-primary" /> Memória
+          </Label>
           <Select value={form.memoria} onValueChange={(val) => setForm({ ...form, memoria: val })}>
             <SelectTrigger>
-              <SelectValue placeholder="Selecionar..." />
+              <SelectValue placeholder="Selecione a capacidade" />
             </SelectTrigger>
             <SelectContent>
               {MEMORIA_OPTIONS.map((m) => (
@@ -177,13 +180,18 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
           </Select>
         </div>
 
+        {/* Placeholder for grid alignment */}
+        <div className="hidden sm:block" />
+
         {/* Cliente */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Cliente</Label>
+          <Label className="text-xs font-medium flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-primary" /> Cliente
+          </Label>
           <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
-                {selectedCliente ? selectedCliente.nome : "Selecionar cliente..."}
+                {selectedCliente ? selectedCliente.nome : "Selecione o Cliente"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -215,7 +223,9 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
 
         {/* Subcliente */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Subcliente</Label>
+          <Label className="text-xs font-medium flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-primary" /> Subcliente
+          </Label>
           <Popover open={subclientePopoverOpen} onOpenChange={setSubclientePopoverOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -226,7 +236,7 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
               >
                 {selectedSubcliente ? selectedSubcliente.nome : (
                   !form.cliente_id ? "Selecione um cliente primeiro" :
-                  subclientes.length === 0 ? "Nenhum subcliente" : "Selecionar subcliente..."
+                  subclientes.length === 0 ? "Nenhum subcliente" : "Selecione o Subcliente"
                 )}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
@@ -268,7 +278,9 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
         />
       </div>
 
-      <Button type="submit" className="w-full">Cadastrar</Button>
+      <Button type="submit" className="w-full font-semibold py-3 shadow-md">
+        Salvar Dispositivo
+      </Button>
     </form>
   );
 };
