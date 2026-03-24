@@ -94,6 +94,7 @@ const ClientesPage = () => {
   const [loadingCep, setLoadingCep] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   const handleScanDocument = async (file: File) => {
     setScanning(true);
