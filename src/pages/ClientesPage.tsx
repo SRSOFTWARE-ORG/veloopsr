@@ -228,9 +228,12 @@ const ClientesPage = () => {
     e.preventDefault();
 
     if (!form.nome.trim()) { toast.error("Nome é obrigatório"); return; }
-    if (!form.telefone.trim()) { toast.error("Telefone é obrigatório"); return; }
-    if (!form.cpf.trim()) { toast.error("CPF é obrigatório"); return; }
-    if (!validateCPFOrCNPJ(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
+    const isSubcliente = !!form.parent_id;
+    if (!isSubcliente) {
+      if (!form.telefone.trim()) { toast.error("Telefone é obrigatório"); return; }
+      if (!form.cpf.trim()) { toast.error("CPF é obrigatório"); return; }
+      if (!validateCPFOrCNPJ(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
+    }
 
     const payload: any = {
       nome: form.nome.trim(),
