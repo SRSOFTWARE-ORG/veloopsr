@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera, ChevronsUpDown, Check, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { maskCPFOrCNPJ, maskPhone, maskCEP, validateCPFOrCNPJ } from "@/lib/masks";
 
 interface Cliente {
@@ -48,6 +55,7 @@ interface Cliente {
   estado_civil: string | null;
   nome_pai: string | null;
   nome_mae: string | null;
+  parent_id: string | null;
 }
 
 const emptyForm = {
@@ -72,6 +80,7 @@ const emptyForm = {
   estado_civil: "",
   nome_pai: "",
   nome_mae: "",
+  parent_id: "",
 };
 
 const ClientesPage = () => {
@@ -85,6 +94,7 @@ const ClientesPage = () => {
   const [loadingCep, setLoadingCep] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   const handleScanDocument = async (file: File) => {
     setScanning(true);
@@ -173,7 +183,7 @@ const ClientesPage = () => {
 
   const fetchClientes = async () => {
     const { data } = await supabase.from("clientes").select("*").order("nome");
-    setClientes((data as Cliente[]) || []);
+    setClientes((data as unknown as Cliente[]) || []);
   };
 
   const resetForm = () => {
@@ -206,6 +216,7 @@ const ClientesPage = () => {
       estado_civil: c.estado_civil || "",
       nome_pai: c.nome_pai || "",
       nome_mae: c.nome_mae || "",
+      parent_id: c.parent_id || "",
     });
     setShowExtra(true);
     setDialogOpen(true);
@@ -243,7 +254,8 @@ const ClientesPage = () => {
       estado_civil: form.estado_civil || null,
       nome_pai: form.nome_pai.trim() || null,
       nome_mae: form.nome_mae.trim() || null,
-    };
+      parent_id: form.parent_id || null,
+    } as any;
 
     if (!editing) payload.criado_por = user?.id;
 
@@ -341,7 +353,60 @@ const ClientesPage = () => {
                   <div className="space-y-2">
                     <Label>CPF / CNPJ *</Label>
                     <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", maskCPFOrCNPJ(e.target.value))} required />
-                  </div>
+              </div>
+
+              {/* Cliente Principal (Parent) */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-primary" /> Cliente Principal (opcional)
+                </Label>
+                <p className="text-[11px] text-muted-foreground">Se este cliente for um subcliente, selecione o cliente principal.</p>
+                <Popover open={parentPopoverOpen} onOpenChange={setParentPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+                      {form.parent_id
+                        ? clientes.find((c) => c.id === form.parent_id)?.nome || "Cliente removido"
+                        : "Nenhum (cliente principal)"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente principal..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__none__"
+                            onSelect={() => {
+                              set("parent_id", "");
+                              setParentPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !form.parent_id ? "opacity-100" : "opacity-0")} />
+                            Nenhum (cliente principal)
+                          </CommandItem>
+                          {clientes
+                            .filter((c) => !c.parent_id && c.id !== editing?.id)
+                            .map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={c.nome}
+                                onSelect={() => {
+                                  set("parent_id", c.id);
+                                  setParentPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", form.parent_id === c.id ? "opacity-100" : "opacity-0")} />
+                                {c.nome}
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
                 </div>
               </div>
 
@@ -512,7 +577,14 @@ const ClientesPage = () => {
                 <span className="text-sm font-bold text-primary">{c.nome.charAt(0).toUpperCase()}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{c.nome}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{c.nome}</p>
+                  {c.parent_id && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground shrink-0">
+                      Sub: {clientes.find((p) => p.id === c.parent_id)?.nome || "—"}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {c.cpf && <span className="text-xs text-muted-foreground">CPF: {c.cpf}</span>}
                   {c.telefone && <span className="text-xs text-muted-foreground">Tel: {c.telefone}</span>}
