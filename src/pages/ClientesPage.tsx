@@ -343,19 +343,24 @@ const ClientesPage = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Required fields */}
               <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados obrigatórios</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {form.parent_id ? "Dados do subcliente" : "Dados obrigatórios"}
+                </p>
+                {form.parent_id && (
+                  <p className="text-[11px] text-muted-foreground -mt-1">Apenas o nome é obrigatório para subclientes</p>
+                )}
                 <div className="space-y-2">
                   <Label>Nome completo *</Label>
                   <Input placeholder="Nome do cliente" value={form.nome} onChange={(e) => set("nome", e.target.value)} required />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Celular *</Label>
-                    <Input placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} required />
+                    <Label className={form.parent_id ? "text-muted-foreground" : ""}>Celular {form.parent_id ? "(opcional)" : "*"}</Label>
+                    <Input placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} required={!form.parent_id} />
                   </div>
                   <div className="space-y-2">
-                    <Label>CPF / CNPJ *</Label>
-                    <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", maskCPFOrCNPJ(e.target.value))} required />
+                    <Label className={form.parent_id ? "text-muted-foreground" : ""}>CPF / CNPJ {form.parent_id ? "(opcional)" : "*"}</Label>
+                    <Input placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set("cpf", maskCPFOrCNPJ(e.target.value))} required={!form.parent_id} />
               </div>
 
               {/* Cliente Principal (Parent) */}
