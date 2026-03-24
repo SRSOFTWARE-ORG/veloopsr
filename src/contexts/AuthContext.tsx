@@ -14,6 +14,8 @@ interface UserPermissions {
   valor_comissao: number;
 }
 
+const PRIMARY_ADMIN_EMAIL = "srcj9975@gmail.com";
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -22,6 +24,8 @@ interface AuthContextType {
   role: UserRole;
   permissions: UserPermissions;
   isAdmin: boolean;
+  isPrimaryAdmin: boolean;
+  isReadOnly: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -43,6 +47,8 @@ const AuthContext = createContext<AuthContextType>({
   role: "vendedor",
   permissions: defaultPermissions,
   isAdmin: false,
+  isPrimaryAdmin: false,
+  isReadOnly: true,
   signOut: async () => {},
 });
 
@@ -133,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         permissions,
         isAdmin: role === "admin",
+        isPrimaryAdmin: role === "admin" && user?.email === PRIMARY_ADMIN_EMAIL,
+        isReadOnly: role === "admin" && user?.email !== PRIMARY_ADMIN_EMAIL,
         signOut,
       }}
     >
