@@ -254,7 +254,8 @@ const ClientesPage = () => {
       estado_civil: form.estado_civil || null,
       nome_pai: form.nome_pai.trim() || null,
       nome_mae: form.nome_mae.trim() || null,
-    };
+      parent_id: form.parent_id || null,
+    } as any;
 
     if (!editing) payload.criado_por = user?.id;
 
