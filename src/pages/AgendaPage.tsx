@@ -145,7 +145,7 @@ const filterOptions: { value: StatusFilter; label: string }[] = [
 ];
 
 const AgendaPage = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPrimaryAdmin, isReadOnly } = useAuth();
   const [cobrancas, setCobrancas] = useState<Cobranca[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -233,7 +233,7 @@ const AgendaPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!isAdmin) {
+    if (!isPrimaryAdmin) {
       toast.error("Apenas administradores podem excluir cobranças");
       return;
     }
@@ -247,7 +247,7 @@ const AgendaPage = () => {
   };
 
   const handleSetPaymentStatus = async (cobrancaId: string, dateKey: string, newStatus: string) => {
-    if (!isAdmin) {
+    if (!isPrimaryAdmin) {
       toast.error("Apenas administradores podem alterar status de pagamento");
       return;
     }
@@ -635,7 +635,7 @@ const AgendaPage = () => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pl-10 pt-1 flex-wrap">
-                      {isAdmin && !isPaidOrExempt && (
+                      {isPrimaryAdmin && !isPaidOrExempt && (
                         <>
                           <Button
                             variant="outline"
@@ -657,7 +657,7 @@ const AgendaPage = () => {
                           </Button>
                         </>
                       )}
-                      {isAdmin && isPaidOrExempt && (
+                      {isPrimaryAdmin && isPaidOrExempt && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -668,7 +668,7 @@ const AgendaPage = () => {
                           Desfazer
                         </Button>
                       )}
-                      {isAdmin && (
+                      {isPrimaryAdmin && (
                         <>
                           <Button
                             variant="ghost"

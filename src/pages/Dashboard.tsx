@@ -27,7 +27,7 @@ const frequenciaLabels: Record<string, string> = {
 };
 
 const Dashboard = () => {
-  const { isAdmin, profile, role, permissions } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, profile, role, permissions } = useAuth();
   const canSeeFaturamento = isAdmin || permissions.pode_ver_faturamento;
   const navigate = useNavigate();
   const [stats, setStats] = useState({

@@ -75,7 +75,7 @@ const emptyForm = {
 };
 
 const ClientesPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -524,7 +524,7 @@ const ClientesPage = () => {
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}>
                   <Edit className="w-4 h-4" />
                 </Button>
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(c.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>

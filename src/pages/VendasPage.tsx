@@ -76,7 +76,7 @@ const frequenciaLabels: Record<string, string> = {
 };
 
 const VendasPage = () => {
-  const { user, isAdmin, permissions } = useAuth();
+  const { user, isAdmin, isPrimaryAdmin, isReadOnly, permissions } = useAuth();
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editVenda, setEditVenda] = useState<Venda | null>(null);
@@ -366,7 +366,7 @@ const VendasPage = () => {
                     <MessageCircle className="w-4 h-4" />
                   </Button>
                 )}
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -376,7 +376,7 @@ const VendasPage = () => {
                     <Pencil className="w-4 h-4" />
                   </Button>
                 )}
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"

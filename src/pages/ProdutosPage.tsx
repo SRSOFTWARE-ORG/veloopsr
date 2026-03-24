@@ -63,7 +63,7 @@ const emptyForm: ProductFormData = {
 };
 
 const ProdutosPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isReadOnly, user } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -201,7 +201,7 @@ const ProdutosPage = () => {
           <h1 className="text-xl font-extrabold tracking-tight">Catálogo</h1>
           <p className="text-sm text-muted-foreground">{produtos.length} produtos</p>
         </div>
-        {isAdmin && (
+        {isPrimaryAdmin && (
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm">
@@ -273,7 +273,7 @@ const ProdutosPage = () => {
             key={p.id}
             produto={p}
             index={i}
-            isAdmin={isAdmin}
+            isAdmin={isPrimaryAdmin}
             onEdit={openEdit}
             onDelete={handleDelete}
             onAddStock={handleAddStock}
@@ -286,7 +286,7 @@ const ProdutosPage = () => {
           <Package className="w-14 h-14 mx-auto mb-3 opacity-20" />
           <p className="font-semibold text-sm">Nenhum produto encontrado</p>
           <p className="text-xs mt-1">
-            {isAdmin ? "Cadastre seu primeiro produto" : "Nenhum item no catálogo"}
+            {isPrimaryAdmin ? "Cadastre seu primeiro produto" : "Nenhum item no catálogo"}
           </p>
         </div>
       )}
