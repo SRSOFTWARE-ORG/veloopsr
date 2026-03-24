@@ -183,7 +183,7 @@ const ClientesPage = () => {
 
   const fetchClientes = async () => {
     const { data } = await supabase.from("clientes").select("*").order("nome");
-    setClientes((data as Cliente[]) || []);
+    setClientes((data as unknown as Cliente[]) || []);
   };
 
   const resetForm = () => {
