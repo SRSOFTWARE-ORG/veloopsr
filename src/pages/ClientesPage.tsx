@@ -49,6 +49,7 @@ interface Cliente {
   nome_pai: string | null;
   nome_mae: string | null;
   parent_id: string | null;
+  grau_parentesco: string | null;
 }
 
 const emptyForm = {
@@ -74,7 +75,7 @@ const ClientesPage = () => {
   const [parentPopoverOpen, setParentPopoverOpen] = useState(false);
 
   // Subcliente form state
-  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", observacoes: "" });
+  const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" });
   const [subParentPopoverOpen, setSubParentPopoverOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Cliente | null>(null);
 
@@ -163,7 +164,7 @@ const ClientesPage = () => {
   };
 
   const resetForm = () => { setForm(emptyForm); setEditing(null); setShowExtra(false); };
-  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", observacoes: "" }); setEditingSub(null); };
+  const resetSubForm = () => { setSubForm({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "" }); setEditingSub(null); };
 
   const openEdit = (c: Cliente) => {
     setEditing(c);
@@ -183,7 +184,7 @@ const ClientesPage = () => {
 
   const openEditSub = (c: Cliente) => {
     setEditingSub(c);
-    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", observacoes: c.observacoes || "" });
+    setSubForm({ nome: c.nome, parent_id: c.parent_id || "", grau_parentesco: (c as any).grau_parentesco || "", observacoes: c.observacoes || "" });
     setSubDialogOpen(true);
   };
 
