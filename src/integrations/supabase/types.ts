@@ -177,6 +177,7 @@ export type Database = {
           nome_mae: string | null
           nome_pai: string | null
           observacoes: string | null
+          parent_id: string | null
           rg: string | null
           rg_data_emissao: string | null
           rg_emissor: string | null
@@ -204,6 +205,7 @@ export type Database = {
           nome_mae?: string | null
           nome_pai?: string | null
           observacoes?: string | null
+          parent_id?: string | null
           rg?: string | null
           rg_data_emissao?: string | null
           rg_emissor?: string | null
@@ -231,6 +233,7 @@ export type Database = {
           nome_mae?: string | null
           nome_pai?: string | null
           observacoes?: string | null
+          parent_id?: string | null
           rg?: string | null
           rg_data_emissao?: string | null
           rg_emissor?: string | null
@@ -239,7 +242,15 @@ export type Database = {
           uf?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cobranca_pagamentos: {
         Row: {
@@ -337,9 +348,15 @@ export type Database = {
           data_ativacao: string | null
           id: string
           imei_serial: string
+          imei2: string | null
+          memoria: string | null
           modelo: string | null
+          nome_dispositivo: string | null
           observacoes: string | null
+          serial_number: string | null
           status_seguranca: string | null
+          subcliente_id: string | null
+          subcliente_nome: string | null
           updated_at: string | null
           venda_id: string | null
         }
@@ -350,9 +367,15 @@ export type Database = {
           data_ativacao?: string | null
           id?: string
           imei_serial: string
+          imei2?: string | null
+          memoria?: string | null
           modelo?: string | null
+          nome_dispositivo?: string | null
           observacoes?: string | null
+          serial_number?: string | null
           status_seguranca?: string | null
+          subcliente_id?: string | null
+          subcliente_nome?: string | null
           updated_at?: string | null
           venda_id?: string | null
         }
@@ -363,9 +386,15 @@ export type Database = {
           data_ativacao?: string | null
           id?: string
           imei_serial?: string
+          imei2?: string | null
+          memoria?: string | null
           modelo?: string | null
+          nome_dispositivo?: string | null
           observacoes?: string | null
+          serial_number?: string | null
           status_seguranca?: string | null
+          subcliente_id?: string | null
+          subcliente_nome?: string | null
           updated_at?: string | null
           venda_id?: string | null
         }
@@ -373,6 +402,13 @@ export type Database = {
           {
             foreignKeyName: "dispositivos_cliente_id_fkey"
             columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispositivos_subcliente_id_fkey"
+            columns: ["subcliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]

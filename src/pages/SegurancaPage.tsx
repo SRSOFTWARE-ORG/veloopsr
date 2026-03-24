@@ -12,22 +12,20 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { ChevronsUpDown, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import DispositivoForm from "@/components/seguranca/DispositivoForm";
 
 interface Dispositivo {
   id: string;
   imei_serial: string;
+  imei2: string | null;
+  serial_number: string | null;
+  nome_dispositivo: string | null;
   modelo: string | null;
+  memoria: string | null;
   status_seguranca: string;
   cliente_nome: string | null;
   cliente_id: string | null;
+  subcliente_nome: string | null;
   observacoes: string | null;
   data_ativacao: string;
 }
@@ -35,6 +33,7 @@ interface Dispositivo {
 interface Cliente {
   id: string;
   nome: string;
+  parent_id: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -55,13 +54,6 @@ const SegurancaPage = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
-  const [form, setForm] = useState({
-    imei_serial: "",
-    modelo: "",
-    cliente_id: "",
-    observacoes: "",
-  });
 
   useEffect(() => {
     fetchDispositivos();
@@ -79,31 +71,12 @@ const SegurancaPage = () => {
 
   const fetchDispositivos = async () => {
     const { data } = await supabase.from("dispositivos").select("*").order("created_at", { ascending: false });
-    setDispositivos((data as Dispositivo[]) || []);
+    setDispositivos((data as unknown as Dispositivo[]) || []);
   };
 
   const fetchClientes = async () => {
-    const { data } = await supabase.from("clientes").select("id, nome").order("nome");
-    setClientes((data as Cliente[]) || []);
-  };
-
-  const selectedCliente = clientes.find((c) => c.id === form.cliente_id);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cliente = clientes.find((c) => c.id === form.cliente_id);
-    const { error } = await supabase.from("dispositivos").insert({
-      imei_serial: form.imei_serial.trim(),
-      modelo: form.modelo.trim() || null,
-      cliente_id: form.cliente_id || null,
-      cliente_nome: cliente?.nome || null,
-      observacoes: form.observacoes.trim() || null,
-    });
-    if (error) { toast.error(error.message); return; }
-    toast.success("Dispositivo cadastrado!");
-    setDialogOpen(false);
-    setForm({ imei_serial: "", modelo: "", cliente_id: "", observacoes: "" });
-    fetchDispositivos();
+    const { data } = await supabase.from("clientes").select("id, nome, parent_id" as any).order("nome");
+    setClientes((data as unknown as Cliente[]) || []);
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
@@ -117,6 +90,7 @@ const SegurancaPage = () => {
   const filtered = dispositivos.filter(
     (d) =>
       d.imei_serial.includes(search) ||
+      d.nome_dispositivo?.toLowerCase().includes(search.toLowerCase()) ||
       d.modelo?.toLowerCase().includes(search.toLowerCase()) ||
       d.cliente_nome?.toLowerCase().includes(search.toLowerCase())
   );
@@ -133,50 +107,15 @@ const SegurancaPage = () => {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Cadastrar Dispositivo</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <Input placeholder="IMEI / Serial *" value={form.imei_serial} onChange={(e) => setForm({ ...form, imei_serial: e.target.value })} required />
-                <Input placeholder="Modelo" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
-
-                {/* Client search dropdown */}
-                <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                      {selectedCliente ? selectedCliente.nome : "Selecionar cliente..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Buscar cliente..." />
-                      <CommandList>
-                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {clientes.map((c) => (
-                            <CommandItem
-                              key={c.id}
-                              value={c.nome}
-                              onSelect={() => {
-                                setForm({ ...form, cliente_id: c.id });
-                                setClientePopoverOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", form.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
-                              {c.nome}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-
-                <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
-                <Button type="submit" className="w-full">Cadastrar</Button>
-              </form>
+              <DispositivoForm
+                clientes={clientes}
+                onSuccess={fetchDispositivos}
+                onClose={() => setDialogOpen(false)}
+              />
             </DialogContent>
           </Dialog>
         )}
@@ -184,7 +123,7 @@ const SegurancaPage = () => {
 
       <div className="relative mb-4 slide-up delay-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar por IMEI, modelo ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+        <Input placeholder="Buscar por IMEI, nome, modelo ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
       </div>
 
       <div className="space-y-2">
@@ -195,13 +134,15 @@ const SegurancaPage = () => {
                 <Smartphone className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{d.modelo || "Dispositivo"}</p>
+                <p className="font-semibold text-sm truncate">{d.nome_dispositivo || d.modelo || "Dispositivo"}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-xs text-muted-foreground font-mono">{d.imei_serial}</span>
+                  {d.memoria && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">{d.memoria}</span>}
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusColors[d.status_seguranca]}`}>
                     {statusLabels[d.status_seguranca]}
                   </span>
                   {d.cliente_nome && <span className="text-xs text-muted-foreground">{d.cliente_nome}</span>}
+                  {d.subcliente_nome && <span className="text-xs text-muted-foreground">→ {d.subcliente_nome}</span>}
                 </div>
               </div>
               {isPrimaryAdmin && (
