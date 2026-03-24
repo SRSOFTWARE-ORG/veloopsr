@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera, ChevronsUpDown, Check, UserPlus } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera, ChevronsUpDown, Check, UserPlus, Eye } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -78,6 +78,7 @@ const ClientesPage = () => {
   const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "", cpf: "", telefone: "" });
   const [subParentPopoverOpen, setSubParentPopoverOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Cliente | null>(null);
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
   const mainClientes = clientes.filter((c) => !c.parent_id);
   const subClientes = clientes.filter((c) => !!c.parent_id);
@@ -310,6 +311,74 @@ const ClientesPage = () => {
       ) : (
         renderClientesTab()
       )}
+
+      {/* View Cliente Dialog */}
+      <Dialog open={!!viewingCliente} onOpenChange={(open) => !open && setViewingCliente(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              {viewingCliente?.parent_id ? "Dados do Subcliente" : "Dados do Cliente"}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingCliente && (() => {
+            const c = viewingCliente;
+            const parent = c.parent_id ? mainClientes.find(p => p.id === c.parent_id) : null;
+            const subs = subClientes.filter(s => s.parent_id === c.id);
+            const fields: [string, string | null | undefined][] = [
+              ["Nome", c.nome],
+              ["CPF", c.cpf],
+              ["Telefone", c.telefone],
+              ["E-mail", c.email],
+              ["Endereço", c.endereco],
+              ["Complemento", c.complemento],
+              ["Bairro", c.bairro],
+              ["Cidade/UF", c.cidade && c.uf ? `${c.cidade}/${c.uf}` : c.cidade || c.uf],
+              ["CEP", c.cep],
+              ["RG", c.rg],
+              ["Emissor RG", c.rg_emissor],
+              ["Data Emissão RG", c.rg_data_emissao],
+              ["Data Nascimento", c.data_nascimento],
+              ["Naturalidade", c.naturalidade],
+              ["Estado Civil", c.estado_civil],
+              ["Nome do Pai", c.nome_pai],
+              ["Nome da Mãe", c.nome_mae],
+              ["Inscrição Estadual", c.inscricao_estadual],
+              ["Observações", c.observacoes],
+            ];
+            if (c.parent_id) {
+              fields.splice(1, 0, ["Cliente Principal", parent?.nome || "—"]);
+              fields.splice(2, 0, ["Grau de Parentesco", (c as any).grau_parentesco]);
+            }
+            return (
+              <div className="space-y-3">
+                {fields.map(([label, value]) => value ? (
+                  <div key={label} className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    <span className="text-sm capitalize">{value}</span>
+                  </div>
+                ) : null)}
+                {!c.parent_id && subs.length > 0 && (
+                  <div className="pt-2 border-t">
+                    <span className="text-xs font-medium text-muted-foreground">Subclientes ({subs.length})</span>
+                    <div className="mt-1 space-y-1">
+                      {subs.map(s => (
+                        <div key={s.id} className="text-sm flex items-center gap-2">
+                          <UserPlus className="w-3 h-3 text-primary" />
+                          {s.nome}
+                          {(s as any).grau_parentesco && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground capitalize">{(s as any).grau_parentesco}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
@@ -517,6 +586,9 @@ const ClientesPage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCliente(c)}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}>
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -716,6 +788,9 @@ const ClientesPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCliente(c)}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditSub(c)}>
                       <Edit className="w-4 h-4" />
                     </Button>
