@@ -352,7 +352,7 @@ const CaixaPage = () => {
                       {new Date(s.created_at).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  {isAdmin && (
+                  {isPrimaryAdmin && (
                     <Button
                       variant="ghost"
                       size="icon"

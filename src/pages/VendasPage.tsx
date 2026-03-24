@@ -366,7 +366,7 @@ const VendasPage = () => {
                     <MessageCircle className="w-4 h-4" />
                   </Button>
                 )}
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -376,7 +376,7 @@ const VendasPage = () => {
                     <Pencil className="w-4 h-4" />
                   </Button>
                 )}
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"
