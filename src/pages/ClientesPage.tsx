@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera } from "lucide-react";
+import { Plus, Search, Users, Edit, Trash2, ChevronDown, ChevronUp, Loader2, Camera, ChevronsUpDown, Check, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { maskCPFOrCNPJ, maskPhone, maskCEP, validateCPFOrCNPJ } from "@/lib/masks";
 
 interface Cliente {
