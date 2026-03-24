@@ -55,6 +55,7 @@ interface Cliente {
   estado_civil: string | null;
   nome_pai: string | null;
   nome_mae: string | null;
+  parent_id: string | null;
 }
 
 const emptyForm = {
