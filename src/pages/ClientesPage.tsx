@@ -78,6 +78,7 @@ const ClientesPage = () => {
   const [subForm, setSubForm] = useState({ nome: "", parent_id: "", grau_parentesco: "", observacoes: "", cpf: "", telefone: "" });
   const [subParentPopoverOpen, setSubParentPopoverOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Cliente | null>(null);
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
   const mainClientes = clientes.filter((c) => !c.parent_id);
   const subClientes = clientes.filter((c) => !!c.parent_id);
