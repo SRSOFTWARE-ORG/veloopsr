@@ -236,6 +236,7 @@ const ClientesPage = () => {
     const payload: any = {
       nome: subForm.nome.trim(),
       parent_id: subForm.parent_id,
+      grau_parentesco: subForm.grau_parentesco || null,
       observacoes: subForm.observacoes.trim() || null,
     };
     if (!editingSub) payload.criado_por = user?.id;
@@ -592,6 +593,35 @@ const ClientesPage = () => {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Grau de Parentesco</Label>
+                  <Select value={subForm.grau_parentesco} onValueChange={(v) => setSubForm({ ...subForm, grau_parentesco: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o grau" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="esposa">Esposa</SelectItem>
+                      <SelectItem value="marido">Marido</SelectItem>
+                      <SelectItem value="filho">Filho(a)</SelectItem>
+                      <SelectItem value="pai">Pai</SelectItem>
+                      <SelectItem value="mae">Mãe</SelectItem>
+                      <SelectItem value="irmao">Irmão(ã)</SelectItem>
+                      <SelectItem value="primo">Primo(a)</SelectItem>
+                      <SelectItem value="tio">Tio(a)</SelectItem>
+                      <SelectItem value="sobrinho">Sobrinho(a)</SelectItem>
+                      <SelectItem value="avo">Avô/Avó</SelectItem>
+                      <SelectItem value="neto">Neto(a)</SelectItem>
+                      <SelectItem value="cunhado">Cunhado(a)</SelectItem>
+                      <SelectItem value="sogro">Sogro(a)</SelectItem>
+                      <SelectItem value="genro">Genro/Nora</SelectItem>
+                      <SelectItem value="amigo">Amigo(a)</SelectItem>
+                      <SelectItem value="conhecido">Conhecido(a)</SelectItem>
+                      <SelectItem value="vizinho">Vizinho(a)</SelectItem>
+                      <SelectItem value="funcionario">Funcionário(a)</SelectItem>
+                      <SelectItem value="socio">Sócio(a)</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
