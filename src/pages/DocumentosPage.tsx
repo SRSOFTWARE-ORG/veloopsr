@@ -481,7 +481,7 @@ const DocumentosPage = () => {
           <p className="text-sm text-muted-foreground">{documentos.length} arquivos</p>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {isPrimaryAdmin && (
             <Button
               size="sm"
               variant="outline"
@@ -499,7 +499,7 @@ const DocumentosPage = () => {
                 : "Escanear Boletos"}
             </Button>
           )}
-          {isAdmin && (
+          {isPrimaryAdmin && (
             <Button
               size="sm"
               variant="outline"
@@ -582,7 +582,7 @@ const DocumentosPage = () => {
                     <Download className="w-4 h-4" />
                   </a>
                 </Button>
-                {isAdmin && (
+                {isPrimaryAdmin && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(d.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
