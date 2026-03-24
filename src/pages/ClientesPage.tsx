@@ -216,6 +216,7 @@ const ClientesPage = () => {
       estado_civil: c.estado_civil || "",
       nome_pai: c.nome_pai || "",
       nome_mae: c.nome_mae || "",
+      parent_id: c.parent_id || "",
     });
     setShowExtra(true);
     setDialogOpen(true);
