@@ -597,31 +597,70 @@ const ClientesPage = () => {
 
                 <div className="space-y-2">
                   <Label>Grau de Parentesco</Label>
-                  <Select value={subForm.grau_parentesco} onValueChange={(v) => setSubForm({ ...subForm, grau_parentesco: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o grau" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="esposa">Esposa</SelectItem>
-                      <SelectItem value="marido">Marido</SelectItem>
-                      <SelectItem value="filho">Filho(a)</SelectItem>
-                      <SelectItem value="pai">Pai</SelectItem>
-                      <SelectItem value="mae">Mãe</SelectItem>
-                      <SelectItem value="irmao">Irmão(ã)</SelectItem>
-                      <SelectItem value="primo">Primo(a)</SelectItem>
-                      <SelectItem value="tio">Tio(a)</SelectItem>
-                      <SelectItem value="sobrinho">Sobrinho(a)</SelectItem>
-                      <SelectItem value="avo">Avô/Avó</SelectItem>
-                      <SelectItem value="neto">Neto(a)</SelectItem>
-                      <SelectItem value="cunhado">Cunhado(a)</SelectItem>
-                      <SelectItem value="sogro">Sogro(a)</SelectItem>
-                      <SelectItem value="genro">Genro/Nora</SelectItem>
-                      <SelectItem value="amigo">Amigo(a)</SelectItem>
-                      <SelectItem value="conhecido">Conhecido(a)</SelectItem>
-                      <SelectItem value="vizinho">Vizinho(a)</SelectItem>
-                      <SelectItem value="funcionario">Funcionário(a)</SelectItem>
-                      <SelectItem value="socio">Sócio(a)</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    const grauOptions = [
+                      { value: "esposa", label: "Esposa" },
+                      { value: "marido", label: "Marido" },
+                      { value: "filho", label: "Filho(a)" },
+                      { value: "pai", label: "Pai" },
+                      { value: "mae", label: "Mãe" },
+                      { value: "irmao", label: "Irmão(ã)" },
+                      { value: "primo", label: "Primo(a)" },
+                      { value: "tio", label: "Tio(a)" },
+                      { value: "sobrinho", label: "Sobrinho(a)" },
+                      { value: "avo", label: "Avô/Avó" },
+                      { value: "neto", label: "Neto(a)" },
+                      { value: "cunhado", label: "Cunhado(a)" },
+                      { value: "sogro", label: "Sogro(a)" },
+                      { value: "genro", label: "Genro/Nora" },
+                      { value: "amigo", label: "Amigo(a)" },
+                      { value: "conhecido", label: "Conhecido(a)" },
+                      { value: "vizinho", label: "Vizinho(a)" },
+                      { value: "funcionario", label: "Funcionário(a)" },
+                      { value: "socio", label: "Sócio(a)" },
+                    ];
+                    const searchTerm = subForm.grau_parentesco || "";
+                    const filtered = grauOptions.filter(o =>
+                      o.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      o.value.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    const exactMatch = grauOptions.find(o => o.value === searchTerm || o.label.toLowerCase() === searchTerm.toLowerCase());
+                    return (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                            {exactMatch ? exactMatch.label : (searchTerm || "Digite ou selecione...")}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Digite o grau..."
+                              value={searchTerm}
+                              onValueChange={(v) => setSubForm({ ...subForm, grau_parentesco: v })}
+                            />
+                            <CommandList>
+                              {filtered.length > 0 ? (
+                                <CommandGroup>
+                                  {filtered.map(o => (
+                                    <CommandItem key={o.value} value={o.value} onSelect={() => setSubForm({ ...subForm, grau_parentesco: o.value })}>
+                                      <Check className={cn("mr-2 h-4 w-4", subForm.grau_parentesco === o.value ? "opacity-100" : "opacity-0")} />
+                                      {o.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              ) : (
+                                <CommandEmpty>
+                                  <span className="text-muted-foreground text-xs">Usar: "<strong>{searchTerm}</strong>"</span>
+                                </CommandEmpty>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-2">
