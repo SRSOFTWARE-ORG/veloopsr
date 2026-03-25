@@ -107,6 +107,30 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_sync: {
+        Row: {
+          cobranca_id: string
+          created_at: string | null
+          google_event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          cobranca_id: string
+          created_at?: string | null
+          google_event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          cobranca_id?: string
+          created_at?: string | null
+          google_event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       checklist_entrega: {
         Row: {
           acessorios_ok: boolean | null
@@ -506,6 +530,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      google_calendar_tokens: {
+        Row: {
+          access_token: string
+          calendar_id: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          refresh_token: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          refresh_token: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       notificacoes: {
         Row: {
