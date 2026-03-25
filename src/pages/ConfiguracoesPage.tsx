@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
+import PermissionsManager from "@/components/PermissionsManager";
 
 interface UserWithPermissions {
   id: string;
