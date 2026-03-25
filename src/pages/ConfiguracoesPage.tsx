@@ -320,6 +320,8 @@ const ConfiguracoesPage = () => {
         )}
       </div>
 
+      <PermissionsManager />
+
       <EditVendedorDialog vendedor={editVendedor} open={editDialogOpen} onOpenChange={setEditDialogOpen} onSaved={fetchUsers} />
 
       <AlertDialog open={!!deleteUserId} onOpenChange={(o) => !o && setDeleteUserId(null)}>
