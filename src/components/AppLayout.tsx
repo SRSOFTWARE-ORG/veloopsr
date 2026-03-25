@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -37,6 +37,7 @@ const adminItems = [
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { profile, isAdmin, isPrimaryAdmin, isReadOnly, signOut, role } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
   const location = useLocation();
 
   const allItems = isPrimaryAdmin ? [...navItems, ...adminItems] : navItems;
@@ -47,7 +48,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/60 fixed inset-y-0 left-0 z-30">
         <div className="p-5 border-b border-border/60 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-primary">Veloop</h1>
+            <h1 className="text-xl font-extrabold tracking-tight text-primary cursor-pointer" onClick={() => navigate("/")}>Veloop</h1>
             <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
           </div>
           <NotificationBell />
@@ -95,7 +96,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border/60 flex items-center justify-between px-4 z-30">
-        <h1 className="text-lg font-extrabold text-primary">Veloop</h1>
+        <h1 className="text-lg font-extrabold text-primary cursor-pointer" onClick={() => navigate("/")}>Veloop</h1>
         <div className="flex items-center gap-1">
           <NotificationBell />
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
@@ -110,7 +111,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="absolute inset-0 bg-foreground/20" onClick={() => setSidebarOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl slide-up">
             <div className="p-5 border-b border-border/60 flex items-center justify-between">
-              <h1 className="text-xl font-extrabold text-primary">Veloop</h1>
+              <h1 className="text-xl font-extrabold text-primary cursor-pointer" onClick={() => { navigate("/"); setSidebarOpen(false); }}>Veloop</h1>
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
             </div>
             <nav className="p-3 space-y-1">
