@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Bell } from "lucide-react";
+import { Bell, BellRing } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -18,6 +19,7 @@ interface Notificacao {
 const NotificationBell = () => {
   const { user } = useAuth();
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [open, setOpen] = useState(false);
 
   const unreadCount = notificacoes.filter((n) => !n.lida).length;
@@ -114,6 +116,25 @@ const NotificationBell = () => {
                 )}
               </div>
             </div>
+
+            {pushSupported && (
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <BellRing className="w-3 h-3" />
+                  Push no celular
+                </span>
+                <button
+                  onClick={() => pushSubscribed ? pushUnsubscribe() : pushSubscribe()}
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    pushSubscribed
+                      ? "bg-primary/10 text-primary"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {pushSubscribed ? "Ativado" : "Ativar"}
+                </button>
+              </div>
+            )}
 
             <div className="overflow-y-auto max-h-72">
               {notificacoes.length === 0 ? (
