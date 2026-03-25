@@ -1,195 +1,191 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const ease = [0.22, 1, 0.36, 1];
 
 const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
-  const [phase, setPhase] = useState<"enter" | "particles" | "logo" | "text" | "exit">("enter");
-
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("particles"), 50);
-    const t2 = setTimeout(() => setPhase("logo"), 600);
-    const t3 = setTimeout(() => setPhase("text"), 1800);
-    const t4 = setTimeout(() => setPhase("exit"), 3400);
-    const t5 = setTimeout(() => onFinish(), 4200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); };
-  }, []);
-
-  const pastEnter = phase !== "enter";
-  const showLogo = phase === "logo" || phase === "text" || phase === "exit";
-  const showText = phase === "text" || phase === "exit";
-  const isExit = phase === "exit";
+    const timer = setTimeout(() => onFinish(), 8200);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
-      style={{
-        background: "radial-gradient(ellipse at 50% 40%, #f0f4f8 0%, #dce3eb 50%, #c8d3df 100%)",
-        opacity: isExit ? 0 : 1,
-        transform: isExit ? "scale(1.08)" : "scale(1)",
-        transition: "opacity 0.8s cubic-bezier(0.4,0,0.2,1), transform 0.8s cubic-bezier(0.4,0,0.2,1)",
-      }}
-    >
-      {/* Animated background rings */}
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            width: `${280 + i * 180}px`,
-            height: `${280 + i * 180}px`,
-            border: `1px solid rgba(100, 130, 170, ${0.12 - i * 0.03})`,
-            opacity: pastEnter ? 1 : 0,
-            transform: pastEnter ? "scale(1)" : "scale(0.5)",
-            transition: `opacity ${0.8 + i * 0.3}s ease-out ${i * 0.15}s, transform ${1 + i * 0.3}s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.15}s`,
-            animation: pastEnter ? `ringPulse ${4 + i}s ease-in-out ${i * 0.5}s infinite` : "none",
-          }}
-        />
-      ))}
-
-      {/* Floating particles */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const angle = (i / 12) * 360;
-        const radius = 120 + (i % 3) * 60;
-        const size = 3 + (i % 4);
-        return (
-          <div
-            key={`p${i}`}
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width: `${size}px`,
-              height: `${size}px`,
-              background: `rgba(80, 120, 180, ${0.15 + (i % 5) * 0.05})`,
-              opacity: pastEnter ? 1 : 0,
-              transform: pastEnter
-                ? `translate(${Math.cos(angle * Math.PI / 180) * radius}px, ${Math.sin(angle * Math.PI / 180) * radius}px)`
-                : "translate(0, 0) scale(0)",
-              transition: `all ${1.2}s cubic-bezier(0.16, 1, 0.3, 1) ${0.3 + i * 0.06}s`,
-              animation: pastEnter ? `particleFloat ${3 + (i % 3)}s ease-in-out ${i * 0.2}s infinite alternate` : "none",
-            }}
-          />
-        );
-      })}
-
-      {/* Glow behind logo */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          width: "400px",
-          height: "400px",
-          background: "radial-gradient(circle, rgba(70,130,220,0.12) 0%, transparent 70%)",
-          opacity: showLogo ? 1 : 0,
-          transform: showLogo ? "scale(1)" : "scale(0.3)",
-          transition: "opacity 1s ease-out, transform 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
-          animation: showLogo ? "glowPulse 3s ease-in-out infinite" : "none",
-        }}
-      />
-
-      <div className="relative flex flex-col items-center gap-0">
-        {/* Logo with dramatic zoom-in entrance */}
-        <div
-          style={{
-            transform: showLogo
-              ? "scale(1) translateY(0) rotate(0deg)"
-              : "scale(0.15) translateY(60px) rotate(-5deg)",
-            opacity: showLogo ? 1 : 0,
-            filter: showLogo ? "blur(0px)" : "blur(8px)",
-            transition:
-              "transform 1.1s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out, filter 0.8s ease-out",
-          }}
-        >
-          <img
-            src="/images/veloop-logo.png"
-            alt="Veloop"
-            className="drop-shadow-2xl"
-            style={{
-              width: "min(85vw, 85vh, 520px)",
-              height: "auto",
-              animation: showLogo ? "logoBreathe 4s ease-in-out infinite" : "none",
-            }}
-          />
-
-          {/* Shine sweep effect */}
-          <div
-            className="absolute inset-0 overflow-hidden pointer-events-none"
-            style={{
-              maskImage: "url(/images/veloop-logo.png)",
-              maskSize: "contain",
-              maskRepeat: "no-repeat",
-              maskPosition: "center",
-              WebkitMaskImage: "url(/images/veloop-logo.png)",
-              WebkitMaskSize: "contain",
-              WebkitMaskRepeat: "no-repeat",
-              WebkitMaskPosition: "center",
-            }}
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
+        style={{ background: "#FFFFFF" }}
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        {/* SVG Loop + Arrow drawing */}
+        <div className="relative flex flex-col items-center">
+          {/* SVG Icon - V Loop with Arrow */}
+          <motion.svg
+            viewBox="0 0 200 160"
+            className="w-[min(60vw,280px)] h-auto drop-shadow-lg"
+            style={{ filter: "drop-shadow(0 8px 24px rgba(26,122,76,0.18))" }}
           >
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.5) 40%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.5) 60%, transparent 70%)",
-                animation: showLogo ? "shineSweep 3s 0.6s ease-in-out infinite" : "none",
-              }}
-            />
-          </div>
-        </div>
+            <defs>
+              <linearGradient id="loopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#1a7a4c" />
+                <stop offset="50%" stopColor="#2196a8" />
+                <stop offset="100%" stopColor="#1a7a4c" />
+              </linearGradient>
+              <linearGradient id="arrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#2196a8" />
+                <stop offset="100%" stopColor="#1ac76c" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-        {/* Tagline with typewriter-like reveal */}
-        <div
-          className="overflow-hidden"
-          style={{
-            marginTop: "-6px",
-            maxWidth: showText ? "400px" : "0px",
-            opacity: showText ? 1 : 0,
-            transition: "max-width 1s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease-out 0.1s",
-          }}
-        >
-          <p
-            className="text-center font-bold tracking-[0.3em] uppercase select-none whitespace-nowrap"
+            {/* V-Loop path */}
+            <motion.path
+              d="M 30 30 L 70 120 L 110 50 Q 130 10 160 30 Q 190 50 170 80 Q 155 105 130 100 Q 110 95 100 80"
+              fill="none"
+              stroke="url(#loopGrad)"
+              strokeWidth="12"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#glow)"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 2, ease, delay: 0 }}
+            />
+
+            {/* Arrow head */}
+            <motion.path
+              d="M 120 55 L 135 35 L 115 40"
+              fill="none"
+              stroke="url(#arrowGrad)"
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#glow)"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 1.5, ease, delay: 2 }}
+            />
+
+            {/* Light trail on arrow */}
+            <motion.circle
+              cx="135"
+              cy="35"
+              r="6"
+              fill="rgba(26,199,108,0.5)"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: [0, 0.8, 0], scale: [0, 2, 0] }}
+              transition={{ duration: 1, delay: 2.8, ease: "easeOut" }}
+            />
+          </motion.svg>
+
+          {/* 3D Parallax Effect on the whole logo group */}
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            initial={{ rotateY: 0, perspective: 800 }}
+            animate={{ rotateY: [0, 8, -4, 0] }}
+            transition={{ duration: 1.5, delay: 4, ease }}
+            style={{ perspective: 800, transformStyle: "preserve-3d" }}
+          />
+
+          {/* Logo image with 3D effect */}
+          <motion.div
+            className="mt-2"
+            initial={{ opacity: 0, y: 40, rotateY: -15 }}
+            animate={{ opacity: 1, y: 0, rotateY: 0 }}
+            transition={{ duration: 1.2, delay: 4, ease }}
+            style={{ perspective: 1000, transformStyle: "preserve-3d" }}
+          >
+            <motion.img
+              src="/images/veloop-logo-3d.jpg"
+              alt="Veloop"
+              className="w-[min(70vw,340px)] h-auto rounded-lg"
+              style={{
+                filter: "drop-shadow(0 12px 32px rgba(0,0,0,0.12))",
+                mixBlendMode: "multiply",
+              }}
+              animate={{
+                rotateY: [0, 3, -2, 0],
+              }}
+              transition={{ duration: 2, delay: 4.2, ease }}
+            />
+          </motion.div>
+
+          {/* "Veloop" text */}
+          <motion.h1
+            className="font-sans font-extrabold tracking-tight select-none"
             style={{
-              fontSize: "clamp(0.65rem, 2.5vw, 1rem)",
-              color: "#3a4a5c",
-              transform: showText ? "translateY(0)" : "translateY(12px)",
-              transition: "transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s",
+              fontSize: "clamp(2rem, 8vw, 3.5rem)",
+              background: "linear-gradient(135deg, #1a7a4c, #2196a8)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              textShadow: "none",
             }}
+            initial={{ opacity: 0, y: 30, letterSpacing: "0.15em" }}
+            animate={{ opacity: 1, y: 0, letterSpacing: "0.02em" }}
+            transition={{ duration: 1, delay: 5.5, ease }}
+          >
+            Veloop
+          </motion.h1>
+
+          {/* Slogan */}
+          <motion.p
+            className="font-sans font-bold tracking-[0.35em] uppercase select-none"
+            style={{
+              fontSize: "clamp(0.6rem, 2.2vw, 0.9rem)",
+              color: "#3a4a5c",
+            }}
+            initial={{ opacity: 0, filter: "blur(10px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            transition={{ duration: 1, delay: 6.5, ease }}
           >
             TUDO EM UM SÓ APP
-          </p>
+          </motion.p>
+
+          {/* Accent line */}
+          <motion.div
+            style={{
+              height: "2px",
+              background: "linear-gradient(90deg, transparent, #1a7a4c, #2196a8, transparent)",
+              marginTop: "12px",
+            }}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 80, opacity: 1 }}
+            transition={{ duration: 0.8, delay: 6.8, ease }}
+          />
+
+          {/* Light sweep across logo */}
+          <motion.div
+            className="absolute inset-0 pointer-events-none overflow-hidden"
+            style={{ borderRadius: "8px" }}
+          >
+            <motion.div
+              className="absolute inset-y-0 w-20"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)",
+              }}
+              initial={{ x: "-100%" }}
+              animate={{ x: ["−100%", "500%"] }}
+              transition={{ duration: 0.8, delay: 7.5, ease: "easeInOut" }}
+            />
+          </motion.div>
         </div>
 
-        {/* Accent line under text */}
-        <div
-          style={{
-            width: showText ? "60px" : "0px",
-            height: "2px",
-            background: "linear-gradient(90deg, transparent, #5a7da8, transparent)",
-            marginTop: "10px",
-            transition: "width 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s",
-          }}
+        {/* Exit fade */}
+        <motion.div
+          className="absolute inset-0 bg-white pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 7.8, ease: "easeIn" }}
         />
-      </div>
-
-      <style>{`
-        @keyframes shineSweep {
-          0% { transform: translateX(-200%); }
-          30% { transform: translateX(200%); }
-          100% { transform: translateX(200%); }
-        }
-        @keyframes ringPulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.06); opacity: 0.6; }
-        }
-        @keyframes particleFloat {
-          0% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1); }
-          100% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.4) translateY(-8px); }
-        }
-        @keyframes glowPulse {
-          0%, 100% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.15); opacity: 1; }
-        }
-        @keyframes logoBreathe {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.02); }
-        }
-      `}</style>
-    </div>
+      </motion.div>
+    </AnimatePresence>
   );
 };
 
