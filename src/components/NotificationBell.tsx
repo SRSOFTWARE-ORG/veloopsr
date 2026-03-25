@@ -117,6 +117,25 @@ const NotificationBell = () => {
               </div>
             </div>
 
+            {pushSupported && (
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <BellRing className="w-3 h-3" />
+                  Push no celular
+                </span>
+                <button
+                  onClick={() => pushSubscribed ? pushUnsubscribe() : pushSubscribe()}
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    pushSubscribed
+                      ? "bg-primary/10 text-primary"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {pushSubscribed ? "Ativado" : "Ativar"}
+                </button>
+              </div>
+            )}
+
             <div className="overflow-y-auto max-h-72">
               {notificacoes.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
