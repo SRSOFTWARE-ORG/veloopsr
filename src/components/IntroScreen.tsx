@@ -24,7 +24,7 @@ const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
           <motion.img
             src="/images/veloop-logo-3d.jpg"
             alt="Veloop"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             animate={{ scale: [1, 1.03, 1] }}
             transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
           />
