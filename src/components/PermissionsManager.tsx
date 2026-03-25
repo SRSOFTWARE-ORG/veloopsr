@@ -57,6 +57,17 @@ const PermissionsManager = () => {
                   >
                     Ativar
                   </button>
+                ) : perm.state === "denied" ? (
+                  <button
+                    onClick={() => {
+                      if (perm.name === "notifications") {
+                        alert("Para desbloquear:\n\n📱 Celular: Toque no ícone de cadeado/info na barra de endereço → Permissões → Notificações → Permitir\n\n💻 Desktop: Clique no cadeado ao lado da URL → Permissões do site → Notificações → Permitir\n\nDepois recarregue a página.");
+                      }
+                    }}
+                    className="text-xs bg-destructive/10 text-destructive px-2.5 py-1 rounded-md font-medium hover:bg-destructive/20 transition-colors"
+                  >
+                    Desbloquear
+                  </button>
                 ) : (
                   <StatusIcon className={`w-4 h-4 ${color}`} />
                 )}
