@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -44,9 +45,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/60 fixed inset-y-0 left-0 z-30">
-        <div className="p-5 border-b border-border/60">
-          <h1 className="text-xl font-extrabold tracking-tight text-primary">Veloop</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
+        <div className="p-5 border-b border-border/60 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-primary">Veloop</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
+          </div>
+          <NotificationBell />
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -92,9 +96,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border/60 flex items-center justify-between px-4 z-30">
         <h1 className="text-lg font-extrabold text-primary">Veloop</h1>
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
-          {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Sidebar Overlay */}
