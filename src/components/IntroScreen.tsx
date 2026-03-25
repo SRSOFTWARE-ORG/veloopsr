@@ -29,6 +29,14 @@ const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
             transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
           />
 
+          {/* Edge gradient blend */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: `
+              linear-gradient(to right, white 0%, transparent 15%, transparent 85%, white 100%),
+              linear-gradient(to bottom, white 0%, transparent 15%, transparent 85%, white 100%)
+            `,
+          }} />
+
           {/* Shine sweep */}
           <motion.div className="absolute inset-0 overflow-hidden pointer-events-none">
             <motion.div
