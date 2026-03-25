@@ -45,9 +45,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/60 fixed inset-y-0 left-0 z-30">
-        <div className="p-5 border-b border-border/60">
-          <h1 className="text-xl font-extrabold tracking-tight text-primary">Veloop</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
+        <div className="p-5 border-b border-border/60 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-primary">Veloop</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
+          </div>
+          <NotificationBell />
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
