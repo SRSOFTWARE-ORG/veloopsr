@@ -19,6 +19,7 @@ interface Notificacao {
 const NotificationBell = () => {
   const { user } = useAuth();
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [open, setOpen] = useState(false);
 
   const unreadCount = notificacoes.filter((n) => !n.lida).length;
