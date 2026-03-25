@@ -485,7 +485,8 @@ const AgendaPage = () => {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filter */}
