@@ -94,7 +94,7 @@ const NotificationBell = () => {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 max-h-96 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="fixed md:absolute right-2 md:right-0 top-14 md:top-full md:mt-2 w-[calc(100vw-1rem)] md:w-80 max-h-96 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
             <div className="flex items-center justify-between p-3 border-b border-border">
               <h3 className="text-sm font-semibold">Notificações</h3>
               <div className="flex gap-2">
