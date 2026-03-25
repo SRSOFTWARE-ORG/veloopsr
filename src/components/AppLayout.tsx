@@ -96,9 +96,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border/60 flex items-center justify-between px-4 z-30">
         <h1 className="text-lg font-extrabold text-primary">Veloop</h1>
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
-          {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Sidebar Overlay */}
