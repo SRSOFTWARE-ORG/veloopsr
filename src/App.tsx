@@ -48,7 +48,7 @@ const App = () => {
   useEffect(() => {
     const introFailsafeTimer = window.setTimeout(() => {
       setShowIntro(false);
-    }, 9000);
+    }, 4500);
 
     return () => window.clearTimeout(introFailsafeTimer);
   }, []);
