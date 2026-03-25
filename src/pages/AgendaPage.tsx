@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import GoogleCalendarSync from "@/components/agenda/GoogleCalendarSync";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -411,14 +412,16 @@ const AgendaPage = () => {
           <h1 className="text-xl font-extrabold tracking-tight">Agenda de Cobranças</h1>
           <p className="text-sm text-muted-foreground">Calendário de pagamentos dos clientes</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nova Cobrança
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-2 flex-wrap">
+          <GoogleCalendarSync />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nova Cobrança
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Agendar Cobrança</DialogTitle>
             </DialogHeader>
@@ -482,7 +485,8 @@ const AgendaPage = () => {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filter */}
