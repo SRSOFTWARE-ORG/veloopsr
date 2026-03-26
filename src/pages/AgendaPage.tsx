@@ -490,18 +490,20 @@ const AgendaPage = () => {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2 mb-4 slide-up overflow-x-auto">
-        {filterOptions.map((opt) => (
-          <Button
-            key={opt.value}
-            variant={statusFilter === opt.value ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter(opt.value)}
-            className="shrink-0"
-          >
-            {opt.label}
-          </Button>
-        ))}
+      <div className="-mx-4 mb-4 overflow-x-auto px-4 slide-up md:mx-0 md:px-0">
+        <div className="flex w-max min-w-full gap-2 pb-1">
+          {filterOptions.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={statusFilter === opt.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(opt.value)}
+              className="shrink-0"
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Calendar */}
