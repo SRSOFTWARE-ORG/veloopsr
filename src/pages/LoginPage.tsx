@@ -52,6 +52,10 @@ const LoginPage = () => {
             src={veloopLogo}
             alt="Logo Veloop"
             className="max-w-[90%] max-h-[400px] object-contain drop-shadow-2xl mix-blend-multiply"
+            style={{
+              WebkitMaskImage: "radial-gradient(circle, rgba(0,0,0,1) 54%, rgba(0,0,0,0.96) 64%, rgba(0,0,0,0.78) 74%, rgba(0,0,0,0.42) 84%, rgba(0,0,0,0) 100%)",
+              maskImage: "radial-gradient(circle, rgba(0,0,0,1) 54%, rgba(0,0,0,0.96) 64%, rgba(0,0,0,0.78) 74%, rgba(0,0,0,0.42) 84%, rgba(0,0,0,0) 100%)",
+            }}
           />
         </div>
 
