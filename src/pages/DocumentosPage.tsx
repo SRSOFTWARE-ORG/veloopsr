@@ -190,8 +190,9 @@ const DocumentosPage = () => {
     };
 
     for (const [srcKey, destKey] of Object.entries(fieldMap)) {
-      if (extraData[srcKey] && String(extraData[srcKey]).trim()) {
-        clienteData[destKey] = extraData[srcKey];
+      const val = extraData[srcKey];
+      if (val && String(val).trim() && String(val).trim().toLowerCase() !== "null") {
+        clienteData[destKey] = val;
       }
     }
 
