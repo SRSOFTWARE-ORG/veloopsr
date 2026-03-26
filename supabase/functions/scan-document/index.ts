@@ -46,9 +46,10 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um assistente especializado em identificar e extrair dados de documentos financeiros brasileiros.
+            content: `Você é um assistente especializado em identificar e extrair ABSOLUTAMENTE TODOS os dados visíveis de documentos financeiros brasileiros.
 Primeiro identifique o tipo do documento: boleto bancário, carnê de pagamento ou nota fiscal.
-Depois extraia os dados relevantes conforme o tipo identificado.
+Depois extraia TODOS os dados relevantes conforme o tipo identificado. NÃO omita nenhum dado visível.
+Leia com extrema atenção cada campo, incluindo endereço completo, CPF, telefone, RG, filiação, etc.
 O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
           },
           {
@@ -56,11 +57,16 @@ O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
             content: [
               {
                 type: "text",
-                text: `Analise este documento financeiro brasileiro. Primeiro identifique o tipo (boleto, carnê ou nota fiscal), depois extraia os dados.
+                text: `Analise este documento financeiro brasileiro. Primeiro identifique o tipo (boleto, carnê ou nota fiscal), depois extraia TODOS os dados visíveis.
+
+IMPORTANTE: Extraia ABSOLUTAMENTE TODOS os dados que estiverem visíveis no documento, sem exceção. Leia com atenção cada campo.
 
 Para BOLETO, extraia:
 - Nome do pagador/sacado
-- CPF/CNPJ do pagador
+- CPF/CNPJ do pagador (formato 000.000.000-00 ou 00.000.000/0001-00)
+- Telefone do pagador (se visível, formato (00) 00000-0000)
+- Endereço do pagador (rua, número)
+- Bairro, cidade, UF, CEP do pagador
 - Valor do boleto
 - Data de vencimento (YYYY-MM-DD)
 - Número do documento
@@ -68,8 +74,13 @@ Para BOLETO, extraia:
 
 Para CARNÊ, extraia:
 - Nome do cliente
-- CPF do cliente
-- Telefone do cliente
+- CPF do cliente (formato 000.000.000-00)
+- Telefone do cliente (formato (00) 00000-0000)
+- Endereço, bairro, cidade, UF, CEP
+- RG, emissor, data emissão
+- Data de nascimento (YYYY-MM-DD)
+- Nome do pai, nome da mãe
+- Naturalidade, estado civil
 - Valor total
 - Valor de cada parcela
 - Número total de parcelas
@@ -80,12 +91,14 @@ Para CARNÊ, extraia:
 Para NOTA FISCAL, extraia:
 - Nome do cliente/destinatário
 - CPF/CNPJ do cliente
+- Telefone do cliente
+- Endereço, bairro, cidade, UF, CEP
 - Valor total da nota
 - Data de emissão (YYYY-MM-DD)
 - Número da nota fiscal
 - Nome do emitente
 
-Seja preciso nos valores e datas.`
+NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preciso nos valores e datas.`
               },
               {
                 type: "image_url",
@@ -108,16 +121,33 @@ Seja preciso nos valores e datas.`
                     enum: ["boleto", "carne", "nota_fiscal"],
                     description: "Tipo do documento identificado"
                   },
-                  // Common fields
                   cliente_nome: { type: "string", description: "Nome do cliente/pagador/sacado" },
-                  cliente_cpf: { type: "string", description: "CPF ou CNPJ do cliente" },
+                  cliente_cpf: { type: "string", description: "CPF ou CNPJ do cliente, formato 000.000.000-00" },
+                  telefone: { type: "string", description: "Telefone do cliente, formato (00) 00000-0000" },
+                  email: { type: "string", description: "E-mail do cliente" },
+                  endereco: { type: "string", description: "Endereço completo (rua, número)" },
+                  complemento: { type: "string", description: "Complemento do endereço" },
+                  bairro: { type: "string", description: "Bairro" },
+                  cidade: { type: "string", description: "Cidade" },
+                  uf: { type: "string", description: "Estado (UF), 2 letras" },
+                  cep: { type: "string", description: "CEP, formato 00000-000" },
+                  rg: { type: "string", description: "Número do RG" },
+                  rg_emissor: { type: "string", description: "Órgão emissor do RG" },
+                  rg_data_emissao: { type: "string", description: "Data de emissão do RG, formato YYYY-MM-DD" },
+                  data_nascimento: { type: "string", description: "Data de nascimento, formato YYYY-MM-DD" },
+                  naturalidade: { type: "string", description: "Naturalidade" },
+                  estado_civil: { type: "string", description: "Estado civil" },
+                  nome_pai: { type: "string", description: "Nome do pai" },
+                  nome_mae: { type: "string", description: "Nome da mãe" },
+                  tipo: { type: "string", description: "Tipo de pessoa: fisica ou juridica" },
+                  inscricao_estadual: { type: "string", description: "Inscrição estadual" },
                   // Boleto fields
                   valor: { type: "number", description: "Valor do boleto ou nota fiscal" },
                   data_vencimento: { type: "string", description: "Data de vencimento (boleto) ou emissão (nota) YYYY-MM-DD" },
                   numero_documento: { type: "string", description: "Número do documento/nota fiscal" },
                   beneficiario: { type: "string", description: "Nome do beneficiário/cedente/emitente" },
                   // Carnê fields
-                  cliente_telefone: { type: "string", description: "Telefone do cliente" },
+                  cliente_telefone: { type: "string", description: "Telefone do cliente (alternativo)" },
                   valor_total: { type: "number", description: "Valor total da venda/financiamento" },
                   valor_parcela: { type: "number", description: "Valor de cada parcela" },
                   num_parcelas: { type: "number", description: "Número total de parcelas" },

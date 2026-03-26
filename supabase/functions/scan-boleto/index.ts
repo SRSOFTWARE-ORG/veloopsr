@@ -46,8 +46,9 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um assistente especializado em extrair dados de boletos bancários brasileiros.
-Analise o documento e extraia as informações de pagamento com precisão.
+            content: `Você é um assistente especializado em extrair ABSOLUTAMENTE TODOS os dados visíveis de boletos bancários brasileiros.
+Analise o documento e extraia as informações de pagamento E dados do pagador com máxima precisão.
+Não omita NENHUM dado visível, especialmente endereço, CPF, bairro, cidade, UF e CEP.
 O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
           },
           {
@@ -55,15 +56,17 @@ O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
             content: [
               {
                 type: "text",
-                text: `Extraia os dados deste boleto bancário. Preciso de:
+                text: `Extraia TODOS os dados deste boleto bancário. Não deixe NENHUM campo em branco se a informação estiver visível. Preciso de:
 - Nome do pagador/cliente (campo "Pagador" ou "Sacado")
-- CPF/CNPJ do pagador (se visível)
+- CPF/CNPJ do pagador (se visível, formato 000.000.000-00)
+- Endereço do pagador (rua, número)
+- Bairro, cidade, UF, CEP do pagador
 - Valor do boleto (campo "Valor do Documento" ou similar)
 - Data de vencimento (formato YYYY-MM-DD)
 - Número do documento
 - Nome do beneficiário/cedente (quem recebe)
 
-Seja preciso nos valores e datas.`
+Leia com EXTREMA ATENÇÃO cada campo visível no documento. Não omita nenhum dado.`
               },
               {
                 type: "image_url",
@@ -83,6 +86,11 @@ Seja preciso nos valores e datas.`
                 properties: {
                   cliente_nome: { type: "string", description: "Nome do pagador/sacado do boleto" },
                   cliente_cpf: { type: "string", description: "CPF ou CNPJ do pagador, formato 000.000.000-00" },
+                  endereco: { type: "string", description: "Endereço do pagador (rua, número)" },
+                  bairro: { type: "string", description: "Bairro do pagador" },
+                  cidade: { type: "string", description: "Cidade do pagador" },
+                  uf: { type: "string", description: "Estado (UF) do pagador, 2 letras" },
+                  cep: { type: "string", description: "CEP do pagador, formato 00000-000" },
                   valor: { type: "number", description: "Valor do boleto em reais" },
                   data_vencimento: { type: "string", description: "Data de vencimento no formato YYYY-MM-DD" },
                   numero_documento: { type: "string", description: "Número do documento do boleto" },
