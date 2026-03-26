@@ -180,6 +180,11 @@ const ConfiguracoesPage = () => {
 
   return (
     <div className="page-container">
+      {/* AI Search Bar */}
+      <div className="mb-6 slide-up">
+        <AISearchBar />
+      </div>
+
       <div className="mb-6 slide-up flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Gerenciar Equipe</h1>
