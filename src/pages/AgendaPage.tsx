@@ -704,6 +704,20 @@ const AgendaPage = () => {
                     )}
 
                     <div className="flex items-center gap-2 pl-10 pt-1 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 gap-1 text-green-600 border-green-500/30 hover:bg-green-500/10"
+                        disabled={sendingWhatsApp === `${c.id}_${selectedDateKey}`}
+                        onClick={() => handleSendWhatsApp(c, selectedDateKey!)}
+                      >
+                        {sendingWhatsApp === `${c.id}_${selectedDateKey}` ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <MessageCircle className="w-3 h-3" />
+                        )}
+                        WhatsApp
+                      </Button>
                       {isPrimaryAdmin && !isPaidOrExempt && (
                         <>
                           <Button
