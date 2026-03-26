@@ -70,6 +70,7 @@ const NotificationBell = () => {
     unsubscribe: pushUnsubscribe,
   } = usePushNotifications();
   const [open, setOpen] = useState(false);
+  const [testCountdown, setTestCountdown] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasInteracted = useRef(false);
 
