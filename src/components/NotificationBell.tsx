@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell, BellRing, Check, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -70,6 +70,29 @@ const NotificationBell = () => {
     unsubscribe: pushUnsubscribe,
   } = usePushNotifications();
   const [open, setOpen] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasInteracted = useRef(false);
+
+  // Pre-load audio and track user interaction
+  useEffect(() => {
+    audioRef.current = new Audio('/notification-sound.wav');
+    audioRef.current.volume = 0.5;
+
+    const markInteracted = () => { hasInteracted.current = true; };
+    document.addEventListener('click', markInteracted, { once: true });
+    document.addEventListener('touchstart', markInteracted, { once: true });
+
+    return () => {
+      document.removeEventListener('click', markInteracted);
+      document.removeEventListener('touchstart', markInteracted);
+    };
+  }, []);
+
+  const playNotificationSound = useCallback(() => {
+    if (!hasInteracted.current || !audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch(() => {});
+  }, []);
 
   const unreadCount = notificacoes.filter((n) => !n.lida).length;
 
@@ -100,6 +123,7 @@ const NotificationBell = () => {
         },
         (payload) => {
           setNotificacoes((prev) => [payload.new as Notificacao, ...prev]);
+          playNotificationSound();
         }
       )
       .subscribe();
