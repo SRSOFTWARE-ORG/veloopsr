@@ -46,8 +46,9 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um assistente especializado em extrair dados de boletos bancários brasileiros.
-Analise o documento e extraia as informações de pagamento com precisão.
+            content: `Você é um assistente especializado em extrair ABSOLUTAMENTE TODOS os dados visíveis de boletos bancários brasileiros.
+Analise o documento e extraia as informações de pagamento E dados do pagador com máxima precisão.
+Não omita NENHUM dado visível, especialmente endereço, CPF, bairro, cidade, UF e CEP.
 O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
           },
           {
