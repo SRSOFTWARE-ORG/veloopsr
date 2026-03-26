@@ -266,16 +266,27 @@ const DocumentosPage = () => {
     const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
 
     if (clienteId) {
-      await supabase.from("cobrancas").insert({
-        cliente_id: clienteId,
-        cliente_nome: clienteNome,
-        valor_parcela: extracted.valor || 0,
-        data_inicio: dataVencimento,
-        data_fim: dataVencimento,
-        frequencia: "mes",
-        criado_por: user!.id,
-        observacoes: `Boleto: ${doc.nome_arquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
-      });
+      // Check if a cobrança already exists for this client with same value/date
+      const { data: existingCob } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .eq("valor_parcela", extracted.valor || 0)
+        .eq("data_inicio", dataVencimento)
+        .limit(1);
+
+      if (!existingCob || existingCob.length === 0) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: clienteId,
+          cliente_nome: clienteNome,
+          valor_parcela: extracted.valor || 0,
+          data_inicio: dataVencimento,
+          data_fim: dataVencimento,
+          frequencia: "mes",
+          criado_por: user!.id,
+          observacoes: `Boleto: ${doc.nome_arquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+        });
+      }
     }
   };
 
