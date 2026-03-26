@@ -48,37 +48,51 @@ const CobrancaResumo = () => {
   const fetchData = async () => {
     const { start, end } = getDateRange(periodo);
 
-    // 1) Cobranças da agenda (cobranca_pagamentos)
-    const { data: pagamentos } = await supabase
-      .from("cobranca_pagamentos")
-      .select("status, cobranca_id, data_vencimento")
-      .gte("data_vencimento", start)
-      .lte("data_vencimento", end);
-
     let totalRecebido = 0;
     let totalPendente = 0;
 
-    if (pagamentos && pagamentos.length > 0) {
-      const cobrancaIds = [...new Set(pagamentos.map((p) => p.cobranca_id))];
+    // 1a) Parcelas PAGAS no período — filtrar por pago_em (data real do pagamento)
+    const { data: pagosPeriodo } = await supabase
+      .from("cobranca_pagamentos")
+      .select("cobranca_id, pago_em")
+      .eq("status", "pago")
+      .gte("pago_em", `${start}T00:00:00`)
+      .lte("pago_em", `${end}T23:59:59`);
+
+    // 1b) Parcelas PENDENTES no período — filtrar por data_vencimento
+    const { data: pendentesPeriodo } = await supabase
+      .from("cobranca_pagamentos")
+      .select("cobranca_id, data_vencimento, status")
+      .neq("status", "pago")
+      .neq("status", "isento")
+      .gte("data_vencimento", start)
+      .lte("data_vencimento", end);
+
+    // Buscar valores das cobranças envolvidas
+    const allCobrancaIds = [
+      ...new Set([
+        ...(pagosPeriodo || []).map((p) => p.cobranca_id),
+        ...(pendentesPeriodo || []).map((p) => p.cobranca_id),
+      ]),
+    ];
+
+    if (allCobrancaIds.length > 0) {
       const { data: cobrancas } = await supabase
         .from("cobrancas")
         .select("id, valor_parcela")
-        .in("id", cobrancaIds);
+        .in("id", allCobrancaIds);
 
       const valorMap: Record<string, number> = {};
       cobrancas?.forEach((c) => {
         valorMap[c.id] = Number(c.valor_parcela);
       });
 
-      pagamentos.forEach((p) => {
-        const valor = valorMap[p.cobranca_id] || 0;
-        if (p.status === "pago") {
-          totalRecebido += valor;
-        } else if (p.status === "isento") {
-          // Isento não conta
-        } else {
-          totalPendente += valor;
-        }
+      pagosPeriodo?.forEach((p) => {
+        totalRecebido += valorMap[p.cobranca_id] || 0;
+      });
+
+      pendentesPeriodo?.forEach((p) => {
+        totalPendente += valorMap[p.cobranca_id] || 0;
       });
     }
 
