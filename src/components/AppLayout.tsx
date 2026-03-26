@@ -199,7 +199,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center gap-0 px-3 py-1 rounded-2xl transition-all duration-200 ${
                   isActive
-                    ? "scale-115 text-info"
+                    ? "scale-125 text-info"
                     : "text-muted-foreground hover:text-foreground active:scale-95"
                 }`
               }
