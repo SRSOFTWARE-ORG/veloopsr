@@ -347,6 +347,47 @@ const AgendaPage = () => {
     }
   };
 
+  const handleSendWhatsApp = async (cobranca: Cobranca, dateKey: string) => {
+    const cliente = clientes.find((c) => c.id === cobranca.cliente_id);
+    const telefone = cliente?.telefone;
+
+    if (!telefone) {
+      toast.error("Cliente não possui telefone cadastrado");
+      return;
+    }
+
+    const status = getPaymentStatus(dateKey, cobranca.id, pagamentosMap);
+    const dataFormatada = format(parseISO(dateKey), "dd/MM/yyyy");
+    const valor = formatCurrency(cobranca.valor_parcela);
+
+    let mensagem = "";
+    if (status === "pendente") {
+      mensagem = `Olá ${cobranca.cliente_nome}! 🔴\n\nIdentificamos que sua parcela de *${valor}* com vencimento em *${dataFormatada}* está em atraso.\n\nPor favor, entre em contato para regularizar.\n\n_Veloop - SR Software_`;
+    } else if (status === "a_pagar") {
+      mensagem = `Olá ${cobranca.cliente_nome}! 📅\n\nLembramos que sua parcela de *${valor}* vence em *${dataFormatada}*.\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
+    } else {
+      mensagem = `Olá ${cobranca.cliente_nome}! ✅\n\nConfirmamos o recebimento da parcela de *${valor}* referente a *${dataFormatada}*.\n\nObrigado!\n\n_Veloop - SR Software_`;
+    }
+
+    setSendingWhatsApp(`${cobranca.id}_${dateKey}`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+        body: { telefone, mensagem },
+      });
+
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.error || "Erro ao enviar");
+
+      toast.success(`WhatsApp enviado para ${cobranca.cliente_nome}!`);
+    } catch (err: any) {
+      console.error("WhatsApp error:", err);
+      toast.error(err.message || "Erro ao enviar WhatsApp. Verifique a conexão com o servidor.");
+    } finally {
+      setSendingWhatsApp(null);
+    }
+  };
+
   // Build date -> cobrancas map
   const dateMap = useMemo(() => {
     const map = new Map<string, Cobranca[]>();
