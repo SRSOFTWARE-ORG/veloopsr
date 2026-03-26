@@ -137,21 +137,21 @@ const CobrancaResumo = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <div>
+        <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
+          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-primary/10 p-3">
+            <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+            <div className="min-w-0">
               <p className="text-[10px] text-muted-foreground">Recebido</p>
-              <p className="text-sm font-bold tabular-nums text-emerald-700">
+              <p className="truncate text-sm font-bold tabular-nums text-primary">
                 R$ {recebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10">
+          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-destructive/10 p-3">
             <Clock className="w-5 h-5 text-destructive shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] text-muted-foreground">Pendente</p>
-              <p className="text-sm font-bold tabular-nums text-destructive">
+              <p className="truncate text-sm font-bold tabular-nums text-destructive">
                 R$ {pendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
             </div>
