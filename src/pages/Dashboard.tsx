@@ -157,7 +157,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 w-full min-w-0">
         {statCards.map((stat, i) => (
           <div key={stat.label} className={`stat-card slide-up delay-${i + 1}`}>
             <div className="flex items-center justify-between mb-3">

@@ -185,7 +185,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 pt-14 md:pt-0">
+      <main className="flex-1 md:ml-64 pt-14 md:pt-0 w-full min-w-0 overflow-x-hidden">
         {children}
       </main>
     </div>
