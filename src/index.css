@@ -79,10 +79,17 @@
 
 @layer utilities {
   .stat-card {
-    @apply bg-card rounded-xl p-4 shadow-md border border-border/60 transition-shadow duration-200 w-full min-w-0 overflow-hidden;
+    @apply bg-card rounded-xl p-4 border border-border/60 w-full min-w-0 overflow-hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   }
   .stat-card:hover {
-    box-shadow: 0 4px 24px 0 hsl(var(--primary) / 0.08);
+    transform: perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.03) translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08);
+  }
+  .stat-card:active {
+    transform: perspective(800px) scale(0.97);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
 
   .quick-action-btn {
