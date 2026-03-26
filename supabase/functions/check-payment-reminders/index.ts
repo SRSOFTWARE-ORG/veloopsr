@@ -103,7 +103,7 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
         messages: [
           {
             role: "system",
-            content: "Você é um assistente de cobranças corporativo da empresa SR SOFTWARE. Gere mensagens formais, elegantes e objetivas para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com:\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_"
+            content: "Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_"
           },
           {
             role: "user",
