@@ -94,6 +94,8 @@ const CaixaPage = () => {
   const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [newSaida, setNewSaida] = useState({ valor: "", motivo: "", responsavel_id: "" });
+  const [entradasDetalhes, setEntradasDetalhes] = useState<EntradaDetalhe[]>([]);
+  const [entradasOpen, setEntradasOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
