@@ -41,6 +41,7 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
+// ── WhatsApp via Evolution API ──
 async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean> {
   const apiUrl = Deno.env.get("EVOLUTION_API_URL");
   const apiKey = Deno.env.get("EVOLUTION_API_KEY");
@@ -68,11 +69,11 @@ async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean
   }
 }
 
+// ── Web Push ──
 async function sendWebPush(subscription: { endpoint: string; p256dh: string; auth: string }, payload: object) {
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
   if (!vapidPublicKey || !vapidPrivateKey) return;
-
   try {
     const { default: webpush } = await import("npm:web-push@3.6.7");
     webpush.setVapidDetails("mailto:admin@veloop.app", vapidPublicKey, vapidPrivateKey);
@@ -85,11 +86,24 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   }
 }
 
-async function generateFormalMessage(clienteNome: string, cpf: string, valor: string, dataVencimento: string): Promise<string> {
+// ── IA: gerar mensagem formal ──
+async function generateFormalMessage(
+  clienteNome: string,
+  cpf: string,
+  valor: string,
+  dataVencimento: string,
+  tipo: "D-1" | "D0"
+): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data de vencimento.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
-  }
+
+  const tomD1 = "preventivo e cordial, informando que a fatura vence AMANHÃ";
+  const tomD0 = "mais urgente e direto, informando que a fatura vence HOJE";
+  const tom = tipo === "D-1" ? tomD1 : tomD0;
+  const diaRef = tipo === "D-1" ? "amanhã" : "hoje";
+
+  const fallback = `Prezado(a) Sr(a). *${clienteNome}*,\n\nInformamos que a fatura vinculada ao CPF *${cpf}*, no valor de *${valor}*, ${tipo === "D-1" ? `possui vencimento previsto para ${diaRef}, dia *${dataVencimento}*` : `vence na presente data (*${dataVencimento}*)`}.\n\n${tipo === "D-1" ? "Solicitamos, por gentileza, que o pagamento seja realizado até a data informada, a fim de evitar encargos adicionais." : "Reforçamos a importância da regularização do pagamento no dia de hoje para evitar encargos adicionais."}\n\nCaso o pagamento já tenha sido efetuado, pedimos que desconsidere esta mensagem.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+
+  if (!LOVABLE_API_KEY) return fallback;
 
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -103,11 +117,11 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
         messages: [
           {
             role: "system",
-            content: "Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_"
+            content: `Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 8 linhas). O tom deve ser ${tom}. Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`
           },
           {
             role: "user",
-            content: `Gere uma mensagem formal e sofisticada de lembrete de pagamento com os seguintes dados:\n- Nome completo do cliente: ${clienteNome}\n- CPF: ${cpf}\n- Valor da parcela: ${valor}\n- Data de vencimento: ${dataVencimento} (amanhã)\n\nA mensagem deve informar que a parcela vence amanhã e solicitar o pagamento de forma cordial e profissional.`
+            content: `Gere uma mensagem formal de cobrança com os seguintes dados:\n- Nome completo: ${clienteNome}\n- CPF: ${cpf}\n- Valor: ${valor}\n- Data de vencimento: ${dataVencimento}\n- A fatura vence ${diaRef}.\n\nInclua uma frase pedindo para desconsiderar caso já tenha sido pago.`
           }
         ],
       }),
@@ -115,17 +129,18 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
 
     if (!res.ok) {
       console.error("AI gateway error:", res.status, await res.text());
-      return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data indicada.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+      return fallback;
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) *${clienteNome}*,\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+    return data.choices?.[0]?.message?.content?.trim() || fallback;
   } catch (err) {
     console.error("AI generation error:", err);
-    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+    return fallback;
   }
 }
 
+// ── Notificação interna (push + banco) ──
 async function createNotification(
   supabase: any,
   userId: string,
@@ -135,7 +150,6 @@ async function createNotification(
   dados: Record<string, any>,
   dedupKey: string
 ) {
-  // Check for duplicate using dados.dedup_key
   const { data: existing } = await supabase
     .from("notificacoes")
     .select("id")
@@ -154,7 +168,6 @@ async function createNotification(
     dados: { ...dados, dedup_key: dedupKey },
   });
 
-  // Send push
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
@@ -167,6 +180,7 @@ async function createNotification(
   return true;
 }
 
+// ── MAIN ──
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -178,193 +192,225 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const now = new Date();
+    const currentHour = now.getUTCHours() - 3; // BRT = UTC-3
     const todayStr = formatDateOnly(now);
     const tomorrow = new Date(now.getTime() + DAY_MS);
     const tomorrowStr = formatDateOnly(tomorrow);
 
-    // Get end of current week (Sunday)
-    const dayOfWeek = now.getUTCDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const endOfWeek = new Date(now.getTime() + daysUntilSunday * DAY_MS);
-    const endOfWeekStr = formatDateOnly(endOfWeek);
+    // ── Verificar horário >= 08:00 BRT ──
+    if (currentHour < 8) {
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: "Fora do horário (antes das 08:00 BRT)" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Get all cobrancas with client info
+    // ── Buscar cobranças com dados de cliente ──
     const { data: cobrancas, error: cobErr } = await supabase
       .from("cobrancas")
       .select("id, cliente_id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
 
-    // Get client phones and CPFs
     const clienteIds = [...new Set((cobrancas || []).map((c: any) => c.cliente_id))];
     const { data: clientesData } = await supabase
       .from("clientes")
       .select("id, telefone, cpf, nome")
       .in("id", clienteIds);
-    const clientePhoneMap = new Map<string, string>();
-    const clienteCpfMap = new Map<string, string>();
-    const clienteNomeMap = new Map<string, string>();
+
+    const clienteMap = new Map<string, { telefone: string; cpf: string; nome: string }>();
     for (const cl of clientesData || []) {
-      if (cl.telefone) clientePhoneMap.set(cl.id, cl.telefone);
-      if (cl.cpf) clienteCpfMap.set(cl.id, cl.cpf);
-      if (cl.nome) clienteNomeMap.set(cl.id, cl.nome);
+      clienteMap.set(cl.id, { telefone: cl.telefone || "", cpf: cl.cpf || "", nome: cl.nome });
     }
 
-    // Get existing pagamentos with status
+    // ── Buscar pagamentos (status) ──
     const { data: pagamentos } = await supabase
       .from("cobranca_pagamentos")
       .select("cobranca_id, data_vencimento, status");
 
-    // Build a set of paid/exempt dates per cobranca
-    const paidDates = new Set<string>();
+    const statusMap = new Map<string, string>();
     for (const p of pagamentos || []) {
-      if (p.status === "pago" || p.status === "isento") {
-        paidDates.add(`${p.cobranca_id}_${p.data_vencimento}`);
-      }
+      statusMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
     }
 
-    // Get admins
+    // ── Buscar envios já feitos HOJE (dedup) ──
+    const { data: enviosHoje } = await supabase
+      .from("envio_cobranca")
+      .select("cpf")
+      .eq("data_envio", todayStr);
+
+    const cpfsJaEnviados = new Set((enviosHoje || []).map((e: any) => e.cpf));
+
+    // ── Buscar admins ──
     const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
     const adminIds = adminRoles?.map((r: any) => r.user_id) || [];
 
-    // Build per-date cobranca list (only unpaid)
-    interface CobrancaEntry {
-      id: string;
-      cliente_id: string;
-      cliente_nome: string;
-      valor_parcela: number;
-      criado_por: string;
+    // ── Processar cada cobrança ──
+    const formatValor = (v: number) =>
+      new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+    interface ProcessEntry {
+      cobrancaId: string;
+      clienteId: string;
+      clienteNome: string;
+      valorParcela: number;
+      criadoPor: string;
       date: string;
+      tipo: "D-1" | "D0";
     }
 
-    const todayEntries: CobrancaEntry[] = [];
-    const tomorrowEntries: CobrancaEntry[] = [];
-    const weekEntries: Map<string, CobrancaEntry[]> = new Map();
+    const entriesToProcess: ProcessEntry[] = [];
 
     for (const cob of cobrancas || []) {
       const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
       for (const date of dates) {
-        if (paidDates.has(`${cob.id}_${date}`)) continue;
+        const key = `${cob.id}_${date}`;
+        const status = statusMap.get(key) || "a_pagar";
 
-        const entry: CobrancaEntry = {
-          id: cob.id,
-          cliente_id: cob.cliente_id,
-          cliente_nome: cob.cliente_nome,
-          valor_parcela: cob.valor_parcela,
-          criado_por: cob.criado_por,
+        // REGRA CRÍTICA: nunca enviar para pago ou isento
+        if (status === "pago" || status === "isento") continue;
+
+        let tipo: "D-1" | "D0" | null = null;
+        if (date === tomorrowStr) tipo = "D-1";
+        else if (date === todayStr) tipo = "D0";
+
+        if (!tipo) continue;
+
+        entriesToProcess.push({
+          cobrancaId: cob.id,
+          clienteId: cob.cliente_id,
+          clienteNome: cob.cliente_nome,
+          valorParcela: cob.valor_parcela,
+          criadoPor: cob.criado_por,
           date,
-        };
+          tipo,
+        });
+      }
+    }
 
-        if (date === todayStr) todayEntries.push(entry);
-        if (date === tomorrowStr) tomorrowEntries.push(entry);
-        if (date >= todayStr && date <= endOfWeekStr) {
-          if (!weekEntries.has(date)) weekEntries.set(date, []);
-          weekEntries.get(date)!.push(entry);
+    let whatsappCount = 0;
+    let notifCount = 0;
+    let skippedDuplicates = 0;
+
+    for (const entry of entriesToProcess) {
+      const cliente = clienteMap.get(entry.clienteId);
+      if (!cliente) continue;
+
+      const cpf = cliente.cpf;
+      const telefone = cliente.telefone;
+      const nomeCompleto = cliente.nome || entry.clienteNome;
+
+      // ── DEDUP: já enviou para esse CPF hoje? ──
+      if (cpf && cpfsJaEnviados.has(cpf)) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      if (!telefone || !cpf) continue;
+
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const valorFormatado = formatValor(entry.valorParcela);
+      const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
+
+      // ── Gerar mensagem com IA ──
+      const mensagem = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada, entry.tipo);
+
+      // ── Enviar WhatsApp ──
+      const enviado = await sendWhatsApp(telefone, mensagem);
+
+      // ── Registrar no banco (SEMPRE, sucesso ou falha) ──
+      try {
+        await supabase.from("envio_cobranca").insert({
+          cobranca_id: entry.cobrancaId,
+          cliente_id: entry.clienteId,
+          cpf,
+          telefone,
+          data_envio: todayStr,
+          tipo_envio: entry.tipo,
+          status_fatura: statusAtual,
+          mensagem,
+          enviado_com_sucesso: enviado,
+        });
+        // Marcar CPF como enviado para evitar duplicação no mesmo loop
+        cpfsJaEnviados.add(cpf);
+      } catch (insertErr) {
+        // Unique constraint violation = duplicata, ignorar
+        console.warn("Insert envio_cobranca falhou (possível duplicata):", insertErr);
+      }
+
+      if (enviado) whatsappCount++;
+
+      // ── Notificação interna para vendedor + admins ──
+      const tipoLabel = entry.tipo === "D-1" ? "Amanhã" : "Hoje";
+      const emoji = entry.tipo === "D-1" ? "🔔" : "📌";
+      const usersToNotify = new Set([entry.criadoPor, ...adminIds]);
+
+      for (const userId of usersToNotify) {
+        const ok = await createNotification(
+          supabase,
+          userId,
+          `${emoji} Cobrança ${tipoLabel}`,
+          `Cobrar ${entry.clienteNome} ${tipoLabel.toLowerCase()} — ${valorFormatado}`,
+          entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje",
+          { cobranca_id: entry.cobrancaId, cliente_nome: entry.clienteNome, data: entry.date },
+          `${entry.tipo === "D-1" ? "amanha" : "hoje"}_${entry.cobrancaId}_${entry.date}`
+        );
+        if (ok) notifCount++;
+      }
+    }
+
+    // ── Resumo semanal (segundas-feiras) ──
+    const dayOfWeek = now.getUTCDay();
+    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    const endOfWeek = new Date(now.getTime() + daysUntilSunday * DAY_MS);
+    const endOfWeekStr = formatDateOnly(endOfWeek);
+
+    if (dayOfWeek === 1) {
+      const weekEntries: Map<string, string[]> = new Map();
+      for (const cob of cobrancas || []) {
+        const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
+        for (const date of dates) {
+          const status = statusMap.get(`${cob.id}_${date}`) || "a_pagar";
+          if (status === "pago" || status === "isento") continue;
+          if (date >= todayStr && date <= endOfWeekStr) {
+            if (!weekEntries.has(date)) weekEntries.set(date, []);
+            weekEntries.get(date)!.push(cob.cliente_nome);
+          }
         }
       }
-    }
 
-    let notifCount = 0;
-    const formatValor = (v: number) =>
-      new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+      const totalWeek = Array.from(weekEntries.values()).flat().length;
+      if (totalWeek > 0) {
+        const weekDays: string[] = [];
+        for (const date of Array.from(weekEntries.keys()).sort()) {
+          const d = new Date(`${date}T00:00:00.000Z`);
+          const dayName = diasSemana[d.getUTCDay()];
+          weekDays.push(`${dayName}: ${weekEntries.get(date)!.join(", ")}`);
+        }
 
-    // --- TODAY notifications + WhatsApp: "Cobrar CLIENTE hoje" ---
-    let whatsappCount = 0;
-    for (const entry of todayEntries) {
-      const usersToNotify = new Set([entry.criado_por, ...adminIds]);
-      for (const userId of usersToNotify) {
-        const ok = await createNotification(
-          supabase, userId,
-          "📌 Cobrança Hoje",
-          `Cobrar ${entry.cliente_nome} hoje — ${formatValor(entry.valor_parcela)}`,
-          "lembrete_hoje",
-          { cobranca_id: entry.id, cliente_nome: entry.cliente_nome, data: entry.date },
-          `hoje_${entry.id}_${entry.date}`
-        );
-        if (ok) notifCount++;
-      }
+        const mensagem = `Essa semana tem ${totalWeek} cobrança${totalWeek > 1 ? "s" : ""} — ${weekDays.join(" · ")}`;
+        const allCreators = new Set((cobrancas || []).map((c: any) => c.criado_por));
+        const usersToNotify = new Set([...allCreators, ...adminIds]);
 
-      // Send WhatsApp to client
-      const phone = clientePhoneMap.get(entry.cliente_id);
-      if (phone) {
-        const dataFormatada = entry.date.split("-").reverse().join("/");
-        const msg = `Olá ${entry.cliente_nome}! 📅\n\nLembramos que sua parcela de *${formatValor(entry.valor_parcela)}* vence hoje (*${dataFormatada}*).\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
-        const sent = await sendWhatsApp(phone, msg);
-        if (sent) whatsappCount++;
-      }
-    }
-
-    // --- TOMORROW notifications: "Cobrar CLIENTE amanhã" ---
-    for (const entry of tomorrowEntries) {
-      const usersToNotify = new Set([entry.criado_por, ...adminIds]);
-      for (const userId of usersToNotify) {
-        const ok = await createNotification(
-          supabase, userId,
-          "🔔 Cobrança Amanhã",
-          `Cobrar ${entry.cliente_nome} amanhã — ${formatValor(entry.valor_parcela)}`,
-          "lembrete_amanha",
-          { cobranca_id: entry.id, cliente_nome: entry.cliente_nome, data: entry.date },
-          `amanha_${entry.id}_${entry.date}`
-        );
-        if (ok) notifCount++;
-      }
-    }
-
-    // --- TOMORROW WhatsApp: AI-generated formal message ---
-    for (const entry of tomorrowEntries) {
-      const phone = clientePhoneMap.get(entry.cliente_id);
-      if (!phone) continue;
-
-      const nomeCompleto = clienteNomeMap.get(entry.cliente_id) || entry.cliente_nome;
-      const cpf = clienteCpfMap.get(entry.cliente_id) || "não informado";
-      const dataFormatada = entry.date.split("-").reverse().join("/");
-      const valorFormatado = formatValor(entry.valor_parcela);
-
-      const msg = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada);
-      const sent = await sendWhatsApp(phone, msg);
-      if (sent) whatsappCount++;
-    }
-
-
-    const totalWeekEntries = Array.from(weekEntries.values()).flat();
-    if (totalWeekEntries.length > 0 && dayOfWeek === 1) {
-      // Only send weekly summary on Mondays
-      const weekDays: string[] = [];
-      const sortedDates = Array.from(weekEntries.keys()).sort();
-      for (const date of sortedDates) {
-        const entries = weekEntries.get(date)!;
-        const d = new Date(`${date}T00:00:00.000Z`);
-        const dayName = diasSemana[d.getUTCDay()];
-        const names = entries.map((e) => e.cliente_nome).join(", ");
-        weekDays.push(`${dayName}: ${names}`);
-      }
-
-      const mensagem = `Essa semana tem ${totalWeekEntries.length} cobrança${totalWeekEntries.length > 1 ? "s" : ""} — ${weekDays.join(" · ")}`;
-
-      // Notify all relevant users
-      const allCreators = new Set(totalWeekEntries.map((e) => e.criado_por));
-      const usersToNotify = new Set([...allCreators, ...adminIds]);
-
-      for (const userId of usersToNotify) {
-        const ok = await createNotification(
-          supabase, userId,
-          "📅 Resumo da Semana",
-          mensagem,
-          "resumo_semanal",
-          { semana: todayStr, total: totalWeekEntries.length },
-          `semana_${todayStr}`
-        );
-        if (ok) notifCount++;
+        for (const userId of usersToNotify) {
+          await createNotification(
+            supabase, userId,
+            "📅 Resumo da Semana",
+            mensagem,
+            "resumo_semanal",
+            { semana: todayStr, total: totalWeek },
+            `semana_${todayStr}`
+          );
+        }
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        notifications_created: notifCount,
         whatsapp_sent: whatsappCount,
-        today: todayEntries.length,
-        tomorrow: tomorrowEntries.length,
-        week_total: totalWeekEntries.length,
+        notifications_created: notifCount,
+        skipped_duplicates: skippedDuplicates,
+        entries_processed: entriesToProcess.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
