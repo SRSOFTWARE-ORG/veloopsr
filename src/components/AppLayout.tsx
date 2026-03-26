@@ -96,7 +96,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border/60 flex items-center justify-between px-4 z-30">
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 h-14 flex items-center justify-between px-4 z-30"
+        style={{
+          background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))',
+          backgroundSize: '200% 100%',
+          animation: 'gradientSlide 3s ease infinite',
+        }}
+      >
         <img
           src={veloopHeaderLogo}
           alt="Veloop"
@@ -106,13 +113,22 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           decoding="sync"
           onClick={() => navigate("/")}
         />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 text-white">
           <NotificationBell />
           <button onClick={() => setSidebarOpen((open) => !open)} className="p-2">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
+      {/* Gradient fade between header and content */}
+      <div
+        className="md:hidden fixed top-14 left-0 right-0 h-6 z-20 pointer-events-none"
+        style={{
+          background: 'linear-gradient(to bottom, hsl(160,60%,45%) 0%, transparent 100%)',
+          animation: 'gradientSlide 3s ease infinite',
+          backgroundSize: '200% 100%',
+        }}
+      />
 
       {/* Mobile Sidebar Overlay */}
       <div
