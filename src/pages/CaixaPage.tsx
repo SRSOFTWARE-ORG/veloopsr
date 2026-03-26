@@ -40,7 +40,17 @@ import {
   Plus,
   Trash2,
   Wallet,
+  ChevronDown,
+  User,
 } from "lucide-react";
+
+interface EntradaDetalhe {
+  cliente_nome: string;
+  valor: number;
+  pago_por_nome: string;
+  pago_em: string;
+  tipo: "parcela" | "entrada";
+}
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
