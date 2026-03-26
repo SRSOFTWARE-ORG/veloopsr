@@ -51,7 +51,7 @@ const LoginPage = () => {
           <img
             src={veloopLogo}
             alt="Logo Veloop"
-            className="max-w-[90%] max-h-[400px] object-contain drop-shadow-2xl"
+            className="max-w-[90%] max-h-[400px] object-contain drop-shadow-2xl mix-blend-multiply"
           />
         </div>
 
