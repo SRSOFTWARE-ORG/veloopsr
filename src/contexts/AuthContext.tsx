@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -61,69 +61,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<{ nome: string } | null>(null);
   const [role, setRole] = useState<UserRole>("vendedor");
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
+  const sessionRef = useRef<Session | null>(null);
+  const initialSessionHandledRef = useRef(false);
+  const activeFetchRef = useRef(0);
 
-  const fetchUserData = async (userId: string) => {
+  const resetUserData = useCallback(() => {
+    setProfile(null);
+    setRole("vendedor");
+    setPermissions(defaultPermissions);
+  }, []);
+
+  const fetchUserData = useCallback(async (userId: string) => {
+    const requestId = ++activeFetchRef.current;
+
     const [profileRes, roleRes, permRes] = await Promise.all([
-      supabase.from("profiles").select("nome").eq("id", userId).single(),
-      supabase.from("user_roles").select("role").eq("user_id", userId).single(),
-      supabase.from("permissions").select("*").eq("user_id", userId).single(),
+      supabase.from("profiles").select("nome").eq("id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      supabase.from("permissions").select("*").eq("user_id", userId).maybeSingle(),
     ]);
 
-    if (profileRes.data) setProfile(profileRes.data);
-    if (roleRes.data) setRole(roleRes.data.role as UserRole);
-    if (permRes.data) {
-      setPermissions({
-        pode_editar_preco: permRes.data.pode_editar_preco ?? false,
-        pode_excluir_venda: permRes.data.pode_excluir_venda ?? false,
-        pode_dar_desconto: permRes.data.pode_dar_desconto ?? false,
-        limite_desconto: Number(permRes.data.limite_desconto) || 0,
-        pode_ver_faturamento: (permRes.data as any).pode_ver_faturamento ?? false,
-        tipo_comissao: (permRes.data as any).tipo_comissao || "percentual",
-        valor_comissao: Number((permRes.data as any).valor_comissao) || 0,
-      });
+    if (requestId !== activeFetchRef.current) {
+      return;
     }
-  };
+
+    setProfile(profileRes.data ? { nome: profileRes.data.nome } : null);
+    setRole((roleRes.data?.role as UserRole) ?? "vendedor");
+
+    if (!permRes.data) {
+      setPermissions(defaultPermissions);
+      return;
+    }
+
+    setPermissions({
+      pode_editar_preco: permRes.data.pode_editar_preco ?? false,
+      pode_excluir_venda: permRes.data.pode_excluir_venda ?? false,
+      pode_dar_desconto: permRes.data.pode_dar_desconto ?? false,
+      limite_desconto: Number(permRes.data.limite_desconto) || 0,
+      pode_ver_faturamento: (permRes.data as any).pode_ver_faturamento ?? false,
+      tipo_comissao: (permRes.data as any).tipo_comissao || "percentual",
+      valor_comissao: Number((permRes.data as any).valor_comissao) || 0,
+    });
+  }, []);
+
+  const syncSession = useCallback(
+    async (nextSession: Session | null) => {
+      setSession(nextSession);
+      sessionRef.current = nextSession;
+
+      const nextUser = nextSession?.user ?? null;
+      setUser(nextUser);
+
+      if (!nextUser) {
+        activeFetchRef.current += 1;
+        resetUserData();
+        setLoading(false);
+        return;
+      }
+
+      await fetchUserData(nextUser.id);
+      setLoading(false);
+    },
+    [fetchUserData, resetUserData],
+  );
 
   useEffect(() => {
-    // If user chose not to stay logged in, clear session on tab close
     const handleBeforeUnload = () => {
       const manterLogado = localStorage.getItem("veloop_manter_logado");
-      if (manterLogado !== "true" && session) {
-        supabase.auth.signOut();
+      if (manterLogado !== "true" && sessionRef.current) {
+        void supabase.auth.signOut({ scope: "local" });
       }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchUserData(session.user.id), 0);
-        } else {
-          setProfile(null);
-          setRole("vendedor");
-          setPermissions(defaultPermissions);
-        }
-        setLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "INITIAL_SESSION") {
+        initialSessionHandledRef.current = true;
       }
-    );
+      void syncSession(nextSession);
+    });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id);
+    void supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (initialSessionHandledRef.current) {
+        return;
       }
-      setLoading(false);
+
+      initialSessionHandledRef.current = true;
+      void syncSession(initialSession);
     });
 
     return () => {
       subscription.unsubscribe();
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [syncSession]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
