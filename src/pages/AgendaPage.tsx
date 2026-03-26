@@ -498,9 +498,8 @@ const AgendaPage = () => {
       </div>
 
       {/* Filter */}
-      <div className="-mx-4 mb-4 overflow-x-auto px-4 slide-up md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-        <style>{`.agenda-filter-scroll::-webkit-scrollbar { display: none; }`}</style>
-        <div className="agenda-filter-scroll flex w-max min-w-full gap-2 pb-1">
+      <div className="agenda-filter-scroll -mx-4 mb-4 overflow-x-auto px-4 slide-up md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex w-max min-w-full gap-2 pb-1">
           {filterOptions.map((opt) => (
             <Button
               key={opt.value}
