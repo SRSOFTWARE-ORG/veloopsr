@@ -360,14 +360,26 @@ const DocumentosPage = () => {
 
     const valorNota = extracted.valor || extracted.valor_total || 0;
 
-    // Check if a venda already exists for this client with similar value (from carnê import)
-    const { data: existingVendas } = await supabase
-      .from("vendas")
-      .select("id")
-      .ilike("cliente_nome", clienteNome)
-      .eq("valor_total", valorNota)
-      .eq("status", "concluida")
-      .limit(1);
+    // Check if a venda already exists for this client (by CPF or name)
+    let existingVendas: any[] | null = null;
+    if (extracted.cliente_cpf) {
+      const { data } = await supabase
+        .from("vendas")
+        .select("id")
+        .eq("cliente_cpf", extracted.cliente_cpf)
+        .eq("status", "concluida")
+        .limit(1);
+      existingVendas = data;
+    }
+    if (!existingVendas || existingVendas.length === 0) {
+      const { data } = await supabase
+        .from("vendas")
+        .select("id")
+        .ilike("cliente_nome", clienteNome)
+        .eq("status", "concluida")
+        .limit(1);
+      existingVendas = data;
+    }
 
     if (!existingVendas || existingVendas.length === 0) {
       await supabase.from("vendas").insert({
