@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -284,7 +285,7 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
                 />
                 {Math.abs(valorParcela - parcelaCalculada) > 0.01 && (
                   <p className="text-xs text-muted-foreground">
-                    Valor calculado: R$ {parcelaCalculada.toFixed(2)}
+                    Valor calculado: {formatCurrency(parcelaCalculada)}
                   </p>
                 )}
               </div>
@@ -316,19 +317,19 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
           <div className="bg-secondary/30 rounded-xl p-4 space-y-2">
             <div className="flex justify-between font-extrabold">
               <span>Total</span>
-              <span className="tabular-nums">R$ {valorTotal.toFixed(2)}</span>
+              <span className="tabular-nums">{formatCurrency(valorTotal)}</span>
             </div>
             {formaPagamento === "parcelado" && (
               <>
                 {valorEntrada > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Entrada</span>
-                    <span className="tabular-nums">- R$ {valorEntrada.toFixed(2)}</span>
+                    <span className="tabular-nums">- {formatCurrency(valorEntrada)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-semibold text-primary">
                   <span>{numParcelas}x {frequenciaLabels[frequencia]}</span>
-                  <span className="tabular-nums">R$ {valorParcela.toFixed(2)}</span>
+                  <span className="tabular-nums">{formatCurrency(valorParcela)}</span>
                 </div>
               </>
             )}

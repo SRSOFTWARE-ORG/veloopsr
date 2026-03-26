@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -293,7 +294,7 @@ const VendasPage = () => {
     if (!venda.cliente_telefone) { toast.error("Cliente sem telefone cadastrado"); return; }
     const phone = venda.cliente_telefone.replace(/\D/g, "");
     const msg = encodeURIComponent(
-      `Olá, ${venda.cliente_nome}! Passando para lembrar sobre sua parcela de R$ ${Number(venda.valor_parcela).toFixed(2)} referente à compra na SR Software. Dúvidas estamos à disposição! 📲`
+      `Olá, ${venda.cliente_nome}! Passando para lembrar sobre sua parcela de ${formatCurrency(venda.valor_parcela)} referente à compra na SR Software. Dúvidas estamos à disposição! 📲`
     );
     window.open(`https://api.whatsapp.com/send?phone=55${phone}&text=${msg}`, "_blank");
   };
@@ -347,14 +348,14 @@ const VendasPage = () => {
                 <p className="font-semibold text-sm truncate">{v.cliente_nome}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-xs font-bold tabular-nums">
-                    R$ {Number(v.valor_total).toFixed(2)}
+                    {formatCurrency(v.valor_total)}
                   </span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getStatusColor(v.status || "")}`}>
                     {getStatusLabel(v.status || "")}
                   </span>
                   {(v.num_parcelas || 0) > 1 && (
                     <span className="text-xs text-muted-foreground">
-                      {v.num_parcelas}x R$ {Number(v.valor_parcela).toFixed(2)}
+                      {v.num_parcelas}x {formatCurrency(v.valor_parcela)}
                       {v.frequencia_parcela && ` · ${frequenciaLabels[v.frequencia_parcela] || v.frequencia_parcela}`}
                     </span>
                   )}
@@ -447,7 +448,7 @@ const VendasPage = () => {
                         <span className="truncate">{p.nome}</span>
                         <span className="text-xs text-muted-foreground ml-2">Est: {p.estoque_atual}</span>
                       </div>
-                      <span className="text-muted-foreground ml-2 shrink-0 font-medium">R$ {Number(p.preco_venda).toFixed(2)}</span>
+                      <span className="text-muted-foreground ml-2 shrink-0 font-medium">{formatCurrency(p.preco_venda)}</span>
                     </button>
                   ))}
                   {filteredProdutos.length === 0 && (
@@ -463,9 +464,9 @@ const VendasPage = () => {
                     <div key={item.produto_id} className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.nome}</p>
-                        <p className="text-xs text-muted-foreground">R$ {item.preco_unitario.toFixed(2)} × {item.quantidade}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(item.preco_unitario)} × {item.quantidade}</p>
                       </div>
-                      <p className="text-sm font-bold tabular-nums">R$ {item.subtotal.toFixed(2)}</p>
+                      <p className="text-sm font-bold tabular-nums">{formatCurrency(item.subtotal)}</p>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQty(item.produto_id, -1)}>
                           <Minus className="w-3 h-3" />
@@ -482,7 +483,7 @@ const VendasPage = () => {
                   ))}
                   <div className="flex justify-between font-bold text-sm pt-2 border-t border-border/60">
                     <span>Subtotal</span>
-                    <span className="tabular-nums">R$ {subtotal.toFixed(2)}</span>
+                    <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                   </div>
                 </div>
               )}
@@ -663,28 +664,28 @@ const VendasPage = () => {
               <div className="bg-secondary/30 rounded-xl p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="tabular-nums">R$ {subtotal.toFixed(2)}</span>
+                  <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
                 {desconto > 0 && (
                   <div className="flex justify-between text-sm text-destructive">
                     <span>Desconto ({desconto}%)</span>
-                    <span className="tabular-nums">- R$ {descontoValor.toFixed(2)}</span>
+                    <span className="tabular-nums">- {formatCurrency(descontoValor)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-base font-extrabold">
                   <span>Total</span>
-                  <span className="tabular-nums">R$ {total.toFixed(2)}</span>
+                  <span className="tabular-nums">{formatCurrency(total)}</span>
                 </div>
                 {temEntrada && entrada > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Entrada</span>
-                    <span className="tabular-nums">- R$ {entrada.toFixed(2)}</span>
+                    <span className="tabular-nums">- {formatCurrency(entrada)}</span>
                   </div>
                 )}
                 {formaPagamento === "parcelado" && numParcelas > 0 && (
                   <div className="flex justify-between text-sm font-semibold text-primary pt-1 border-t border-border/60">
                     <span>{numParcelas}x {frequenciaLabels[frequencia]}</span>
-                    <span className="tabular-nums">R$ {valorParcela.toFixed(2)}</span>
+                    <span className="tabular-nums">{formatCurrency(valorParcela)}</span>
                   </div>
                 )}
               </div>
@@ -703,7 +704,7 @@ const VendasPage = () => {
                 {cart.map((item) => (
                   <div key={item.produto_id} className="flex justify-between text-sm">
                     <span>{item.nome} × {item.quantidade}</span>
-                    <span className="tabular-nums">R$ {item.subtotal.toFixed(2)}</span>
+                    <span className="tabular-nums">{formatCurrency(item.subtotal)}</span>
                   </div>
                 ))}
 
@@ -711,23 +712,23 @@ const VendasPage = () => {
                   {desconto > 0 && (
                     <div className="flex justify-between text-sm text-destructive">
                       <span>Desconto ({desconto}%)</span>
-                      <span className="tabular-nums">- R$ {descontoValor.toFixed(2)}</span>
+                      <span className="tabular-nums">- {formatCurrency(descontoValor)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-extrabold">
                     <span>Total</span>
-                    <span className="tabular-nums">R$ {total.toFixed(2)}</span>
+                    <span className="tabular-nums">{formatCurrency(total)}</span>
                   </div>
                   {temEntrada && entrada > 0 && (
                     <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Entrada</span>
-                      <span className="tabular-nums">R$ {entrada.toFixed(2)}</span>
+                      <span className="tabular-nums">{formatCurrency(entrada)}</span>
                     </div>
                   )}
                   {formaPagamento === "parcelado" && (
                     <div className="flex justify-between text-sm font-semibold text-primary">
                       <span>{numParcelas}x {frequenciaLabels[frequencia]}</span>
-                      <span className="tabular-nums">R$ {valorParcela.toFixed(2)}</span>
+                      <span className="tabular-nums">{formatCurrency(valorParcela)}</span>
                     </div>
                   )}
                   {formaPagamento === "avista" && (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -290,7 +291,7 @@ const CaixaPage = () => {
             <div>
               <p className="text-[10px] text-muted-foreground">Entradas</p>
               <p className="text-sm font-bold tabular-nums text-emerald-700">
-                R$ {entradaTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {formatCurrency(entradaTotal)}
               </p>
             </div>
           </CardContent>
@@ -303,7 +304,7 @@ const CaixaPage = () => {
             <div>
               <p className="text-[10px] text-muted-foreground">Saídas</p>
               <p className="text-sm font-bold tabular-nums text-destructive">
-                R$ {totalSaidas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {formatCurrency(totalSaidas)}
               </p>
             </div>
           </CardContent>
@@ -316,7 +317,7 @@ const CaixaPage = () => {
             <div>
               <p className="text-[10px] text-muted-foreground">Saldo</p>
               <p className={`text-sm font-bold tabular-nums ${saldo >= 0 ? "text-primary" : "text-destructive"}`}>
-                R$ {saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {formatCurrency(saldo)}
               </p>
             </div>
           </CardContent>
@@ -341,7 +342,7 @@ const CaixaPage = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-destructive">
-                        - R$ {Number(s.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        - {formatCurrency(s.valor)}
                       </p>
                       <span className="text-xs text-muted-foreground">
                         • {getResponsavelNome(s.responsavel_id)}
