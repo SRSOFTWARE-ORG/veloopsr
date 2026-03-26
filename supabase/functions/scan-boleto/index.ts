@@ -85,6 +85,11 @@ Leia com EXTREMA ATENÇÃO cada campo visível no documento. Não omita nenhum d
                 properties: {
                   cliente_nome: { type: "string", description: "Nome do pagador/sacado do boleto" },
                   cliente_cpf: { type: "string", description: "CPF ou CNPJ do pagador, formato 000.000.000-00" },
+                  endereco: { type: "string", description: "Endereço do pagador (rua, número)" },
+                  bairro: { type: "string", description: "Bairro do pagador" },
+                  cidade: { type: "string", description: "Cidade do pagador" },
+                  uf: { type: "string", description: "Estado (UF) do pagador, 2 letras" },
+                  cep: { type: "string", description: "CEP do pagador, formato 00000-000" },
                   valor: { type: "number", description: "Valor do boleto em reais" },
                   data_vencimento: { type: "string", description: "Data de vencimento no formato YYYY-MM-DD" },
                   numero_documento: { type: "string", description: "Número do documento do boleto" },
