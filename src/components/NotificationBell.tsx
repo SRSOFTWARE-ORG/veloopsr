@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, BellRing, Check, Trash2 } from "lucide-react";
+import { Bell, BellRing, Check, Trash2, Volume2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -70,6 +70,7 @@ const NotificationBell = () => {
     unsubscribe: pushUnsubscribe,
   } = usePushNotifications();
   const [open, setOpen] = useState(false);
+  const [testCountdown, setTestCountdown] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasInteracted = useRef(false);
 
@@ -156,6 +157,27 @@ const NotificationBell = () => {
     setOpen(false);
   };
 
+  const startTestNotification = () => {
+    if (testCountdown !== null || !user) return;
+    setTestCountdown(10);
+    const interval = setInterval(() => {
+      setTestCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          // Send test notification via DB insert (triggers realtime + sound)
+          supabase.from("notificacoes").insert({
+            user_id: user!.id,
+            titulo: "🔔 Teste de Notificação",
+            mensagem: "Se você ouviu o som, as notificações estão funcionando!",
+            tipo: "teste",
+          }).then(() => {});
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   return (
     <div className="relative">
       <button
@@ -218,7 +240,25 @@ const NotificationBell = () => {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Test notification */}
+              <div className="mx-3 mb-2 px-3.5 py-2.5 bg-secondary/40 rounded-xl flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Testar som
+                </span>
+                <button
+                  onClick={startTestNotification}
+                  disabled={testCountdown !== null}
+                  className={`text-xs px-3 py-1 rounded-full font-medium transition-all ${
+                    testCountdown !== null
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                  }`}
+                >
+                  {testCountdown !== null ? `${testCountdown}s` : "Testar"}
+                </button>
+              </div>
+
               {notificacoes.length > 0 && (
                 <div className="flex items-center gap-2 px-4 pb-2">
                   {unreadCount > 0 && (
