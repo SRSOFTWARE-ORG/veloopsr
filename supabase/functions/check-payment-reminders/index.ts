@@ -310,7 +310,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- WEEKLY SUMMARY: "Essa semana tem X cobranças" ---
+    // --- TOMORROW WhatsApp: AI-generated formal message ---
+    for (const entry of tomorrowEntries) {
+      const phone = clientePhoneMap.get(entry.cliente_id);
+      if (!phone) continue;
+
+      const nomeCompleto = clienteNomeMap.get(entry.cliente_id) || entry.cliente_nome;
+      const cpf = clienteCpfMap.get(entry.cliente_id) || "não informado";
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const valorFormatado = formatValor(entry.valor_parcela);
+
+      const msg = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada);
+      const sent = await sendWhatsApp(phone, msg);
+      if (sent) whatsappCount++;
+    }
+
+
     const totalWeekEntries = Array.from(weekEntries.values()).flat();
     if (totalWeekEntries.length > 0 && dayOfWeek === 1) {
       // Only send weekly summary on Mondays
