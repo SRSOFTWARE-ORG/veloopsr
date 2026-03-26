@@ -296,27 +296,39 @@ const ProdutosPage = () => {
           <p className="text-sm text-muted-foreground">{produtos.length} produtos</p>
         </div>
         {isPrimaryAdmin && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-1" /> Novo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
-              </DialogHeader>
-              <ProductForm
-                form={form}
-                setForm={setForm}
-                onSubmit={handleSubmit}
-                isEditing={!!editingProduct}
-                imageFile={imageFile}
-                setImageFile={setImageFile}
-                currentImageUrl={editingProduct?.imagem_url}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <input
+              ref={scanFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={handleScanFile}
+              className="hidden"
+            />
+            <Button size="sm" variant="outline" onClick={() => scanFileRef.current?.click()}>
+              <ScanLine className="w-4 h-4 mr-1" /> Escanear
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-1" /> Novo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+                </DialogHeader>
+                <ProductForm
+                  form={form}
+                  setForm={setForm}
+                  onSubmit={handleSubmit}
+                  isEditing={!!editingProduct}
+                  imageFile={imageFile}
+                  setImageFile={setImageFile}
+                  currentImageUrl={editingProduct?.imagem_url}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -384,6 +396,70 @@ const ProdutosPage = () => {
           </p>
         </div>
       )}
+
+      {/* Scan Results Dialog */}
+      <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Produtos Escaneados</DialogTitle>
+          </DialogHeader>
+          {scanning ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analisando documento...</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {scannedProducts.length} produto(s) encontrado(s). Selecione os que deseja importar.
+              </p>
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {scannedProducts.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
+                  >
+                    <Checkbox
+                      checked={p.selected}
+                      onCheckedChange={(checked) => {
+                        setScannedProducts((prev) =>
+                          prev.map((item, idx) => idx === i ? { ...item, selected: checked === true } : item)
+                        );
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.nome}</p>
+                      {p.codigo_barras && (
+                        <p className="text-xs text-muted-foreground">Código: {p.codigo_barras}</p>
+                      )}
+                      {p.referencia && p.referencia !== "0" && (
+                        <p className="text-xs text-muted-foreground">Ref: {p.referencia}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setScanDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={handleImportScanned}
+                  disabled={importing || scannedProducts.filter((p) => p.selected).length === 0}
+                >
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {importing ? "Importando..." : `Importar (${scannedProducts.filter((p) => p.selected).length})`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
