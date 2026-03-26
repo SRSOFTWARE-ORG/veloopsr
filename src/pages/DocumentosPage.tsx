@@ -184,7 +184,6 @@ const DocumentosPage = () => {
   };
 
   const processCarneData = async (doc: Documento, extracted: any) => {
-    // Remove any previous records from this same document
     await removeOldLinkedRecords(doc.nome_arquivo);
 
     const clienteNome = extracted.cliente_nome;
@@ -204,35 +203,57 @@ const DocumentosPage = () => {
     }
     const endDate = end.toISOString().split("T")[0];
 
-    await supabase.from("vendas").insert({
-      cliente_nome: clienteNome,
-      cliente_cpf: extracted.cliente_cpf || null,
-      cliente_telefone: extracted.cliente_telefone || null,
-      valor_total: valorTotal,
-      valor_entrada: valorEntrada,
-      num_parcelas: numParcelas,
-      valor_parcela: valorParcela,
-      vendedor_id: user!.id,
-      forma_pagamento: "parcelado",
-      frequencia_parcela: freq,
-      data_inicio_pagamento: startDate,
-      status: "concluida",
-      observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
-    });
+    // Check if a venda already exists for this client with similar value (avoid duplicates from different doc names)
+    const { data: existingVendas } = await supabase
+      .from("vendas")
+      .select("id")
+      .ilike("cliente_nome", clienteNome)
+      .eq("valor_total", valorTotal)
+      .eq("status", "concluida")
+      .limit(1);
+
+    if (!existingVendas || existingVendas.length === 0) {
+      await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        cliente_telefone: extracted.cliente_telefone || null,
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
+        num_parcelas: numParcelas,
+        valor_parcela: valorParcela,
+        vendedor_id: user!.id,
+        forma_pagamento: "parcelado",
+        frequencia_parcela: freq,
+        data_inicio_pagamento: startDate,
+        status: "concluida",
+        observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
+      });
+    }
 
     const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf, extracted.cliente_telefone);
 
     if (clienteId) {
-      await supabase.from("cobrancas").insert({
-        cliente_id: clienteId,
-        cliente_nome: clienteNome,
-        valor_parcela: valorParcela,
-        data_inicio: startDate,
-        data_fim: endDate,
-        frequencia: freq,
-        criado_por: user!.id,
-        observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
-      });
+      // Check if a cobrança already exists for this client with same value/dates
+      const { data: existingCob } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .eq("valor_parcela", valorParcela)
+        .eq("data_inicio", startDate)
+        .limit(1);
+
+      if (!existingCob || existingCob.length === 0) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: clienteId,
+          cliente_nome: clienteNome,
+          valor_parcela: valorParcela,
+          data_inicio: startDate,
+          data_fim: endDate,
+          frequencia: freq,
+          criado_por: user!.id,
+          observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
+        });
+      }
     }
   };
 
