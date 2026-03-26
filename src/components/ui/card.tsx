@@ -2,16 +2,24 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+const cardBaseStyle = {
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)',
+  transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease',
+};
+const cardHoverStyle = {
+  transform: 'perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.03) translateY(-4px)',
+  boxShadow: '0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)',
+};
+
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div
     ref={ref}
     className={cn("w-full min-w-0 overflow-hidden rounded-lg border bg-card text-card-foreground", className)}
-    style={{
-      boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)',
-      transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease',
-    }}
-    onPointerEnter={(e) => { e.currentTarget.style.transform = 'perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.03) translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)'; }}
-    onPointerLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)'; }}
+    style={cardBaseStyle}
+    onPointerEnter={(e) => { Object.assign(e.currentTarget.style, cardHoverStyle); }}
+    onPointerLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = cardBaseStyle.boxShadow; }}
+    onTouchStart={(e) => { Object.assign(e.currentTarget.style, cardHoverStyle); }}
+    onTouchEnd={(e) => { setTimeout(() => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = cardBaseStyle.boxShadow; }, 200); }}
     {...props}
   />
 ));
