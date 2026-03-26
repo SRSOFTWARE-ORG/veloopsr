@@ -7,38 +7,96 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function formatDateOnly(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addMonthsPreservingDay(date: Date, months: number): Date {
+  const next = new Date(date);
+  const originalDay = next.getUTCDate();
+  next.setUTCDate(1);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(originalDay, lastDay));
+  return next;
+}
+
+function generateProjectedDates(dataInicio: string, dataFim: string, frequencia: string): string[] {
+  const start = new Date(`${dataInicio}T00:00:00.000Z`);
+  const end = new Date(`${dataFim}T00:00:00.000Z`);
+  const dates: string[] = [];
+  let current = new Date(start);
+  while (current <= end) {
+    dates.push(formatDateOnly(current));
+    if (frequencia === "semana") current = new Date(current.getTime() + 7 * DAY_MS);
+    else if (frequencia === "quinzena") current = new Date(current.getTime() + 15 * DAY_MS);
+    else current = addMonthsPreservingDay(current, 1);
+  }
+  return dates;
+}
+
+const diasSemana: Record<number, string> = {
+  0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
+};
+
 async function sendWebPush(subscription: { endpoint: string; p256dh: string; auth: string }, payload: object) {
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    console.warn("VAPID keys not configured, skipping push");
-    return;
-  }
+  if (!vapidPublicKey || !vapidPrivateKey) return;
 
   try {
-    // Use web-push compatible approach with crypto APIs
     const { default: webpush } = await import("npm:web-push@3.6.7");
-
-    webpush.setVapidDetails(
-      "mailto:admin@veloop.app",
-      vapidPublicKey,
-      vapidPrivateKey
-    );
-
+    webpush.setVapidDetails("mailto:admin@veloop.app", vapidPublicKey, vapidPrivateKey);
     await webpush.sendNotification(
-      {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
-        },
-      },
+      { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
       JSON.stringify(payload)
     );
   } catch (err) {
-    console.error("Push send failed for", subscription.endpoint, err);
+    console.error("Push failed:", subscription.endpoint, err);
   }
+}
+
+async function createNotification(
+  supabase: any,
+  userId: string,
+  titulo: string,
+  mensagem: string,
+  tipo: string,
+  dados: Record<string, any>,
+  dedupKey: string
+) {
+  // Check for duplicate using dados.dedup_key
+  const { data: existing } = await supabase
+    .from("notificacoes")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("tipo", tipo)
+    .contains("dados", { dedup_key: dedupKey })
+    .maybeSingle();
+
+  if (existing) return false;
+
+  await supabase.from("notificacoes").insert({
+    user_id: userId,
+    titulo,
+    mensagem,
+    tipo,
+    dados: { ...dados, dedup_key: dedupKey },
+  });
+
+  // Send push
+  const { data: subs } = await supabase
+    .from("push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId);
+
+  for (const sub of subs || []) {
+    await sendWebPush(sub, { titulo, mensagem, tag: dedupKey });
+  }
+
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -51,123 +109,151 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const now = new Date();
+    const todayStr = formatDateOnly(now);
+    const tomorrow = new Date(now.getTime() + DAY_MS);
+    const tomorrowStr = formatDateOnly(tomorrow);
 
-    // Find payments due tomorrow that are still pending
-    const { data: pagamentos, error: pagErr } = await supabase
-      .from("cobranca_pagamentos")
-      .select("id, cobranca_id, data_vencimento, status")
-      .eq("data_vencimento", tomorrowStr)
-      .in("status", ["a_pagar"]);
+    // Get end of current week (Sunday)
+    const dayOfWeek = now.getUTCDay();
+    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    const endOfWeek = new Date(now.getTime() + daysUntilSunday * DAY_MS);
+    const endOfWeekStr = formatDateOnly(endOfWeek);
 
-    if (pagErr) throw pagErr;
-
-    if (!pagamentos || pagamentos.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "Nenhum pagamento vencendo amanhã", count: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get cobranca details for each payment
-    const cobrancaIds = [...new Set(pagamentos.map((p) => p.cobranca_id))];
+    // Get all cobrancas
     const { data: cobrancas, error: cobErr } = await supabase
       .from("cobrancas")
-      .select("id, cliente_nome, valor_parcela, criado_por")
-      .in("id", cobrancaIds);
-
+      .select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
 
-    const cobrancaMap = new Map(cobrancas?.map((c) => [c.id, c]) || []);
+    // Get existing pagamentos with status
+    const { data: pagamentos } = await supabase
+      .from("cobranca_pagamentos")
+      .select("cobranca_id, data_vencimento, status");
 
-    // Get all admin users to notify them too
-    const { data: adminRoles } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .eq("role", "admin");
+    // Build a set of paid/exempt dates per cobranca
+    const paidDates = new Set<string>();
+    for (const p of pagamentos || []) {
+      if (p.status === "pago" || p.status === "isento") {
+        paidDates.add(`${p.cobranca_id}_${p.data_vencimento}`);
+      }
+    }
 
-    const adminIds = adminRoles?.map((r) => r.user_id) || [];
+    // Get admins
+    const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+    const adminIds = adminRoles?.map((r: any) => r.user_id) || [];
 
-    let notificacoesCreated = 0;
-    let pushSent = 0;
+    // Build per-date cobranca list (only unpaid)
+    interface CobrancaEntry {
+      id: string;
+      cliente_nome: string;
+      valor_parcela: number;
+      criado_por: string;
+      date: string;
+    }
 
-    for (const pagamento of pagamentos) {
-      const cobranca = cobrancaMap.get(pagamento.cobranca_id);
-      if (!cobranca) continue;
+    const todayEntries: CobrancaEntry[] = [];
+    const tomorrowEntries: CobrancaEntry[] = [];
+    const weekEntries: Map<string, CobrancaEntry[]> = new Map(); // date -> entries
 
-      const valor = new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).format(cobranca.valor_parcela);
+    for (const cob of cobrancas || []) {
+      const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
+      for (const date of dates) {
+        if (paidDates.has(`${cob.id}_${date}`)) continue;
 
-      const titulo = "Lembrete de Pagamento";
-      const mensagem = `Amanhã vence a prestação do cliente ${cobranca.cliente_nome} no valor de ${valor}`;
+        const entry: CobrancaEntry = {
+          id: cob.id,
+          cliente_nome: cob.cliente_nome,
+          valor_parcela: cob.valor_parcela,
+          criado_por: cob.criado_por,
+          date,
+        };
 
-      // Notify the creator and all admins
-      const usersToNotify = new Set([cobranca.criado_por, ...adminIds]);
+        if (date === todayStr) todayEntries.push(entry);
+        if (date === tomorrowStr) tomorrowEntries.push(entry);
+        if (date >= todayStr && date <= endOfWeekStr) {
+          if (!weekEntries.has(date)) weekEntries.set(date, []);
+          weekEntries.get(date)!.push(entry);
+        }
+      }
+    }
+
+    let notifCount = 0;
+    const formatValor = (v: number) =>
+      new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+    // --- TODAY notifications: "Cobrar CLIENTE hoje" ---
+    for (const entry of todayEntries) {
+      const usersToNotify = new Set([entry.criado_por, ...adminIds]);
+      for (const userId of usersToNotify) {
+        const ok = await createNotification(
+          supabase, userId,
+          "📌 Cobrança Hoje",
+          `Cobrar ${entry.cliente_nome} hoje — ${formatValor(entry.valor_parcela)}`,
+          "lembrete_hoje",
+          { cobranca_id: entry.id, cliente_nome: entry.cliente_nome, data: entry.date },
+          `hoje_${entry.id}_${entry.date}`
+        );
+        if (ok) notifCount++;
+      }
+    }
+
+    // --- TOMORROW notifications: "Cobrar CLIENTE amanhã" ---
+    for (const entry of tomorrowEntries) {
+      const usersToNotify = new Set([entry.criado_por, ...adminIds]);
+      for (const userId of usersToNotify) {
+        const ok = await createNotification(
+          supabase, userId,
+          "🔔 Cobrança Amanhã",
+          `Cobrar ${entry.cliente_nome} amanhã — ${formatValor(entry.valor_parcela)}`,
+          "lembrete_amanha",
+          { cobranca_id: entry.id, cliente_nome: entry.cliente_nome, data: entry.date },
+          `amanha_${entry.id}_${entry.date}`
+        );
+        if (ok) notifCount++;
+      }
+    }
+
+    // --- WEEKLY SUMMARY: "Essa semana tem X cobranças" ---
+    const totalWeekEntries = Array.from(weekEntries.values()).flat();
+    if (totalWeekEntries.length > 0 && dayOfWeek === 1) {
+      // Only send weekly summary on Mondays
+      const weekDays: string[] = [];
+      const sortedDates = Array.from(weekEntries.keys()).sort();
+      for (const date of sortedDates) {
+        const entries = weekEntries.get(date)!;
+        const d = new Date(`${date}T00:00:00.000Z`);
+        const dayName = diasSemana[d.getUTCDay()];
+        const names = entries.map((e) => e.cliente_nome).join(", ");
+        weekDays.push(`${dayName}: ${names}`);
+      }
+
+      const mensagem = `Essa semana tem ${totalWeekEntries.length} cobrança${totalWeekEntries.length > 1 ? "s" : ""} — ${weekDays.join(" · ")}`;
+
+      // Notify all relevant users
+      const allCreators = new Set(totalWeekEntries.map((e) => e.criado_por));
+      const usersToNotify = new Set([...allCreators, ...adminIds]);
 
       for (const userId of usersToNotify) {
-        // Check if notification already exists to avoid duplicates
-        const { data: existing } = await supabase
-          .from("notificacoes")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("tipo", "lembrete_pagamento")
-          .contains("dados", { pagamento_id: pagamento.id })
-          .maybeSingle();
-
-        if (!existing) {
-          // Create internal notification
-          await supabase.from("notificacoes").insert({
-            user_id: userId,
-            titulo,
-            mensagem,
-            tipo: "lembrete_pagamento",
-            dados: {
-              pagamento_id: pagamento.id,
-              cobranca_id: pagamento.cobranca_id,
-              cliente_nome: cobranca.cliente_nome,
-              valor: cobranca.valor_parcela,
-              data_vencimento: pagamento.data_vencimento,
-            },
-          });
-          notificacoesCreated++;
-
-          // Send Web Push to all devices of this user
-          const { data: subs } = await supabase
-            .from("push_subscriptions")
-            .select("endpoint, p256dh, auth")
-            .eq("user_id", userId);
-
-          if (subs && subs.length > 0) {
-            const pushPayload = {
-              titulo,
-              mensagem,
-              tag: `pagamento-${pagamento.id}`,
-              dados: {
-                pagamento_id: pagamento.id,
-                cobranca_id: pagamento.cobranca_id,
-              },
-            };
-
-            for (const sub of subs) {
-              await sendWebPush(sub, pushPayload);
-              pushSent++;
-            }
-          }
-        }
+        const ok = await createNotification(
+          supabase, userId,
+          "📅 Resumo da Semana",
+          mensagem,
+          "resumo_semanal",
+          { semana: todayStr, total: totalWeekEntries.length },
+          `semana_${todayStr}`
+        );
+        if (ok) notifCount++;
       }
     }
 
     return new Response(
       JSON.stringify({
-        message: `${notificacoesCreated} notificações criadas, ${pushSent} push enviados`,
-        count: notificacoesCreated,
-        push_sent: pushSent,
-        pagamentos_encontrados: pagamentos.length,
+        success: true,
+        notifications_created: notifCount,
+        today: todayEntries.length,
+        tomorrow: tomorrowEntries.length,
+        week_total: totalWeekEntries.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
