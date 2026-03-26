@@ -305,7 +305,7 @@ const DocumentosPage = () => {
         .limit(1);
 
       if (!existingCob || existingCob.length === 0) {
-        await supabase.from("cobrancas").insert({
+        const { data: newCob } = await supabase.from("cobrancas").insert({
           cliente_id: clienteId,
           cliente_nome: clienteNome,
           valor_parcela: valorParcela,
@@ -314,7 +314,18 @@ const DocumentosPage = () => {
           frequencia: freq,
           criado_por: user!.id,
           observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
-        });
+        }).select("id").single();
+
+        // Registrar entrada como pagamento pago se houver
+        if (newCob && valorEntrada > 0) {
+          const today = new Date().toISOString().split("T")[0];
+          await supabase.from("cobranca_pagamentos").insert({
+            cobranca_id: newCob.id,
+            data_vencimento: today,
+            status: "pago",
+            pago_em: new Date().toISOString(),
+          });
+        }
       }
     }
   };
