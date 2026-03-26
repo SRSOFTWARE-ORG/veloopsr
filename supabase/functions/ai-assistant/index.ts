@@ -124,6 +124,92 @@ const actionTools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_whatsapp",
+      description: "Enviar mensagem WhatsApp para um cliente. Pode enviar cobrança automática (com dados de fatura) ou mensagem livre.",
+      parameters: {
+        type: "object",
+        properties: {
+          telefone: { type: "string", description: "Telefone do cliente com DDD" },
+          mensagem: { type: "string", description: "Mensagem livre (opcional se dados de cobrança forem fornecidos)" },
+          cobranca_id: { type: "string", description: "ID da cobrança (para cobrança automática)" },
+          cliente_id: { type: "string", description: "ID do cliente" },
+          cliente_nome: { type: "string", description: "Nome do cliente" },
+          cpf: { type: "string", description: "CPF do cliente" },
+          valor: { type: "number", description: "Valor da parcela" },
+          data_vencimento: { type: "string", description: "Data de vencimento YYYY-MM-DD" },
+          status_parcela: { type: "string", description: "Status da parcela" },
+        },
+        required: ["telefone"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "trigger_payment_reminders",
+      description: "Disparar manualmente a automação de lembretes de pagamento (notificações + WhatsApp para cobranças do dia/amanhã)",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar notificação interna para um ou todos os usuários",
+      parameters: {
+        type: "object",
+        properties: {
+          user_id: { type: "string", description: "ID do usuário (ou 'all_admins' para todos os admins)" },
+          titulo: { type: "string", description: "Título da notificação" },
+          mensagem: { type: "string", description: "Corpo da notificação" },
+          tipo: { type: "string", description: "Tipo: lembrete, alerta, info", default: "info" },
+        },
+        required: ["titulo", "mensagem"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "view_whatsapp_history",
+      description: "Ver histórico de envios WhatsApp de um cliente ou período",
+      parameters: {
+        type: "object",
+        properties: {
+          cpf: { type: "string", description: "CPF do cliente (opcional)" },
+          dias: { type: "number", description: "Últimos N dias (padrão 7)", default: 7 },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_cobranca",
+      description: "Criar nova cobrança para um cliente com parcelas automáticas",
+      parameters: {
+        type: "object",
+        properties: {
+          cliente_id: { type: "string", description: "ID do cliente" },
+          cliente_nome: { type: "string", description: "Nome do cliente" },
+          valor_parcela: { type: "number", description: "Valor de cada parcela" },
+          data_inicio: { type: "string", description: "Data de início YYYY-MM-DD" },
+          data_fim: { type: "string", description: "Data de fim YYYY-MM-DD" },
+          frequencia: { type: "string", enum: ["semana", "quinzena", "mes"], default: "mes" },
+          observacoes: { type: "string", description: "Observações opcionais" },
+        },
+        required: ["cliente_id", "cliente_nome", "valor_parcela", "data_inicio", "data_fim"],
+      },
+    },
+  },
 ];
 
 // Allowed fields per table for security
