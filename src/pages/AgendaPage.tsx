@@ -86,6 +86,7 @@ interface Cliente {
   id: string;
   nome: string;
   telefone: string | null;
+  cpf: string | null;
 }
 
 type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente" | "isento";
