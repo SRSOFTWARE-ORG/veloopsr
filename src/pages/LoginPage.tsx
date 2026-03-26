@@ -47,7 +47,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <div className="w-full max-w-[900px] bg-card rounded-xl shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
         {/* Left - Logo */}
-        <div className="flex-1 flex items-center justify-center p-10" style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(260,70%,55%), hsl(142,70%,45%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 6s ease infinite' }}>
+        <div className="flex-1 flex items-center justify-center p-10" style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 12s ease infinite' }}>
           <img
             src={veloopLogo}
             alt="Logo Veloop"
@@ -122,7 +122,7 @@ const LoginPage = () => {
             <Button
               type="submit"
               className="w-full h-12 rounded-lg text-base font-semibold text-white border-0 hover:opacity-90"
-              style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(260,70%,55%), hsl(142,70%,45%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 6s ease infinite' }}
+              style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 12s ease infinite' }}
               disabled={loading}
             >
               {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
