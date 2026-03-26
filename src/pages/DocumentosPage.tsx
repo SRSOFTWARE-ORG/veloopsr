@@ -279,7 +279,7 @@ const DocumentosPage = () => {
       });
     }
 
-    const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf, extracted.cliente_telefone);
+    const clienteId = await findOrCreateCliente(clienteNome, extracted);
 
     if (clienteId) {
       // Check if a cobrança already exists for this client with same value/dates
@@ -312,7 +312,7 @@ const DocumentosPage = () => {
     const clienteNome = extracted.cliente_nome;
     const dataVencimento = extracted.data_vencimento || new Date().toISOString().split("T")[0];
 
-    const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
+    const clienteId = await findOrCreateCliente(clienteNome, extracted);
 
     if (clienteId) {
       // Check if a cobrança already exists for this client with same value/date
@@ -343,7 +343,7 @@ const DocumentosPage = () => {
     await removeOldLinkedRecords(doc.nome_arquivo);
 
     const clienteNome = extracted.cliente_nome;
-    await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
+    await findOrCreateCliente(clienteNome, extracted);
 
     const valorNota = extracted.valor || extracted.valor_total || 0;
 
