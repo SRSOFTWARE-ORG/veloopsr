@@ -418,25 +418,31 @@ const ProdutosPage = () => {
 
       {/* Scan Results Dialog */}
       <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Produtos Escaneados</DialogTitle>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto mx-4 rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] border-0 bg-card/95 backdrop-blur-sm" style={{ perspective: "800px" }}>
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-lg font-bold text-center">Produtos Escaneados</DialogTitle>
           </DialogHeader>
           {scanning ? (
-            <div className="flex flex-col items-center py-10 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Analisando documento...</p>
+            <div className="flex flex-col items-center py-14 gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground font-medium">Analisando documento...</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-4 px-1">
+              <p className="text-sm text-muted-foreground text-center">
                 {scannedProducts.length} produto(s) encontrado(s). Selecione os que deseja importar.
               </p>
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
                 {scannedProducts.map((p, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
+                    className="flex items-center gap-3 p-4 rounded-xl bg-background border border-border/40 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
+                    style={{ perspective: "800px" }}
+                    onClick={() => {
+                      setScannedProducts((prev) =>
+                        prev.map((item, idx) => idx === i ? { ...item, selected: !item.selected } : item)
+                      );
+                    }}
                   >
                     <Checkbox
                       checked={p.selected}
@@ -445,11 +451,12 @@ const ProdutosPage = () => {
                           prev.map((item, idx) => idx === i ? { ...item, selected: checked === true } : item)
                         );
                       }}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{p.nome}</p>
+                      <p className="text-sm font-semibold truncate">{p.nome}</p>
                       {p.codigo_barras && (
-                        <p className="text-xs text-muted-foreground">Código: {p.codigo_barras}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Código: {p.codigo_barras}</p>
                       )}
                       {p.referencia && p.referencia !== "0" && (
                         <p className="text-xs text-muted-foreground">Ref: {p.referencia}</p>
