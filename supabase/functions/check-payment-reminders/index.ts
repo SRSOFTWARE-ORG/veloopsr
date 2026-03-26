@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
     // Build per-date cobranca list (only unpaid)
     interface CobrancaEntry {
       id: string;
+      cliente_id: string;
       cliente_nome: string;
       valor_parcela: number;
       criado_por: string;
@@ -192,7 +193,7 @@ Deno.serve(async (req) => {
 
     const todayEntries: CobrancaEntry[] = [];
     const tomorrowEntries: CobrancaEntry[] = [];
-    const weekEntries: Map<string, CobrancaEntry[]> = new Map(); // date -> entries
+    const weekEntries: Map<string, CobrancaEntry[]> = new Map();
 
     for (const cob of cobrancas || []) {
       const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
@@ -201,6 +202,7 @@ Deno.serve(async (req) => {
 
         const entry: CobrancaEntry = {
           id: cob.id,
+          cliente_id: cob.cliente_id,
           cliente_nome: cob.cliente_nome,
           valor_parcela: cob.valor_parcela,
           criado_por: cob.criado_por,
