@@ -301,6 +301,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         notifications_created: notifCount,
+        whatsapp_sent: whatsappCount,
         today: todayEntries.length,
         tomorrow: tomorrowEntries.length,
         week_total: totalWeekEntries.length,
