@@ -55,15 +55,17 @@ O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
             content: [
               {
                 type: "text",
-                text: `Extraia os dados deste boleto bancário. Preciso de:
+                text: `Extraia TODOS os dados deste boleto bancário. Não deixe NENHUM campo em branco se a informação estiver visível. Preciso de:
 - Nome do pagador/cliente (campo "Pagador" ou "Sacado")
-- CPF/CNPJ do pagador (se visível)
+- CPF/CNPJ do pagador (se visível, formato 000.000.000-00)
+- Endereço do pagador (rua, número)
+- Bairro, cidade, UF, CEP do pagador
 - Valor do boleto (campo "Valor do Documento" ou similar)
 - Data de vencimento (formato YYYY-MM-DD)
 - Número do documento
 - Nome do beneficiário/cedente (quem recebe)
 
-Seja preciso nos valores e datas.`
+Leia com EXTREMA ATENÇÃO cada campo visível no documento. Não omita nenhum dado.`
               },
               {
                 type: "image_url",
