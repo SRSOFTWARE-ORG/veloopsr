@@ -62,6 +62,31 @@ Deno.serve(async (req) => {
     const { action, user_id } = await req.json();
     if (!user_id) throw new Error("user_id required");
 
+    // Handle status and disconnect without needing a valid token
+    if (action === "status") {
+      const { data: tokens } = await supabase
+        .from("google_calendar_tokens")
+        .select("id, updated_at")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({ connected: !!tokens, last_sync: tokens?.updated_at }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "disconnect") {
+      await supabase.from("google_calendar_tokens").delete().eq("user_id", user_id);
+      await supabase.from("calendar_sync").delete().eq("user_id", user_id);
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // For export/import, we need a valid access token
     const accessToken = await getValidAccessToken(supabase, user_id);
     const calendarApi = "https://www.googleapis.com/calendar/v3";
     const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
