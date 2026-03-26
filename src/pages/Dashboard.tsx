@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,9 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-
-const SalesChartCard = lazy(() => import("@/components/dashboard/SalesChartCard"));
-const CobrancaResumo = lazy(() => import("@/components/dashboard/CobrancaResumo"));
+import SalesChartCard from "@/components/dashboard/SalesChartCard";
+import CobrancaResumo from "@/components/dashboard/CobrancaResumo";
 
 const frequenciaLabels: Record<string, string> = {
   semana: "Semanal",
@@ -167,15 +166,11 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <Suspense fallback={<CardSectionLoader message="Carregando gráfico de vendas..." />}>
-        <SalesChartCard />
-      </Suspense>
+      <SalesChartCard />
 
-      <Suspense fallback={<CardSectionLoader message="Carregando resumo de cobranças..." />}>
-        <div className="mb-6">
-          <CobrancaResumo />
-        </div>
-      </Suspense>
+      <div className="mb-6">
+        <CobrancaResumo />
+      </div>
 
       {isAdmin && recentVendas.length > 0 && (
         <div className="slide-up delay-6">

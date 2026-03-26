@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
   useEffect(() => {
-    const timer = setTimeout(() => onFinish(), 4200);
+    const timer = setTimeout(() => onFinish(), 1800);
     return () => clearTimeout(timer);
   }, [onFinish]);
 
@@ -71,7 +71,7 @@ const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
           style={{ willChange: "opacity" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 3.4, ease: "easeIn" }}
+          transition={{ duration: 0.5, delay: 1.2, ease: "easeIn" }}
         />
       </motion.div>
     </AnimatePresence>
