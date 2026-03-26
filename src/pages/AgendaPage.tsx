@@ -186,7 +186,7 @@ const AgendaPage = () => {
     const [cobRes, pagRes, cliRes] = await Promise.all([
       supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
       supabase.from("cobranca_pagamentos").select("*"),
-      supabase.from("clientes").select("id, nome, telefone").order("nome"),
+      supabase.from("clientes").select("id, nome, telefone, cpf").order("nome"),
     ]);
     if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
     if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
