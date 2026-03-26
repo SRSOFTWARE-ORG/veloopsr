@@ -151,19 +151,68 @@ const DocumentosPage = () => {
     }
   };
 
-  const findOrCreateCliente = async (nome: string, cpf?: string, telefone?: string) => {
-    const { data: existing } = await supabase
-      .from("clientes")
-      .select("id")
-      .ilike("nome", `%${nome}%`)
-      .limit(1);
+  const findOrCreateCliente = async (nome: string, extraData: Record<string, any> = {}) => {
+    // Try to find by CPF first (more reliable), then by name
+    let existing: any[] | null = null;
+    if (extraData.cpf || extraData.cliente_cpf) {
+      const cpfVal = extraData.cpf || extraData.cliente_cpf;
+      const { data } = await supabase.from("clientes").select("*").eq("cpf", cpfVal).limit(1);
+      existing = data;
+    }
+    if (!existing || existing.length === 0) {
+      const { data } = await supabase.from("clientes").select("*").ilike("nome", `%${nome}%`).limit(1);
+      existing = data;
+    }
 
-    if (existing?.[0]?.id) return existing[0].id;
+    // Build client data from extracted fields
+    const clienteData: Record<string, any> = {};
+    const fieldMap: Record<string, string> = {
+      cliente_cpf: "cpf", cpf: "cpf",
+      cliente_telefone: "telefone", telefone: "telefone",
+      email: "email",
+      endereco: "endereco",
+      complemento: "complemento",
+      bairro: "bairro",
+      cidade: "cidade",
+      uf: "uf",
+      cep: "cep",
+      rg: "rg",
+      rg_emissor: "rg_emissor",
+      rg_data_emissao: "rg_data_emissao",
+      data_nascimento: "data_nascimento",
+      naturalidade: "naturalidade",
+      estado_civil: "estado_civil",
+      nome_pai: "nome_pai",
+      nome_mae: "nome_mae",
+      tipo: "tipo",
+      inscricao_estadual: "inscricao_estadual",
+      observacoes: "observacoes",
+    };
+
+    for (const [srcKey, destKey] of Object.entries(fieldMap)) {
+      if (extraData[srcKey] && String(extraData[srcKey]).trim()) {
+        clienteData[destKey] = extraData[srcKey];
+      }
+    }
+
+    if (existing?.[0]?.id) {
+      // Update existing client with any missing fields
+      const updates: Record<string, any> = {};
+      const current = existing[0];
+      for (const [key, value] of Object.entries(clienteData)) {
+        if (!current[key] && value) {
+          updates[key] = value;
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("clientes").update(updates).eq("id", current.id);
+      }
+      return current.id;
+    }
 
     const { data: newCliente } = await supabase.from("clientes").insert({
       nome,
-      cpf: cpf || null,
-      telefone: telefone || null,
+      ...clienteData,
       criado_por: user!.id,
     }).select("id").single();
 
