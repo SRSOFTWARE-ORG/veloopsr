@@ -85,7 +85,49 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   }
 }
 
-async function createNotification(
+async function generateFormalMessage(clienteNome: string, cpf: string, valor: string, dataVencimento: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    // Fallback template if no AI key
+    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento para evitar encargos.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  }
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          {
+            role: "system",
+            content: "Você é um assistente de cobranças profissional. Gere mensagens formais, educadas e objetivas para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com 'Atenciosamente,\\n_Veloop - SR Software_'."
+          },
+          {
+            role: "user",
+            content: `Gere uma mensagem formal de lembrete de pagamento com os seguintes dados:\n- Nome completo do cliente: ${clienteNome}\n- CPF: ${cpf}\n- Valor da parcela: ${valor}\n- Data de vencimento: ${dataVencimento} (amanhã)\n\nA mensagem deve informar que a parcela vence amanhã e pedir que o cliente providencie o pagamento.`
+          }
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("AI gateway error:", res.status, await res.text());
+      return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) ${clienteNome},\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  } catch (err) {
+    console.error("AI generation error:", err);
+    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  }
+}
+
+
   supabase: any,
   userId: string,
   titulo: string,
