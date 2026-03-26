@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Smartphone, Lock, Mail, User } from "lucide-react";
+import { Lock, Mail, User } from "lucide-react";
+import veloopLogo from "@/assets/veloop-logo.jpg";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,18 +44,20 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8 slide-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
-            <Smartphone className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Veloop</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestão Inteligente SR Software</p>
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
+      <div className="w-full max-w-[900px] bg-card rounded-xl shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
+        {/* Left - Logo */}
+        <div className="flex-1 bg-gradient-to-br from-[hsl(200,80%,50%)] to-[hsl(142,70%,45%)] flex items-center justify-center p-10">
+          <img
+            src={veloopLogo}
+            alt="Logo Veloop"
+            className="max-w-[80%] max-h-[300px] object-contain drop-shadow-2xl"
+          />
         </div>
 
-        <div className="bg-card rounded-2xl border border-border/60 p-6 shadow-lg slide-up delay-1">
-          <h2 className="text-lg font-bold mb-4">
+        {/* Right - Form */}
+        <div className="flex-1 p-8 md:p-12 flex flex-col justify-center">
+          <h2 className="text-2xl font-bold text-foreground mb-6">
             {isLogin ? "Entrar" : "Criar Conta"}
           </h2>
 
@@ -66,11 +69,12 @@ const LoginPage = () => {
                   placeholder="Nome completo"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
                   required={!isLogin}
                 />
               </div>
             )}
+
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -78,10 +82,11 @@ const LoginPage = () => {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
                 required
               />
             </div>
+
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -89,33 +94,39 @@ const LoginPage = () => {
                 placeholder="Senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
                 required
                 minLength={6}
               />
             </div>
 
             {isLogin && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="manter-logado"
-                  checked={manterLogado}
-                  onCheckedChange={(checked) => setManterLogado(checked === true)}
-                />
-                <label htmlFor="manter-logado" className="text-sm text-muted-foreground cursor-pointer select-none">
-                  Manter conectado
-                </label>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="manter-logado"
+                    checked={manterLogado}
+                    onCheckedChange={(checked) => setManterLogado(checked === true)}
+                  />
+                  <label htmlFor="manter-logado" className="text-muted-foreground cursor-pointer select-none">
+                    Manter conectado
+                  </label>
+                </div>
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-lg text-base font-semibold bg-gradient-to-r from-[hsl(200,80%,50%)] to-[hsl(142,70%,45%)] hover:opacity-90 text-white border-0"
+              disabled={loading}
+            >
               {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
             </Button>
           </form>
 
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="w-full text-center mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="w-full text-center mt-5 text-sm text-primary hover:underline transition-colors"
           >
             {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
           </button>
