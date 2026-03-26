@@ -493,6 +493,63 @@ export type Database = {
           },
         ]
       }
+      envio_cobranca: {
+        Row: {
+          cliente_id: string | null
+          cobranca_id: string | null
+          cpf: string
+          criado_em: string
+          data_envio: string
+          enviado_com_sucesso: boolean
+          id: string
+          mensagem: string
+          status_fatura: string
+          telefone: string
+          tipo_envio: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          cpf: string
+          criado_em?: string
+          data_envio: string
+          enviado_com_sucesso?: boolean
+          id?: string
+          mensagem: string
+          status_fatura: string
+          telefone: string
+          tipo_envio: string
+        }
+        Update: {
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          cpf?: string
+          criado_em?: string
+          data_envio?: string
+          enviado_com_sucesso?: boolean
+          id?: string
+          mensagem?: string
+          status_fatura?: string
+          telefone?: string
+          tipo_envio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "envio_cobranca_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "envio_cobranca_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estoque_movimentacao: {
         Row: {
           created_at: string | null
