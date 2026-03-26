@@ -407,7 +407,7 @@ const AgendaPage = () => {
 
   return (
     <div className="page-container pb-24 md:pb-8">
-      <div className="mb-6 slide-up flex items-center justify-between">
+      <div className="mb-6 slide-up flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Agenda de Cobranças</h1>
           <p className="text-sm text-muted-foreground">Calendário de pagamentos dos clientes</p>
