@@ -47,7 +47,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen flex" style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 3s ease infinite' }}>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/60 fixed inset-y-0 left-0 z-30">
-        <div className="p-5 border-b border-border/60 flex items-center justify-between">
+        <div className="p-5 flex items-center justify-between">
           <div>
             <img src={veloopHeaderLogo} alt="Veloop" className="h-14 object-contain cursor-pointer" style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }} onClick={() => navigate("/")} />
             <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
@@ -55,7 +55,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <NotificationBell />
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {allItems.map((item) => (
             <NavLink
               key={item.to}
@@ -64,10 +64,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    ? "bg-primary/10 text-primary shadow-md"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
                 }`
               }
+              style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
             >
               <item.icon className="w-5 h-5" />
               {item.label}
@@ -75,7 +76,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border/60">
+        <div className="p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
               {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
@@ -87,7 +88,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
           <button
             onClick={signOut}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors w-full"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all w-full px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+            style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
           >
             <LogOut className="w-4 h-4" />
             Sair
@@ -151,7 +153,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             />
             <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
           </div>
-          <nav className="p-3 space-y-1">
+          <nav className="p-3 space-y-0.5">
             {allItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -161,17 +163,18 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      ? "bg-primary/10 text-primary shadow-md"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
                   }`
                 }
+                style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
               >
                 <item.icon className="w-5 h-5" />
                 {item.label}
               </NavLink>
             ))}
           </nav>
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border/60">
+          <div className="absolute bottom-0 left-0 right-0 p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                 {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
@@ -181,7 +184,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <p className="text-xs text-muted-foreground capitalize">{role}</p>
               </div>
             </div>
-            <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
+            <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}>
               <LogOut className="w-4 h-4" />
               Sair
             </button>

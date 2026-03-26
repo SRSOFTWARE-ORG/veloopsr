@@ -136,7 +136,8 @@ const NotificationBell = () => {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 rounded-full hover:bg-secondary/60 transition-colors active:scale-95"
+        className="relative p-2 rounded-full hover:bg-secondary/60 transition-all active:scale-90 hover:scale-110 hover:shadow-md"
+        style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
       >
         <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
