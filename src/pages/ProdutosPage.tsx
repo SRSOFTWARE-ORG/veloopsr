@@ -465,16 +465,16 @@ const ProdutosPage = () => {
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-3">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 h-11 rounded-xl font-semibold"
                   onClick={() => setScanDialogOpen(false)}
                 >
                   Cancelar
                 </Button>
                 <Button
-                  className="flex-1 gap-2"
+                  className="flex-1 h-11 rounded-xl gap-2 font-semibold shadow-md hover:shadow-lg transition-all"
                   onClick={handleImportScanned}
                   disabled={importing || scannedProducts.filter((p) => p.selected).length === 0}
                 >
