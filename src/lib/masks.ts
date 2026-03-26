@@ -78,3 +78,27 @@ export const validateCPFOrCNPJ = (value: string): boolean => {
   if (d.length <= 11) return validateCPF(value);
   return validateCNPJ(value);
 };
+
+/**
+ * Formata um número como moeda brasileira: R$ 000.000,00
+ */
+export const formatCurrency = (value: number | string | null | undefined): string => {
+  const num = typeof value === "string" ? parseFloat(value) : (value ?? 0);
+  if (isNaN(num)) return "R$ 0,00";
+  return num.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+/**
+ * Máscara de input para valor monetário (apenas dígitos → formato R$ 0,00)
+ */
+export const maskCurrency = (v: string): string => {
+  const d = v.replace(/\D/g, "");
+  if (!d) return "";
+  const num = parseInt(d, 10) / 100;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
