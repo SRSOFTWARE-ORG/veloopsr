@@ -7,6 +7,40 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendWebPush(subscription: { endpoint: string; p256dh: string; auth: string }, payload: object) {
+  const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+  const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
+
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.warn("VAPID keys not configured, skipping push");
+    return;
+  }
+
+  try {
+    // Use web-push compatible approach with crypto APIs
+    const { default: webpush } = await import("npm:web-push@3.6.7");
+
+    webpush.setVapidDetails(
+      "mailto:admin@veloop.app",
+      vapidPublicKey,
+      vapidPrivateKey
+    );
+
+    await webpush.sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+        },
+      },
+      JSON.stringify(payload)
+    );
+  } catch (err) {
+    console.error("Push send failed for", subscription.endpoint, err);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -58,6 +92,7 @@ Deno.serve(async (req) => {
     const adminIds = adminRoles?.map((r) => r.user_id) || [];
 
     let notificacoesCreated = 0;
+    let pushSent = 0;
 
     for (const pagamento of pagamentos) {
       const cobranca = cobrancaMap.get(pagamento.cobranca_id);
@@ -85,6 +120,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!existing) {
+          // Create internal notification
           await supabase.from("notificacoes").insert({
             user_id: userId,
             titulo,
@@ -99,14 +135,38 @@ Deno.serve(async (req) => {
             },
           });
           notificacoesCreated++;
+
+          // Send Web Push to all devices of this user
+          const { data: subs } = await supabase
+            .from("push_subscriptions")
+            .select("endpoint, p256dh, auth")
+            .eq("user_id", userId);
+
+          if (subs && subs.length > 0) {
+            const pushPayload = {
+              titulo,
+              mensagem,
+              tag: `pagamento-${pagamento.id}`,
+              dados: {
+                pagamento_id: pagamento.id,
+                cobranca_id: pagamento.cobranca_id,
+              },
+            };
+
+            for (const sub of subs) {
+              await sendWebPush(sub, pushPayload);
+              pushSent++;
+            }
+          }
         }
       }
     }
 
     return new Response(
       JSON.stringify({
-        message: `${notificacoesCreated} notificações criadas`,
+        message: `${notificacoesCreated} notificações criadas, ${pushSent} push enviados`,
         count: notificacoesCreated,
+        push_sent: pushSent,
         pagamentos_encontrados: pagamentos.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
