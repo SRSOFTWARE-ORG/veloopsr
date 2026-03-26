@@ -285,15 +285,28 @@ const DocumentosPage = () => {
     const clienteNome = extracted.cliente_nome;
     await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
 
-    await supabase.from("vendas").insert({
-      cliente_nome: clienteNome,
-      cliente_cpf: extracted.cliente_cpf || null,
-      valor_total: extracted.valor || extracted.valor_total || 0,
-      vendedor_id: user!.id,
-      forma_pagamento: "pix",
-      status: "concluida",
-      observacoes: `Nota Fiscal: ${doc.nome_arquivo}${extracted.numero_documento ? ` | NF: ${extracted.numero_documento}` : ""}${extracted.beneficiario ? ` | Emitente: ${extracted.beneficiario}` : ""}`,
-    });
+    const valorNota = extracted.valor || extracted.valor_total || 0;
+
+    // Check if a venda already exists for this client with similar value (from carnê import)
+    const { data: existingVendas } = await supabase
+      .from("vendas")
+      .select("id")
+      .ilike("cliente_nome", clienteNome)
+      .eq("valor_total", valorNota)
+      .eq("status", "concluida")
+      .limit(1);
+
+    if (!existingVendas || existingVendas.length === 0) {
+      await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        valor_total: valorNota,
+        vendedor_id: user!.id,
+        forma_pagamento: "pix",
+        status: "concluida",
+        observacoes: `Nota Fiscal: ${doc.nome_arquivo}${extracted.numero_documento ? ` | NF: ${extracted.numero_documento}` : ""}${extracted.beneficiario ? ` | Emitente: ${extracted.beneficiario}` : ""}`,
+      });
+    }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
