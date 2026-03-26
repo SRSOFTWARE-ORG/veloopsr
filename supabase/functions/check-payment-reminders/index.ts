@@ -222,7 +222,8 @@ Deno.serve(async (req) => {
     const formatValor = (v: number) =>
       new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
-    // --- TODAY notifications: "Cobrar CLIENTE hoje" ---
+    // --- TODAY notifications + WhatsApp: "Cobrar CLIENTE hoje" ---
+    let whatsappCount = 0;
     for (const entry of todayEntries) {
       const usersToNotify = new Set([entry.criado_por, ...adminIds]);
       for (const userId of usersToNotify) {
@@ -235,6 +236,15 @@ Deno.serve(async (req) => {
           `hoje_${entry.id}_${entry.date}`
         );
         if (ok) notifCount++;
+      }
+
+      // Send WhatsApp to client
+      const phone = clientePhoneMap.get(entry.cliente_id);
+      if (phone) {
+        const dataFormatada = entry.date.split("-").reverse().join("/");
+        const msg = `Olá ${entry.cliente_nome}! 📅\n\nLembramos que sua parcela de *${formatValor(entry.valor_parcela)}* vence hoje (*${dataFormatada}*).\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
+        const sent = await sendWhatsApp(phone, msg);
+        if (sent) whatsappCount++;
       }
     }
 
