@@ -157,6 +157,27 @@ const NotificationBell = () => {
     setOpen(false);
   };
 
+  const startTestNotification = () => {
+    if (testCountdown !== null || !user) return;
+    setTestCountdown(10);
+    const interval = setInterval(() => {
+      setTestCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          // Send test notification via DB insert (triggers realtime + sound)
+          supabase.from("notificacoes").insert({
+            user_id: user!.id,
+            titulo: "🔔 Teste de Notificação",
+            mensagem: "Se você ouviu o som, as notificações estão funcionando!",
+            tipo: "teste",
+          }).then(() => {});
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   return (
     <div className="relative">
       <button
