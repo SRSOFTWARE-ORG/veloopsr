@@ -88,7 +88,7 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
 async function generateFormalMessage(clienteNome: string, cpf: string, valor: string, dataVencimento: string): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
-    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data de vencimento.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data de vencimento.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   }
 
   try {
@@ -103,7 +103,7 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
         messages: [
           {
             role: "system",
-            content: "Você é um assistente de cobranças corporativo da empresa SR SOFTWARE. Gere mensagens formais, elegantes e objetivas para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com:\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_"
+            content: "Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_"
           },
           {
             role: "user",
@@ -115,14 +115,14 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
 
     if (!res.ok) {
       console.error("AI gateway error:", res.status, await res.text());
-      return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data indicada.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+      return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data indicada.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) *${clienteNome}*,\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) *${clienteNome}*,\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   } catch (err) {
     console.error("AI generation error:", err);
-    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   }
 }
 
