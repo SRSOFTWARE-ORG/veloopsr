@@ -240,7 +240,25 @@ const NotificationBell = () => {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Test notification */}
+              <div className="mx-3 mb-2 px-3.5 py-2.5 bg-secondary/40 rounded-xl flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Testar som
+                </span>
+                <button
+                  onClick={startTestNotification}
+                  disabled={testCountdown !== null}
+                  className={`text-xs px-3 py-1 rounded-full font-medium transition-all ${
+                    testCountdown !== null
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                  }`}
+                >
+                  {testCountdown !== null ? `${testCountdown}s` : "Testar"}
+                </button>
+              </div>
+
               {notificacoes.length > 0 && (
                 <div className="flex items-center gap-2 px-4 pb-2">
                   {unreadCount > 0 && (
