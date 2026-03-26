@@ -87,14 +87,17 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p className="text-xs text-muted-foreground capitalize">{role}</p>
             </div>
           </div>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all w-full px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
-            style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
-          >
-            <LogOut className="w-4 h-4" />
-            Sair
-          </button>
+          <div className="flex items-center gap-2">
+            <SobreDialog />
+            <button
+              onClick={signOut}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all flex-1 px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -185,11 +188,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <p className="text-xs text-muted-foreground capitalize">{role}</p>
               </div>
             </div>
-            <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
-              style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}>
-              <LogOut className="w-4 h-4" />
-              Sair
-            </button>
+            <div className="flex items-center gap-2">
+              <SobreDialog />
+              <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all px-3 py-2 rounded-lg hover:bg-destructive/10 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+                style={{ transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}>
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
           </div>
         </aside>
       </div>
