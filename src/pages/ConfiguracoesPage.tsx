@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
 import PermissionsManager from "@/components/PermissionsManager";
+import AISearchBar from "@/components/configuracoes/AISearchBar";
 
 interface UserWithPermissions {
   id: string;
