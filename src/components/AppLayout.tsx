@@ -155,26 +155,26 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Mobile Bottom Nav - macOS Dock style with liquid glass */}
       <div className="md:hidden fixed bottom-3 left-3 right-3 z-30">
-        <nav className="flex items-end justify-around py-2 px-2 rounded-[22px] bg-white/30 dark:bg-white/8 backdrop-blur-3xl border border-white/50 dark:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]" style={{ backdropFilter: 'blur(60px) saturate(180%)' }}>
+        <nav className="flex items-center justify-around py-1 px-2 rounded-[18px] bg-white/30 dark:bg-white/8 border border-white/50 dark:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]" style={{ backdropFilter: 'blur(60px) saturate(180%)' }}>
           {navItems.slice(0, 5).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === "/"}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200 ${
+                `flex flex-col items-center justify-center gap-0 px-3 py-1 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? "text-primary scale-110 -translate-y-0.5"
+                    ? "text-primary scale-110"
                     : "text-muted-foreground hover:text-foreground active:scale-95"
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <div className={`relative p-1.5 rounded-xl transition-all duration-200 ${isActive ? "bg-primary/15 shadow-sm shadow-primary/20" : ""}`}>
-                    <item.icon className={`w-5 h-5 shrink-0 transition-all duration-200 ${isActive ? "text-primary" : ""}`} />
+                  <div className={`relative p-1 rounded-lg transition-all duration-200 ${isActive ? "bg-primary/15 shadow-sm shadow-primary/20" : ""}`}>
+                    <item.icon className={`w-4.5 h-4.5 shrink-0 transition-all duration-200 ${isActive ? "text-primary" : ""}`} />
                   </div>
-                  <span className={`text-[10px] font-medium truncate max-w-full transition-all duration-200 ${isActive ? "text-primary font-semibold" : ""}`}>
+                  <span className={`text-[9px] font-medium truncate max-w-full transition-all duration-200 ${isActive ? "text-primary font-semibold" : ""}`}>
                     {item.label}
                   </span>
                 </>
