@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Plus, Search, Package, Edit, Trash2, BarChart3, Grid3X3, List } from "lucide-react";
+import { Plus, Search, Package, Edit, Trash2, BarChart3, Grid3X3, List, ScanLine, Loader2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import ProductCatalogCard from "@/components/products/ProductCatalogCard";
 import ProductForm from "@/components/products/ProductForm";
 
@@ -71,6 +72,13 @@ const ProdutosPage = () => {
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [selectedCategoria, setSelectedCategoria] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Scan states
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scannedProducts, setScannedProducts] = useState<Array<{ codigo_barras: string; referencia: string; nome: string; selected: boolean }>>([]);
+  const [importing, setImporting] = useState(false);
+  const scanFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProdutos();
@@ -191,6 +199,92 @@ const ProdutosPage = () => {
     ]);
     toast.success(`+${qty} unidades adicionadas`);
     fetchProdutos();
+  };
+
+  const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Envie um arquivo JPG, PNG ou PDF");
+      return;
+    }
+
+    setScanning(true);
+    setScanDialogOpen(true);
+    setScannedProducts([]);
+
+    try {
+      // Upload temp file
+      const ext = file.name.split(".").pop();
+      const path = `scan_temp/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("produto_imagens")
+        .upload(path, file, { upsert: true });
+      if (upErr) throw new Error("Erro ao enviar arquivo");
+
+      const { data: urlData } = supabase.storage.from("produto_imagens").getPublicUrl(path);
+
+      const res = await supabase.functions.invoke("scan-products", {
+        body: { file_url: urlData.publicUrl, nome_arquivo: file.name },
+      });
+
+      if (res.error || res.data?.error) {
+        throw new Error(res.data?.error || res.error?.message || "Erro ao escanear");
+      }
+
+      const products = res.data?.data?.produtos || [];
+      if (products.length === 0) {
+        toast.error("Nenhum produto encontrado no documento");
+        setScanDialogOpen(false);
+      } else {
+        setScannedProducts(products.map((p: any) => ({ ...p, selected: true })));
+        toast.success(`${products.length} produto(s) encontrado(s)!`);
+      }
+
+      // Clean up temp file
+      await supabase.storage.from("produto_imagens").remove([path]);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao escanear produtos");
+      setScanDialogOpen(false);
+    } finally {
+      setScanning(false);
+      if (scanFileRef.current) scanFileRef.current.value = "";
+    }
+  };
+
+  const handleImportScanned = async () => {
+    const selected = scannedProducts.filter((p) => p.selected);
+    if (selected.length === 0) {
+      toast.error("Selecione pelo menos um produto");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const payload = selected.map((p) => ({
+        nome: p.nome.trim(),
+        codigo_barras: p.codigo_barras?.trim() || null,
+        preco_venda: 0,
+        preco_custo: 0,
+        estoque_atual: 0,
+        estoque_minimo: 5,
+        atualizado_por: user?.id,
+      }));
+
+      const { error } = await supabase.from("produtos").insert(payload);
+      if (error) throw error;
+
+      toast.success(`${selected.length} produto(s) importado(s)!`);
+      setScanDialogOpen(false);
+      setScannedProducts([]);
+      fetchProdutos();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao importar");
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
