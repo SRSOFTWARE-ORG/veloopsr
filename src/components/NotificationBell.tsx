@@ -75,7 +75,7 @@ const NotificationBell = () => {
 
   // Pre-load audio and track user interaction
   useEffect(() => {
-    audioRef.current = new Audio('/notification-sound.wav');
+    audioRef.current = new Audio('/notification-sound.mp3');
     audioRef.current.volume = 1.0;
 
     const markInteracted = () => { hasInteracted.current = true; };
