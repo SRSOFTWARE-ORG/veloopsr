@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CalendarSync, Unplug, RefreshCw, Download, Upload } from "lucide-react";
+import { CalendarSync, Unplug, Upload, Download } from "lucide-react";
 
 const GoogleCalendarSync = () => {
   const { user } = useAuth();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [autoExported, setAutoExported] = useState(false);
+  const connectedRef = useRef(false);
 
   const checkStatus = useCallback(async () => {
     if (!user) return;
@@ -18,54 +18,77 @@ const GoogleCalendarSync = () => {
       const { data } = await supabase.functions.invoke("google-calendar-sync", {
         body: { action: "status", user_id: user.id },
       });
-      setConnected(!!data?.connected);
-      return !!data?.connected;
+      const isConnected = !!data?.connected;
+      setConnected(isConnected);
+      connectedRef.current = isConnected;
     } catch {
       setConnected(false);
-      return false;
+      connectedRef.current = false;
     }
   }, [user]);
 
-  // Auto-export when connected
-  const autoExport = useCallback(async () => {
-    if (!user || autoExported) return;
-    try {
-      const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
-        body: { action: "export", user_id: user.id },
-      });
-      if (!error && data?.events_created > 0) {
-        toast.success(`${data.events_created} eventos exportados automaticamente`);
-      }
-    } catch {
-      // Silent fail for auto-export
-    }
-    setAutoExported(true);
-  }, [user, autoExported]);
-
   useEffect(() => {
-    checkStatus().then((isConnected) => {
-      if (isConnected) autoExport();
-    });
-  }, [checkStatus, autoExport]);
+    checkStatus();
+  }, [checkStatus]);
+
+  // Auto-export on first load (only new/unsynced)
+  useEffect(() => {
+    if (!connected || !user) return;
+    supabase.functions.invoke("google-calendar-sync", {
+      body: { action: "export", user_id: user.id },
+    }).then(({ data }) => {
+      if (data?.events_created > 0) {
+        toast.success(`${data.events_created} novos eventos sincronizados`);
+      }
+    }).catch(() => {});
+  }, [connected, user]);
+
+  // Realtime: listen for cobrancas changes and auto-sync
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("cobrancas-gcal-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cobrancas" },
+        async (payload) => {
+          if (!connectedRef.current) return;
+
+          if (payload.eventType === "DELETE" && payload.old) {
+            await supabase.functions.invoke("google-calendar-sync", {
+              body: { action: "delete_cobranca", user_id: user.id, cobranca_id: (payload.old as any).id },
+            });
+          } else if (payload.eventType === "INSERT" && payload.new) {
+            await supabase.functions.invoke("google-calendar-sync", {
+              body: { action: "sync_cobranca", user_id: user.id, cobranca_id: (payload.new as any).id },
+            });
+          } else if (payload.eventType === "UPDATE" && payload.new) {
+            await supabase.functions.invoke("google-calendar-sync", {
+              body: { action: "sync_cobranca", user_id: user.id, cobranca_id: (payload.new as any).id },
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const handleConnect = async () => {
     if (!user) return;
     setLoading(true);
     try {
       const redirectUri = `${window.location.origin}/agenda`;
-
       const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
         body: { redirect_uri: redirectUri },
       });
-
       if (error) throw error;
       if (!data?.url) throw new Error("No auth URL returned");
-
-      // Store user_id and redirect_uri for callback
       sessionStorage.setItem("gcal_user_id", user.id);
       sessionStorage.setItem("gcal_redirect_uri", redirectUri);
-
-      // Redirect to Google OAuth
       window.location.href = data.url;
     } catch (err: any) {
       toast.error("Erro ao conectar: " + (err.message || "Tente novamente"));
@@ -74,7 +97,6 @@ const GoogleCalendarSync = () => {
     }
   };
 
-  // Handle OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -82,7 +104,6 @@ const GoogleCalendarSync = () => {
     const redirectUri = sessionStorage.getItem("gcal_redirect_uri");
 
     if (code && userId && redirectUri) {
-      // Clean URL
       window.history.replaceState({}, "", window.location.pathname);
       sessionStorage.removeItem("gcal_user_id");
       sessionStorage.removeItem("gcal_redirect_uri");
@@ -93,9 +114,9 @@ const GoogleCalendarSync = () => {
           const { error } = await supabase.functions.invoke("google-calendar-callback", {
             body: { code, redirect_uri: redirectUri, user_id: userId },
           });
-
           if (error) throw error;
           setConnected(true);
+          connectedRef.current = true;
           toast.success("Google Calendar conectado!");
         } catch (err: any) {
           toast.error("Erro no callback: " + (err.message || "Tente novamente"));
@@ -113,16 +134,14 @@ const GoogleCalendarSync = () => {
       const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
         body: { action, user_id: user.id },
       });
-
       if (error) throw error;
-
       if (action === "export") {
-        toast.success(`${data?.events_created || 0} eventos exportados para o Google Calendar`);
+        toast.success(`${data?.events_created || 0} eventos exportados`);
       } else {
-        toast.success(`${data?.events?.length || 0} eventos encontrados no Google Calendar`);
+        toast.success(`${data?.events?.length || 0} eventos encontrados`);
       }
     } catch (err: any) {
-      toast.error("Erro na sincronização: " + (err.message || "Tente novamente"));
+      toast.error("Erro: " + (err.message || "Tente novamente"));
     } finally {
       setSyncing(false);
     }
@@ -136,6 +155,7 @@ const GoogleCalendarSync = () => {
         body: { action: "disconnect", user_id: user.id },
       });
       setConnected(false);
+      connectedRef.current = false;
       toast.success("Google Calendar desconectado");
     } catch {
       toast.error("Erro ao desconectar");
@@ -146,13 +166,7 @@ const GoogleCalendarSync = () => {
 
   if (!connected) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleConnect}
-        disabled={loading}
-        className="gap-2"
-      >
+      <Button variant="outline" size="sm" onClick={handleConnect} disabled={loading} className="gap-2">
         <CalendarSync className="w-4 h-4" />
         {loading ? "Conectando..." : "Google Calendar"}
       </Button>
@@ -161,36 +175,15 @@ const GoogleCalendarSync = () => {
 
   return (
     <div className="flex items-center gap-1.5">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleSync("export")}
-        disabled={syncing}
-        className="gap-1.5"
-        title="Exportar cobranças para o Google Calendar"
-      >
+      <Button variant="outline" size="sm" onClick={() => handleSync("export")} disabled={syncing} className="gap-1.5" title="Exportar cobranças">
         <Upload className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Exportar</span>
       </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleSync("import")}
-        disabled={syncing}
-        className="gap-1.5"
-        title="Importar eventos do Google Calendar"
-      >
+      <Button variant="outline" size="sm" onClick={() => handleSync("import")} disabled={syncing} className="gap-1.5" title="Importar eventos">
         <Download className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Importar</span>
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleDisconnect}
-        disabled={loading}
-        className="h-8 w-8"
-        title="Desconectar Google Calendar"
-      >
+      <Button variant="ghost" size="icon" onClick={handleDisconnect} disabled={loading} className="h-8 w-8" title="Desconectar">
         <Unplug className="w-3.5 h-3.5 text-muted-foreground" />
       </Button>
     </div>
