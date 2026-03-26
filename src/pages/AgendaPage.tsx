@@ -603,43 +603,42 @@ const AgendaPage = () => {
 
               return (
                 <Card key={c.id} className={cn("border", isPaidOrExempt && "opacity-75")}>
-                  <CardContent className="py-4 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CardContent className="space-y-2 py-4">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                           <User className="w-4 h-4 text-primary" />
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{c.cliente_nome}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
+                              <DollarSign className="w-3 h-3 shrink-0" />
                               R$ {Number(c.valor_parcela).toFixed(2)}
                             </span>
                             <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
+                              <Clock className="w-3 h-3 shrink-0" />
                               {frequenciaLabels[c.frequencia]}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <Badge variant="outline" className={cn("text-xs border", config.color)}>
-                        <StatusIcon className="w-3 h-3 mr-1" />
+                      <Badge variant="outline" className={cn("w-fit max-w-full text-xs border", config.color)}>
+                        <StatusIcon className="w-3 h-3 mr-1 shrink-0" />
                         {config.label}
                       </Badge>
                     </div>
 
-                    <div className="text-xs text-muted-foreground pl-10">
+                    <div className="text-xs text-muted-foreground pl-10 break-words">
                       De {format(parseISO(c.data_inicio), "dd/MM/yyyy")} até{" "}
                       {format(parseISO(c.data_fim), "dd/MM/yyyy")}
                       {" · "}
                       {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
                     </div>
                     {c.observacoes && (
-                      <p className="text-xs text-muted-foreground pl-10 italic">{c.observacoes}</p>
+                      <p className="text-xs text-muted-foreground pl-10 italic break-words">{c.observacoes}</p>
                     )}
 
-                    {/* Actions */}
                     <div className="flex items-center gap-2 pl-10 pt-1 flex-wrap">
                       {isPrimaryAdmin && !isPaidOrExempt && (
                         <>
@@ -705,7 +704,6 @@ const AgendaPage = () => {
         </div>
       )}
 
-      {/* Upcoming list */}
       {!selectedDate && (
         <div className="space-y-3 slide-up delay-2">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -721,15 +719,15 @@ const AgendaPage = () => {
           ) : (
             upcomingItems.map((c) => (
               <Card key={c.id}>
-                <CardContent className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{c.cliente_nome}</p>
-                    <p className="text-xs text-muted-foreground">
+                <CardContent className="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                    <p className="text-xs text-muted-foreground break-words">
                       R$ {Number(c.valor_parcela).toFixed(2)} · {frequenciaLabels[c.frequencia]} · até{" "}
                       {format(parseISO(c.data_fim), "dd/MM/yyyy")}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="w-fit text-xs">
                     {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
                   </Badge>
                 </CardContent>
