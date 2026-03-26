@@ -263,18 +263,37 @@ const ProdutosPage = () => {
 
     setImporting(true);
     try {
-      const payload = selected.map((p) => ({
-        nome: p.nome.trim(),
-        codigo_barras: p.codigo_barras?.trim() || null,
-        preco_venda: 0,
-        preco_custo: 0,
-        estoque_atual: 0,
-        estoque_minimo: 5,
-        atualizado_por: user?.id,
-      }));
+      for (const p of selected) {
+        const nome = p.nome.trim();
+        const codigo = p.codigo_barras?.trim() || null;
 
-      const { error } = await supabase.from("produtos").insert(payload);
-      if (error) throw error;
+        // Check for existing product by codigo_barras or nome
+        let existing: any = null;
+        if (codigo) {
+          const { data } = await supabase.from("produtos").select("id").eq("codigo_barras", codigo).maybeSingle();
+          existing = data;
+        }
+        if (!existing) {
+          const { data } = await supabase.from("produtos").select("id").eq("nome", nome).maybeSingle();
+          existing = data;
+        }
+
+        const payload = {
+          nome,
+          codigo_barras: codigo,
+          preco_venda: 0,
+          preco_custo: 0,
+          estoque_atual: 0,
+          estoque_minimo: 5,
+          atualizado_por: user?.id,
+        };
+
+        if (existing) {
+          await supabase.from("produtos").update(payload).eq("id", existing.id);
+        } else {
+          await supabase.from("produtos").insert(payload);
+        }
+      }
 
       toast.success(`${selected.length} produto(s) importado(s)!`);
       setScanDialogOpen(false);
