@@ -41,6 +41,33 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
+async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean> {
+  const apiUrl = Deno.env.get("EVOLUTION_API_URL");
+  const apiKey = Deno.env.get("EVOLUTION_API_KEY");
+  if (!apiUrl || !apiKey || !telefone) return false;
+
+  const digits = telefone.replace(/\D/g, "");
+  const formattedPhone = digits.startsWith("55") && digits.length >= 12
+    ? digits
+    : `55${digits.startsWith("0") ? digits.slice(1) : digits}`;
+
+  try {
+    const res = await fetch(`${apiUrl}/message/sendText/Veloop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({ number: formattedPhone, text: mensagem }),
+    });
+    if (!res.ok) {
+      console.error("WhatsApp send failed:", await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("WhatsApp network error:", err);
+    return false;
+  }
+}
+
 async function sendWebPush(subscription: { endpoint: string; p256dh: string; auth: string }, payload: object) {
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
