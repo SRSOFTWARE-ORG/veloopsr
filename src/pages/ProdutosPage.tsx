@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Plus, Search, Package, Edit, Trash2, BarChart3, Grid3X3, List } from "lucide-react";
+import { Plus, Search, Package, Edit, Trash2, BarChart3, Grid3X3, List, ScanLine, Loader2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import ProductCatalogCard from "@/components/products/ProductCatalogCard";
 import ProductForm from "@/components/products/ProductForm";
 
@@ -71,6 +72,13 @@ const ProdutosPage = () => {
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [selectedCategoria, setSelectedCategoria] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Scan states
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scannedProducts, setScannedProducts] = useState<Array<{ codigo_barras: string; referencia: string; nome: string; selected: boolean }>>([]);
+  const [importing, setImporting] = useState(false);
+  const scanFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProdutos();
@@ -193,6 +201,92 @@ const ProdutosPage = () => {
     fetchProdutos();
   };
 
+  const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Envie um arquivo JPG, PNG ou PDF");
+      return;
+    }
+
+    setScanning(true);
+    setScanDialogOpen(true);
+    setScannedProducts([]);
+
+    try {
+      // Upload temp file
+      const ext = file.name.split(".").pop();
+      const path = `scan_temp/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("produto_imagens")
+        .upload(path, file, { upsert: true });
+      if (upErr) throw new Error("Erro ao enviar arquivo");
+
+      const { data: urlData } = supabase.storage.from("produto_imagens").getPublicUrl(path);
+
+      const res = await supabase.functions.invoke("scan-products", {
+        body: { file_url: urlData.publicUrl, nome_arquivo: file.name },
+      });
+
+      if (res.error || res.data?.error) {
+        throw new Error(res.data?.error || res.error?.message || "Erro ao escanear");
+      }
+
+      const products = res.data?.data?.produtos || [];
+      if (products.length === 0) {
+        toast.error("Nenhum produto encontrado no documento");
+        setScanDialogOpen(false);
+      } else {
+        setScannedProducts(products.map((p: any) => ({ ...p, selected: true })));
+        toast.success(`${products.length} produto(s) encontrado(s)!`);
+      }
+
+      // Clean up temp file
+      await supabase.storage.from("produto_imagens").remove([path]);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao escanear produtos");
+      setScanDialogOpen(false);
+    } finally {
+      setScanning(false);
+      if (scanFileRef.current) scanFileRef.current.value = "";
+    }
+  };
+
+  const handleImportScanned = async () => {
+    const selected = scannedProducts.filter((p) => p.selected);
+    if (selected.length === 0) {
+      toast.error("Selecione pelo menos um produto");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const payload = selected.map((p) => ({
+        nome: p.nome.trim(),
+        codigo_barras: p.codigo_barras?.trim() || null,
+        preco_venda: 0,
+        preco_custo: 0,
+        estoque_atual: 0,
+        estoque_minimo: 5,
+        atualizado_por: user?.id,
+      }));
+
+      const { error } = await supabase.from("produtos").insert(payload);
+      if (error) throw error;
+
+      toast.success(`${selected.length} produto(s) importado(s)!`);
+      setScanDialogOpen(false);
+      setScannedProducts([]);
+      fetchProdutos();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao importar");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="page-container pb-24">
       {/* Header */}
@@ -202,27 +296,39 @@ const ProdutosPage = () => {
           <p className="text-sm text-muted-foreground">{produtos.length} produtos</p>
         </div>
         {isPrimaryAdmin && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-1" /> Novo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
-              </DialogHeader>
-              <ProductForm
-                form={form}
-                setForm={setForm}
-                onSubmit={handleSubmit}
-                isEditing={!!editingProduct}
-                imageFile={imageFile}
-                setImageFile={setImageFile}
-                currentImageUrl={editingProduct?.imagem_url}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <input
+              ref={scanFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={handleScanFile}
+              className="hidden"
+            />
+            <Button size="sm" variant="outline" onClick={() => scanFileRef.current?.click()}>
+              <ScanLine className="w-4 h-4 mr-1" /> Escanear
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-1" /> Novo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+                </DialogHeader>
+                <ProductForm
+                  form={form}
+                  setForm={setForm}
+                  onSubmit={handleSubmit}
+                  isEditing={!!editingProduct}
+                  imageFile={imageFile}
+                  setImageFile={setImageFile}
+                  currentImageUrl={editingProduct?.imagem_url}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -290,6 +396,70 @@ const ProdutosPage = () => {
           </p>
         </div>
       )}
+
+      {/* Scan Results Dialog */}
+      <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Produtos Escaneados</DialogTitle>
+          </DialogHeader>
+          {scanning ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analisando documento...</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {scannedProducts.length} produto(s) encontrado(s). Selecione os que deseja importar.
+              </p>
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {scannedProducts.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
+                  >
+                    <Checkbox
+                      checked={p.selected}
+                      onCheckedChange={(checked) => {
+                        setScannedProducts((prev) =>
+                          prev.map((item, idx) => idx === i ? { ...item, selected: checked === true } : item)
+                        );
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.nome}</p>
+                      {p.codigo_barras && (
+                        <p className="text-xs text-muted-foreground">Código: {p.codigo_barras}</p>
+                      )}
+                      {p.referencia && p.referencia !== "0" && (
+                        <p className="text-xs text-muted-foreground">Ref: {p.referencia}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setScanDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={handleImportScanned}
+                  disabled={importing || scannedProducts.filter((p) => p.selected).length === 0}
+                >
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {importing ? "Importando..." : `Importar (${scannedProducts.filter((p) => p.selected).length})`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
