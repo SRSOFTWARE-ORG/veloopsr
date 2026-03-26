@@ -22,6 +22,7 @@ const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
 const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
+const HistoricoEnviosPage = lazy(() => import("@/pages/HistoricoEnviosPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -194,6 +195,14 @@ const App = () => {
                 element={
                   <ProtectedRoute requirePrimaryAdmin>
                     <ConfiguracoesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/historico-envios"
+                element={
+                  <ProtectedRoute>
+                    <HistoricoEnviosPage />
                   </ProtectedRoute>
                 }
               />

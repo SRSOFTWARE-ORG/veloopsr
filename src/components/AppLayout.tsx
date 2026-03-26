@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Wrench,
   Wallet,
+  MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import SobreDialog from "@/components/SobreDialog";
@@ -33,6 +34,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { to: "/historico-envios", icon: MessageSquare, label: "Envios WhatsApp" },
   { to: "/configuracoes", icon: Settings, label: "Configurações" },
 ];
 
