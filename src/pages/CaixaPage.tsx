@@ -326,19 +326,55 @@ const CaixaPage = () => {
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 slide-up delay-2">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground">Entradas</p>
-              <p className="text-sm font-bold tabular-nums text-emerald-700">
-                {formatCurrency(entradaTotal)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <Collapsible open={entradasOpen} onOpenChange={setEntradasOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardContent className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground">Entradas</p>
+                  <p className="text-sm font-bold tabular-nums text-emerald-700">
+                    {formatCurrency(entradaTotal)}
+                  </p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${entradasOpen ? "rotate-180" : ""}`} />
+              </CardContent>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t px-4 py-2 space-y-2 max-h-60 overflow-y-auto">
+                {entradasDetalhes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-2">Nenhuma entrada no período</p>
+                ) : (
+                  entradasDetalhes.map((d, i) => (
+                    <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0 border-border/50">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">{d.cliente_nome}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <User className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">
+                            {d.pago_por_nome}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">•</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {d.pago_em ? new Date(d.pago_em).toLocaleDateString("pt-BR") : "—"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/70">
+                          {d.tipo === "entrada" ? "Entrada da venda" : "Parcela paga"}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                        +{formatCurrency(d.valor)}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
