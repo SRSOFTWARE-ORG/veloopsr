@@ -85,6 +85,7 @@ interface Pagamento {
 interface Cliente {
   id: string;
   nome: string;
+  telefone: string | null;
 }
 
 type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente" | "isento";
@@ -161,6 +162,7 @@ const AgendaPage = () => {
   const [editingCobranca, setEditingCobranca] = useState<Cobranca | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     cliente_id: "",
