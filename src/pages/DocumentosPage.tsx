@@ -475,57 +475,61 @@ const DocumentosPage = () => {
 
   return (
     <div className="page-container pb-24 md:pb-8">
-      <div className="flex items-center justify-between mb-4 slide-up">
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight">Documentos</h1>
-          <p className="text-sm text-muted-foreground">{documentos.length} arquivos</p>
+      <div className="mb-4 slide-up">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight">Documentos</h1>
+            <p className="text-sm text-muted-foreground">{documentos.length} arquivos</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isPrimaryAdmin && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleScanAllBoletos}
-              disabled={scanningBoletos || scanningCarnes}
-              className="gap-1"
-            >
-              {scanningBoletos ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ScanLine className="w-4 h-4" />
-              )}
-              {scanningBoletos
-                ? `${scanProgress.current}/${scanProgress.total}`
-                : "Escanear Boletos"}
-            </Button>
-          )}
-          {isPrimaryAdmin && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleScanAllCarnes}
-              disabled={scanningCarnes || scanningBoletos}
-              className="gap-1"
-            >
-              {scanningCarnes ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ScanLine className="w-4 h-4" />
-              )}
-              {scanningCarnes
-                ? `${scanProgress.current}/${scanProgress.total}`
-                : "Escanear Carnês"}
-            </Button>
-          )}
-          <label className="cursor-pointer">
-            <Button size="sm" asChild disabled={uploading}>
-              <span>
-                <Upload className="w-4 h-4 mr-1" />
-                {uploading ? "Enviando..." : "Upload"}
-              </span>
-          </Button>
-          <input type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple />
-        </label>
+        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+          <div className="flex w-max min-w-full gap-2 pb-1">
+            <label className="cursor-pointer shrink-0">
+              <Button size="sm" asChild disabled={uploading}>
+                <span>
+                  <Upload className="w-4 h-4 mr-1" />
+                  {uploading ? "Enviando..." : "Upload"}
+                </span>
+              </Button>
+              <input type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple />
+            </label>
+            {isPrimaryAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleScanAllBoletos}
+                disabled={scanningBoletos || scanningCarnes}
+                className="gap-1 shrink-0"
+              >
+                {scanningBoletos ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ScanLine className="w-4 h-4" />
+                )}
+                {scanningBoletos
+                  ? `${scanProgress.current}/${scanProgress.total}`
+                  : "Escanear Boletos"}
+              </Button>
+            )}
+            {isPrimaryAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleScanAllCarnes}
+                disabled={scanningCarnes || scanningBoletos}
+                className="gap-1 shrink-0"
+              >
+                {scanningCarnes ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ScanLine className="w-4 h-4" />
+                )}
+                {scanningCarnes
+                  ? `${scanProgress.current}/${scanProgress.total}`
+                  : "Escanear Carnês"}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
