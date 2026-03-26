@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Lock, Mail, User, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, User, Eye, EyeOff, Phone } from "lucide-react";
+import { maskPhone } from "@/lib/masks";
 import veloopLogo from "@/assets/veloop-logo-transparent.png";
 
 const LoginPage = () => {
@@ -13,6 +14,7 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [manterLogado, setManterLogado] = useState(() => {
@@ -37,10 +39,16 @@ const LoginPage = () => {
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
       } else {
+        const rawPhone = telefone.replace(/\D/g, "");
+        if (rawPhone.length < 10 || rawPhone.length > 11) {
+          toast.error("Informe um telefone válido com DDD (10 ou 11 dígitos)");
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { nome } },
+          options: { data: { nome, telefone: rawPhone } },
         });
         if (error) throw error;
         toast.success("Conta criada! Verifique seu email.");
@@ -81,16 +89,29 @@ const LoginPage = () => {
               </p>
             )}
             {!isLogin && !isForgotPassword && (
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Nome completo"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
-                  required={!isLogin}
-                />
-              </div>
+              <>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nome completo"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    value={telefone}
+                    onChange={(e) => setTelefone(maskPhone(e.target.value))}
+                    className="pl-10 h-12 rounded-lg border-border/60 focus:border-primary"
+                    required
+                  />
+                </div>
+              </>
             )}
 
             <div className="relative">
