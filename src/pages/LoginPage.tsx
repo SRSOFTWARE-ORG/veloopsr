@@ -9,6 +9,7 @@ import veloopLogo from "@/assets/veloop-logo-transparent.png";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nome, setNome] = useState("");
@@ -23,7 +24,14 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        const res = await supabase.functions.invoke("forgot-password-notify", {
+          body: { email },
+        });
+        if (res.error) throw res.error;
+        toast.success("Solicitação enviada! O administrador será notificado.");
+        setIsForgotPassword(false);
+      } else if (isLogin) {
         localStorage.setItem("veloop_manter_logado", manterLogado.toString());
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -63,11 +71,16 @@ const LoginPage = () => {
         {/* Right - Form */}
         <div className="flex-1 p-8 md:p-12 flex flex-col justify-center">
           <h2 className="text-2xl font-bold text-foreground mb-6">
-            {isLogin ? "Entrar" : "Criar Conta"}
+            {isForgotPassword ? "Esqueci a Senha" : isLogin ? "Entrar" : "Criar Conta"}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            {isForgotPassword && (
+              <p className="text-sm text-muted-foreground">
+                Informe seu email. O administrador será notificado e poderá redefinir sua senha.
+              </p>
+            )}
+            {!isLogin && !isForgotPassword && (
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -92,27 +105,29 @@ const LoginPage = () => {
               />
             </div>
 
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10 h-12 rounded-lg border-border/60 focus:border-primary"
-                required
-                minLength={6}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            {!isForgotPassword && (
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10 h-12 rounded-lg border-border/60 focus:border-primary"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
 
-            {isLogin && (
+            {isLogin && !isForgotPassword && (
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -124,6 +139,13 @@ const LoginPage = () => {
                     Manter conectado
                   </label>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-primary hover:underline"
+                >
+                  Esqueci a senha
+                </button>
               </div>
             )}
 
@@ -133,16 +155,25 @@ const LoginPage = () => {
               style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 3s ease infinite' }}
               disabled={loading}
             >
-              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
+              {loading ? "Carregando..." : isForgotPassword ? "Enviar Solicitação" : isLogin ? "Entrar" : "Criar Conta"}
             </Button>
           </form>
 
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="w-full text-center mt-5 text-sm text-primary hover:underline transition-colors"
-          >
-            {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
-          </button>
+          {isForgotPassword ? (
+            <button
+              onClick={() => setIsForgotPassword(false)}
+              className="w-full text-center mt-5 text-sm text-primary hover:underline transition-colors"
+            >
+              Voltar ao login
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsLogin(!isLogin)}
+              className="w-full text-center mt-5 text-sm text-primary hover:underline transition-colors"
+            >
+              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
+            </button>
+          )}
         </div>
       </div>
     </div>

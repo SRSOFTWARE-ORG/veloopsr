@@ -38,6 +38,7 @@ import PermissionsManager from "@/components/PermissionsManager";
 interface UserWithPermissions {
   id: string;
   nome: string;
+  email?: string;
   role: string;
   permissions: {
     pode_editar_preco: boolean;
@@ -57,7 +58,7 @@ const ConfiguracoesPage = () => {
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({ nome: "", email: "", password: "" });
-  const [editVendedor, setEditVendedor] = useState<{ id: string; nome: string } | null>(null);
+  const [editVendedor, setEditVendedor] = useState<{ id: string; nome: string; email?: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -67,15 +68,17 @@ const ConfiguracoesPage = () => {
   }, [isAdmin]);
 
   const fetchUsers = async () => {
-    const [profilesRes, rolesRes, permsRes] = await Promise.all([
+    const [profilesRes, rolesRes, permsRes, emailsRes] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("user_roles").select("*"),
       supabase.from("permissions").select("*"),
+      supabase.functions.invoke("list-user-emails"),
     ]);
 
     const profiles = profilesRes.data || [];
     const roles = rolesRes.data || [];
     const perms = permsRes.data || [];
+    const emailMap: Record<string, string> = emailsRes.data?.emails || {};
 
     const merged: UserWithPermissions[] = profiles.map((p) => {
       const role = roles.find((r) => r.user_id === p.id);
@@ -83,6 +86,7 @@ const ConfiguracoesPage = () => {
       return {
         id: p.id,
         nome: p.nome,
+        email: emailMap[p.id] || "",
         role: role?.role || "vendedor",
         permissions: {
           pode_editar_preco: perm?.pode_editar_preco ?? false,
@@ -228,11 +232,12 @@ const ConfiguracoesPage = () => {
                   </div>
                   <div>
                     <span className="block">{u.nome}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{u.email}</span>
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome }); setEditDialogOpen(true); }}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
                   {u.id !== user?.id && (
