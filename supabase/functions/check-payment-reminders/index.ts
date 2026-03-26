@@ -127,7 +127,7 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
   }
 }
 
-
+async function createNotification(
   supabase: any,
   userId: string,
   titulo: string,
