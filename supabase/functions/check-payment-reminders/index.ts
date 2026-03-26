@@ -115,7 +115,7 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
 
     if (!res.ok) {
       console.error("AI gateway error:", res.status, await res.text());
-      return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+      return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data indicada.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
     }
 
     const data = await res.json();
