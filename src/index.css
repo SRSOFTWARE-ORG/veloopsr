@@ -97,7 +97,7 @@
   }
 
   .page-container {
-    @apply px-4 pb-24 pt-4 md:px-8 md:pb-8 max-w-7xl mx-auto;
+    @apply px-4 pb-24 pt-4 md:px-8 md:pb-8 max-w-7xl mx-auto overflow-x-hidden;
   }
 
   .section-title {
