@@ -161,7 +161,8 @@ const NotificationBell = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
-              className="fixed left-1/2 -translate-x-1/2 top-14 w-[calc(100vw-1.5rem)] max-w-sm max-h-[28rem] bg-card/95 backdrop-blur-xl border border-border/30 rounded-2xl shadow-2xl z-50 overflow-hidden"
+              className="fixed top-14 w-[calc(100vw-1.5rem)] max-w-sm max-h-[28rem] bg-card/95 backdrop-blur-xl border border-border/30 rounded-2xl shadow-2xl z-50 overflow-hidden"
+              style={{ left: '50%', transform: 'translateX(-50%)' }}
             >
               {/* Header */}
               <div className="px-4 pt-4 pb-2">
