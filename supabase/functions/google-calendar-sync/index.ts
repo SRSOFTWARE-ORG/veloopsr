@@ -180,30 +180,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (action === "status") {
-      // Check if connected
-      const { data: tokens } = await supabase
-        .from("google_calendar_tokens")
-        .select("id, updated_at")
-        .eq("user_id", user_id)
-        .maybeSingle();
-
-      return new Response(
-        JSON.stringify({ connected: !!tokens, last_sync: tokens?.updated_at }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (action === "disconnect") {
-      await supabase.from("google_calendar_tokens").delete().eq("user_id", user_id);
-      await supabase.from("calendar_sync").delete().eq("user_id", user_id);
-
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     throw new Error("Invalid action. Use: export, import, status, disconnect");
   } catch (error) {
     console.error("Sync error:", error);
