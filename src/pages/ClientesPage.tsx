@@ -292,10 +292,10 @@ const ClientesPage = () => {
       {isPrimaryAdmin ? (
         <Tabs defaultValue="clientes" className="w-full">
           <TabsList className="w-full mb-4">
-            <TabsTrigger value="clientes" className="flex-1 gap-1.5">
+            <TabsTrigger value="clientes" className="flex-1 gap-1.5 tab-animated">
               <Users className="w-4 h-4" /> Clientes
             </TabsTrigger>
-            <TabsTrigger value="subclientes" className="flex-1 gap-1.5">
+            <TabsTrigger value="subclientes" className="flex-1 gap-1.5 tab-animated">
               <UserPlus className="w-4 h-4" /> Subclientes
             </TabsTrigger>
           </TabsList>
@@ -392,7 +392,7 @@ const ClientesPage = () => {
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
+              <Button size="sm" className="btn-3d"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
@@ -402,7 +402,7 @@ const ClientesPage = () => {
               <div className="flex items-center gap-2">
                 <input type="file" accept="image/*" capture="environment" ref={fileInputRef} className="hidden"
                   onChange={(e) => { const file = e.target.files?.[0]; if (file) handleScanDocument(file); }} />
-                <Button type="button" variant="outline" className="w-full gap-2" disabled={scanning}
+                <Button type="button" variant="outline" className="w-full gap-2 btn-3d" disabled={scanning}
                   onClick={() => fileInputRef.current?.click()}>
                   {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                   {scanning ? "Escaneando documento..." : "Escanear documento com foto"}

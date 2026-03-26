@@ -327,12 +327,12 @@ const ProdutosPage = () => {
               onChange={handleScanFile}
               className="hidden"
             />
-            <Button size="sm" variant="outline" onClick={() => scanFileRef.current?.click()}>
+            <Button size="sm" variant="outline" className="btn-3d" onClick={() => scanFileRef.current?.click()}>
               <ScanLine className="w-4 h-4 mr-1" /> Escanear
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="btn-3d">
                   <Plus className="w-4 h-4 mr-1" /> Novo
                 </Button>
               </DialogTrigger>
