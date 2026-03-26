@@ -32,7 +32,7 @@ const SobreDialog = () => {
           Sobre
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-2xl [&>button]:text-white [&>button]:hover:text-white/80">
+      <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-2xl [&>button]:z-50 [&>button]:text-white [&>button]:hover:text-white/80 [&>button]:bg-black/30 [&>button]:rounded-full [&>button]:p-1">
         {/* Background Image */}
         <div className="relative min-h-[520px] flex flex-col">
           <img
