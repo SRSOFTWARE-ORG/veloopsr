@@ -72,8 +72,7 @@ const DocumentosPage = () => {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [uploading, setUploading] = useState(false);
   const [viewDoc, setViewDoc] = useState<Documento | null>(null);
-  const [scanningCarnes, setScanningCarnes] = useState(false);
-  const [scanningBoletos, setScanningBoletos] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
@@ -83,62 +82,32 @@ const DocumentosPage = () => {
   }, []);
 
   const autoScanPending = async () => {
-    // Scan pending carnês
-    const { data: carnesData } = await supabase
+    const { data: pendingData } = await supabase
       .from("documentos")
       .select("*")
-      .eq("tipo", "carne")
+      .in("tipo", ["carne", "boleto", "nota_fiscal"])
       .eq("processado", false)
       .order("created_at", { ascending: true });
 
-    const carnes = (carnesData || []) as Documento[];
-    if (carnes.length > 0) {
-      setScanningCarnes(true);
-      setScanProgress({ current: 0, total: carnes.length });
-      toast.info(`Escaneando ${carnes.length} carnê(s) pendente(s)...`);
+    const pending = (pendingData || []) as Documento[];
+    if (pending.length === 0) return;
 
-      let scanOk = 0;
-      let scanFail = 0;
-      for (let i = 0; i < carnes.length; i++) {
-        setScanProgress({ current: i + 1, total: carnes.length });
-        const ok = await scanCarneAndCreateVenda(carnes[i].id, carnes[i].url_arquivo, carnes[i].nome_arquivo);
-        if (ok) scanOk++;
-        else scanFail++;
-      }
+    setScanning(true);
+    setScanProgress({ current: 0, total: pending.length });
+    toast.info(`Escaneando ${pending.length} documento(s) pendente(s)...`);
 
-      setScanningCarnes(false);
-      if (scanOk > 0) toast.success(`${scanOk} carnê(s) processado(s)!`);
-      if (scanFail > 0) toast.error(`${scanFail} carnê(s) com erro`);
+    let scanOk = 0;
+    let scanFail = 0;
+    for (let i = 0; i < pending.length; i++) {
+      setScanProgress({ current: i + 1, total: pending.length });
+      const ok = await scanDocumentAndProcess(pending[i]);
+      if (ok) scanOk++;
+      else scanFail++;
     }
 
-    // Scan pending boletos
-    const { data: boletosData } = await supabase
-      .from("documentos")
-      .select("*")
-      .eq("tipo", "boleto")
-      .eq("processado", false)
-      .order("created_at", { ascending: true });
-
-    const boletos = (boletosData || []) as Documento[];
-    if (boletos.length > 0) {
-      setScanningBoletos(true);
-      setScanProgress({ current: 0, total: boletos.length });
-      toast.info(`Escaneando ${boletos.length} boleto(s) pendente(s)...`);
-
-      let scanOk = 0;
-      let scanFail = 0;
-      for (let i = 0; i < boletos.length; i++) {
-        setScanProgress({ current: i + 1, total: boletos.length });
-        const ok = await scanBoletoAndCreateCobranca(boletos[i].id, boletos[i].url_arquivo, boletos[i].nome_arquivo);
-        if (ok) scanOk++;
-        else scanFail++;
-      }
-
-      setScanningBoletos(false);
-      if (scanOk > 0) toast.success(`${scanOk} boleto(s) lançado(s) na agenda!`);
-      if (scanFail > 0) toast.error(`${scanFail} boleto(s) com erro`);
-    }
-
+    setScanning(false);
+    if (scanOk > 0) toast.success(`${scanOk} documento(s) processado(s)!`);
+    if (scanFail > 0) toast.error(`${scanFail} documento(s) com erro`);
     fetchDocumentos();
   };
 
@@ -147,10 +116,10 @@ const DocumentosPage = () => {
     setDocumentos((data as Documento[]) || []);
   };
 
-  const scanCarneAndCreateVenda = async (docId: string, pdfUrl: string, nomeArquivo: string) => {
+  const scanDocumentAndProcess = async (doc: Documento) => {
     try {
-      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-carne", {
-        body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-document", {
+        body: { pdf_url: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
       });
 
       if (scanError) throw scanError;
@@ -159,81 +128,131 @@ const DocumentosPage = () => {
       const extracted = scanResult?.data;
       if (!extracted?.cliente_nome) throw new Error("Dados insuficientes");
 
-      const clienteNome = extracted.cliente_nome;
-      const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
-      const numParcelas = extracted.num_parcelas || 1;
-      const freq = extracted.frequencia || "mes";
-      const valorParcela = extracted.valor_parcela || 0;
-      const valorTotal = extracted.valor_total || (valorParcela * numParcelas);
-      const valorEntrada = extracted.valor_entrada || 0;
+      const tipoDetectado = extracted.tipo_documento || "boleto";
 
-      const start = new Date(startDate + "T00:00:00");
-      const end = new Date(start);
-      for (let p = 1; p < numParcelas; p++) {
-        if (freq === "semana") end.setDate(end.getDate() + 7);
-        else if (freq === "quinzena") end.setDate(end.getDate() + 15);
-        else end.setMonth(end.getMonth() + 1);
-      }
-      const endDate = end.toISOString().split("T")[0];
-
-      // Create venda
-      await supabase.from("vendas").insert({
-        cliente_nome: clienteNome,
-        cliente_cpf: extracted.cliente_cpf || null,
-        cliente_telefone: extracted.cliente_telefone || null,
-        valor_total: valorTotal,
-        valor_entrada: valorEntrada,
-        num_parcelas: numParcelas,
-        valor_parcela: valorParcela,
-        vendedor_id: user!.id,
-        forma_pagamento: "parcelado",
-        frequencia_parcela: freq,
-        data_inicio_pagamento: startDate,
-        status: "concluida",
-      });
-
-      // Find or create client
-      let clienteId: string | null = null;
-      const { data: existingCliente } = await supabase
-        .from("clientes")
-        .select("id")
-        .ilike("nome", `%${clienteNome}%`)
-        .limit(1);
-
-      if (existingCliente?.[0]?.id) {
-        clienteId = existingCliente[0].id;
-      } else {
-        const { data: newCliente } = await supabase.from("clientes").insert({
-          nome: clienteNome,
-          cpf: extracted.cliente_cpf || null,
-          telefone: extracted.cliente_telefone || null,
-          criado_por: user!.id,
-        }).select("id").single();
-        clienteId = newCliente?.id || null;
+      // Update document type if AI detected differently
+      if (tipoDetectado !== doc.tipo) {
+        await supabase.from("documentos").update({ tipo: tipoDetectado } as any).eq("id", doc.id);
       }
 
-      // Always create cobrança
-      if (clienteId) {
-        await supabase.from("cobrancas").insert({
-          cliente_id: clienteId,
-          cliente_nome: clienteNome,
-          valor_parcela: valorParcela,
-          data_inicio: startDate,
-          data_fim: endDate,
-          frequencia: freq,
-          criado_por: user!.id,
-          observacoes: `Importado do carnê: ${nomeArquivo}`,
-        });
+      if (tipoDetectado === "carne") {
+        await processCarneData(doc, extracted);
+      } else if (tipoDetectado === "boleto") {
+        await processBoletoData(doc, extracted);
+      } else if (tipoDetectado === "nota_fiscal") {
+        await processNotaData(doc, extracted);
       }
 
-      // Mark as processed
-      await supabase.from("documentos").update({ processado: true } as any).eq("id", docId);
-
+      await supabase.from("documentos").update({ processado: true } as any).eq("id", doc.id);
       return true;
     } catch (err) {
-      console.error(`Erro ao escanear carnê ${nomeArquivo}:`, err);
+      console.error(`Erro ao escanear ${doc.nome_arquivo}:`, err);
       return false;
     }
+  };
+
+  const findOrCreateCliente = async (nome: string, cpf?: string, telefone?: string) => {
+    const { data: existing } = await supabase
+      .from("clientes")
+      .select("id")
+      .ilike("nome", `%${nome}%`)
+      .limit(1);
+
+    if (existing?.[0]?.id) return existing[0].id;
+
+    const { data: newCliente } = await supabase.from("clientes").insert({
+      nome,
+      cpf: cpf || null,
+      telefone: telefone || null,
+      criado_por: user!.id,
+    }).select("id").single();
+
+    return newCliente?.id || null;
+  };
+
+  const processCarneData = async (doc: Documento, extracted: any) => {
+    const clienteNome = extracted.cliente_nome;
+    const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
+    const numParcelas = extracted.num_parcelas || 1;
+    const freq = extracted.frequencia || "mes";
+    const valorParcela = extracted.valor_parcela || 0;
+    const valorTotal = extracted.valor_total || (valorParcela * numParcelas);
+    const valorEntrada = extracted.valor_entrada || 0;
+
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(start);
+    for (let p = 1; p < numParcelas; p++) {
+      if (freq === "semana") end.setDate(end.getDate() + 7);
+      else if (freq === "quinzena") end.setDate(end.getDate() + 15);
+      else end.setMonth(end.getMonth() + 1);
+    }
+    const endDate = end.toISOString().split("T")[0];
+
+    await supabase.from("vendas").insert({
+      cliente_nome: clienteNome,
+      cliente_cpf: extracted.cliente_cpf || null,
+      cliente_telefone: extracted.cliente_telefone || null,
+      valor_total: valorTotal,
+      valor_entrada: valorEntrada,
+      num_parcelas: numParcelas,
+      valor_parcela: valorParcela,
+      vendedor_id: user!.id,
+      forma_pagamento: "parcelado",
+      frequencia_parcela: freq,
+      data_inicio_pagamento: startDate,
+      status: "concluida",
+    });
+
+    const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf, extracted.cliente_telefone);
+
+    if (clienteId) {
+      await supabase.from("cobrancas").insert({
+        cliente_id: clienteId,
+        cliente_nome: clienteNome,
+        valor_parcela: valorParcela,
+        data_inicio: startDate,
+        data_fim: endDate,
+        frequencia: freq,
+        criado_por: user!.id,
+        observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
+      });
+    }
+  };
+
+  const processBoletoData = async (doc: Documento, extracted: any) => {
+    const clienteNome = extracted.cliente_nome;
+    const dataVencimento = extracted.data_vencimento || new Date().toISOString().split("T")[0];
+
+    const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
+
+    if (clienteId) {
+      await supabase.from("cobrancas").insert({
+        cliente_id: clienteId,
+        cliente_nome: clienteNome,
+        valor_parcela: extracted.valor || 0,
+        data_inicio: dataVencimento,
+        data_fim: dataVencimento,
+        frequencia: "mes",
+        criado_por: user!.id,
+        observacoes: `Boleto: ${doc.nome_arquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+      });
+    }
+  };
+
+  const processNotaData = async (doc: Documento, extracted: any) => {
+    const clienteNome = extracted.cliente_nome;
+    await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
+
+    // Create a venda record from nota fiscal
+    await supabase.from("vendas").insert({
+      cliente_nome: clienteNome,
+      cliente_cpf: extracted.cliente_cpf || null,
+      valor_total: extracted.valor || extracted.valor_total || 0,
+      vendedor_id: user!.id,
+      forma_pagamento: "pix",
+      status: "concluida",
+      observacoes: `Nota Fiscal: ${doc.nome_arquivo}${extracted.numero_documento ? ` | NF: ${extracted.numero_documento}` : ""}${extracted.beneficiario ? ` | Emitente: ${extracted.beneficiario}` : ""}`,
+    });
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,8 +262,7 @@ const DocumentosPage = () => {
     setUploading(true);
     let successCount = 0;
     let errorCount = 0;
-    const carnesToScan: { id: string; url: string; nome: string }[] = [];
-    const boletosToScan: { id: string; url: string; nome: string }[] = [];
+    const docsToScan: Documento[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -265,7 +283,7 @@ const DocumentosPage = () => {
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
-      }).select("id").single();
+      }).select("*").single();
 
       if (insertError) {
         console.error("Document insert error:", insertError.message);
@@ -275,63 +293,39 @@ const DocumentosPage = () => {
 
       successCount++;
 
-      if (tipo === "carne" && docData?.id) {
-        carnesToScan.push({ id: docData.id, url: urlData.publicUrl, nome: file.name });
-      }
-      if (tipo === "boleto" && docData?.id) {
-        boletosToScan.push({ id: docData.id, url: urlData.publicUrl, nome: file.name });
+      if (docData && ["carne", "boleto", "nota_fiscal"].includes(tipo)) {
+        docsToScan.push(docData as Documento);
       }
     }
 
     if (successCount > 0) toast.success(`${successCount} arquivo(s) enviado(s)!`);
     if (errorCount > 0) toast.error(`${errorCount} arquivo(s) com erro`);
-    
+
     fetchDocumentos();
     e.target.value = "";
 
-    // Auto-scan carnês
-    if (carnesToScan.length > 0) {
+    // Auto-scan uploaded documents
+    if (docsToScan.length > 0) {
       setUploading(false);
-      setScanningCarnes(true);
-      setScanProgress({ current: 0, total: carnesToScan.length });
-      toast.info(`Escaneando ${carnesToScan.length} carnê(s) automaticamente...`);
+      setScanning(true);
+      setScanProgress({ current: 0, total: docsToScan.length });
+      toast.info(`Escaneando ${docsToScan.length} documento(s)...`);
 
       let scanOk = 0;
       let scanFail = 0;
-      for (let i = 0; i < carnesToScan.length; i++) {
-        setScanProgress({ current: i + 1, total: carnesToScan.length });
-        const ok = await scanCarneAndCreateVenda(carnesToScan[i].id, carnesToScan[i].url, carnesToScan[i].nome);
+      for (let i = 0; i < docsToScan.length; i++) {
+        setScanProgress({ current: i + 1, total: docsToScan.length });
+        const ok = await scanDocumentAndProcess(docsToScan[i]);
         if (ok) scanOk++;
         else scanFail++;
       }
 
-      setScanningCarnes(false);
-      if (scanOk > 0) toast.success(`${scanOk} venda(s) criada(s) a partir dos carnês!`);
-      if (scanFail > 0) toast.error(`${scanFail} carnê(s) não puderam ser processados`);
+      setScanning(false);
+      if (scanOk > 0) toast.success(`${scanOk} documento(s) processado(s)!`);
+      if (scanFail > 0) toast.error(`${scanFail} documento(s) com erro`);
+      fetchDocumentos();
+      return;
     }
-
-    // Auto-scan boletos
-    if (boletosToScan.length > 0) {
-      setUploading(false);
-      setScanningBoletos(true);
-      setScanProgress({ current: 0, total: boletosToScan.length });
-      toast.info(`Escaneando ${boletosToScan.length} boleto(s) automaticamente...`);
-
-      let scanOk = 0;
-      let scanFail = 0;
-      for (let i = 0; i < boletosToScan.length; i++) {
-        setScanProgress({ current: i + 1, total: boletosToScan.length });
-        const ok = await scanBoletoAndCreateCobranca(boletosToScan[i].id, boletosToScan[i].url, boletosToScan[i].nome);
-        if (ok) scanOk++;
-        else scanFail++;
-      }
-
-      setScanningBoletos(false);
-      if (scanOk > 0) toast.success(`${scanOk} boleto(s) lançado(s) na agenda!`);
-      if (scanFail > 0) toast.error(`${scanFail} boleto(s) com erro no processamento`);
-    }
-
-    if (carnesToScan.length > 0 || boletosToScan.length > 0) return;
 
     setUploading(false);
   };
@@ -343,122 +337,30 @@ const DocumentosPage = () => {
     fetchDocumentos();
   };
 
-  const scanBoletoAndCreateCobranca = async (docId: string, pdfUrl: string, nomeArquivo: string) => {
-    try {
-      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-boleto", {
-        body: { pdf_url: pdfUrl, nome_arquivo: nomeArquivo },
-      });
-
-      if (scanError) throw scanError;
-      if (scanResult?.error) throw new Error(scanResult.error);
-
-      const extracted = scanResult?.data;
-      if (!extracted?.cliente_nome || !extracted?.data_vencimento) throw new Error("Dados insuficientes");
-
-      const clienteNome = extracted.cliente_nome;
-      const dataVencimento = extracted.data_vencimento;
-
-      // Find or skip client
-      const { data: existingCliente } = await supabase
-        .from("clientes")
-        .select("id")
-        .ilike("nome", `%${clienteNome}%`)
-        .limit(1);
-
-      if (existingCliente?.[0]?.id) {
-        await supabase.from("cobrancas").insert({
-          cliente_id: existingCliente[0].id,
-          cliente_nome: clienteNome,
-          valor_parcela: extracted.valor || 0,
-          data_inicio: dataVencimento,
-          data_fim: dataVencimento,
-          frequencia: "mes",
-          criado_por: user!.id,
-          observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
-        });
-      } else {
-        // Create client first, then cobrança
-        const { data: newCliente } = await supabase.from("clientes").insert({
-          nome: clienteNome,
-          cpf: extracted.cliente_cpf || null,
-          criado_por: user!.id,
-        }).select("id").single();
-
-        if (newCliente?.id) {
-          await supabase.from("cobrancas").insert({
-            cliente_id: newCliente.id,
-            cliente_nome: clienteNome,
-            valor_parcela: extracted.valor || 0,
-            data_inicio: dataVencimento,
-            data_fim: dataVencimento,
-            frequencia: "mes",
-            criado_por: user!.id,
-            observacoes: `Boleto: ${nomeArquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
-          });
-        }
-      }
-
-      await supabase.from("documentos").update({ processado: true } as any).eq("id", docId);
-      return true;
-    } catch (err) {
-      console.error(`Erro ao escanear boleto ${nomeArquivo}:`, err);
-      return false;
-    }
-  };
-
-  const handleScanAllCarnes = async () => {
-    const carnes = documentos.filter((d) => d.tipo === "carne" && !d.processado);
-    if (carnes.length === 0) {
-      toast.info("Todos os carnês já foram processados!");
+  const handleScanAll = async () => {
+    const pending = documentos.filter((d) => !d.processado && ["carne", "boleto", "nota_fiscal"].includes(d.tipo));
+    if (pending.length === 0) {
+      toast.info("Todos os documentos já foram processados!");
       return;
     }
 
-    if (!confirm(`Escanear ${carnes.length} carnê(s) pendente(s) e criar vendas + cobranças?`)) return;
+    if (!confirm(`Escanear ${pending.length} documento(s) pendente(s)?`)) return;
 
-    setScanningCarnes(true);
-    setScanProgress({ current: 0, total: carnes.length });
+    setScanning(true);
+    setScanProgress({ current: 0, total: pending.length });
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < carnes.length; i++) {
-      const carne = carnes[i];
-      setScanProgress({ current: i + 1, total: carnes.length });
-      const ok = await scanCarneAndCreateVenda(carne.id, carne.url_arquivo, carne.nome_arquivo);
+    for (let i = 0; i < pending.length; i++) {
+      setScanProgress({ current: i + 1, total: pending.length });
+      const ok = await scanDocumentAndProcess(pending[i]);
       if (ok) successCount++;
       else errorCount++;
     }
 
-    setScanningCarnes(false);
-    if (successCount > 0) toast.success(`${successCount} carnê(s) processado(s) com sucesso!`);
-    if (errorCount > 0) toast.error(`${errorCount} carnê(s) com erro no processamento`);
-    fetchDocumentos();
-  };
-
-  const handleScanAllBoletos = async () => {
-    const boletos = documentos.filter((d) => d.tipo === "boleto" && !d.processado);
-    if (boletos.length === 0) {
-      toast.info("Todos os boletos já foram processados!");
-      return;
-    }
-
-    if (!confirm(`Escanear ${boletos.length} boleto(s) pendente(s) e lançar na agenda?`)) return;
-
-    setScanningBoletos(true);
-    setScanProgress({ current: 0, total: boletos.length });
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (let i = 0; i < boletos.length; i++) {
-      const boleto = boletos[i];
-      setScanProgress({ current: i + 1, total: boletos.length });
-      const ok = await scanBoletoAndCreateCobranca(boleto.id, boleto.url_arquivo, boleto.nome_arquivo);
-      if (ok) successCount++;
-      else errorCount++;
-    }
-
-    setScanningBoletos(false);
-    if (successCount > 0) toast.success(`${successCount} boleto(s) lançado(s) na agenda!`);
-    if (errorCount > 0) toast.error(`${errorCount} boleto(s) com erro no processamento`);
+    setScanning(false);
+    if (successCount > 0) toast.success(`${successCount} documento(s) processado(s)!`);
+    if (errorCount > 0) toast.error(`${errorCount} documento(s) com erro`);
     fetchDocumentos();
   };
 
@@ -497,36 +399,18 @@ const DocumentosPage = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleScanAllBoletos}
-                disabled={scanningBoletos || scanningCarnes}
+                onClick={handleScanAll}
+                disabled={scanning}
                 className="gap-1 shrink-0"
               >
-                {scanningBoletos ? (
+                {scanning ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <ScanLine className="w-4 h-4" />
                 )}
-                {scanningBoletos
+                {scanning
                   ? `${scanProgress.current}/${scanProgress.total}`
-                  : "Escanear Boletos"}
-              </Button>
-            )}
-            {isPrimaryAdmin && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleScanAllCarnes}
-                disabled={scanningCarnes || scanningBoletos}
-                className="gap-1 shrink-0"
-              >
-                {scanningCarnes ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ScanLine className="w-4 h-4" />
-                )}
-                {scanningCarnes
-                  ? `${scanProgress.current}/${scanProgress.total}`
-                  : "Escanear Carnês"}
+                  : "Escanear"}
               </Button>
             )}
           </div>
@@ -566,7 +450,7 @@ const DocumentosPage = () => {
                 <p className="font-semibold text-sm truncate">{d.nome_arquivo}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs bg-secondary px-1.5 py-0.5 rounded">{tipoLabels[d.tipo] || d.tipo}</span>
-                  {d.tipo === "carne" && d.processado && (
+                  {d.processado && (
                     <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">✓ Processado</span>
                   )}
                   {d.cliente_nome && <span className="text-xs text-muted-foreground">{d.cliente_nome}</span>}
