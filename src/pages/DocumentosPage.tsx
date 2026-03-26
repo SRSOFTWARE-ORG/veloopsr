@@ -143,7 +143,7 @@ const DocumentosPage = () => {
         await processNotaData(doc, extracted);
       }
 
-      await supabase.from("documentos").update({ processado: true } as any).eq("id", doc.id);
+      await supabase.from("documentos").update({ processado: true, cliente_nome: extracted.cliente_nome } as any).eq("id", doc.id);
       return true;
     } catch (err) {
       console.error(`Erro ao escanear ${doc.nome_arquivo}:`, err);
