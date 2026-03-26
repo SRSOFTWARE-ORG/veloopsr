@@ -143,7 +143,7 @@ const CobrancaResumo = () => {
             <div className="min-w-0">
               <p className="text-[10px] text-muted-foreground">Recebido</p>
               <p className="truncate text-sm font-bold tabular-nums text-primary">
-                R$ {recebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {recebido.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -152,7 +152,7 @@ const CobrancaResumo = () => {
             <div className="min-w-0">
               <p className="text-[10px] text-muted-foreground">Pendente</p>
               <p className="truncate text-sm font-bold tabular-nums text-destructive">
-                R$ {pendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {pendente.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -184,7 +184,7 @@ const CobrancaResumo = () => {
                     fontSize: 13,
                   }}
                   formatter={(value: number) => [
-                    `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+                    `${value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}`,
                   ]}
                 />
                 <Legend

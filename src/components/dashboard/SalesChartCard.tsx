@@ -111,7 +111,7 @@ const SalesChartCard = () => {
         <div className="mb-3 flex items-center justify-between rounded-lg bg-primary/10 p-3">
           <span className="text-xs font-medium text-muted-foreground">Total do período</span>
           <span className="text-sm font-extrabold tabular-nums text-primary">
-            R$ {totalPeriodo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            {totalPeriodo.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
           </span>
         </div>
         <div className="h-48">

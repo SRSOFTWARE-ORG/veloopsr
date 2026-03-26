@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -85,7 +86,7 @@ const Dashboard = () => {
   const statCards = [
     {
       label: "Vendas Hoje",
-      value: `R$ ${stats.vendasHoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      value: formatCurrency(stats.vendasHoje),
       icon: DollarSign,
       color: "text-primary",
       bg: "bg-primary/10",
@@ -190,11 +191,11 @@ const Dashboard = () => {
                     <p className="truncate text-sm font-semibold">{venda.cliente_nome}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
                       <span className="text-xs font-bold tabular-nums">
-                        R$ {Number(venda.valor_total).toFixed(2)}
+                        R$ {Number(venda.valor_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
                       {(venda.num_parcelas || 0) > 1 && (
                         <span className="text-xs text-muted-foreground">
-                          {venda.num_parcelas}x R$ {Number(venda.valor_parcela).toFixed(2)}
+                          {venda.num_parcelas}x {formatCurrency(venda.valor_parcela)}
                           {venda.frequencia_parcela && ` · ${frequenciaLabels[venda.frequencia_parcela] || ""}`}
                         </span>
                       )}
