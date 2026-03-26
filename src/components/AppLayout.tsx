@@ -187,8 +187,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <nav
           className="flex items-center justify-around py-1.5 px-2 rounded-[22px] border border-white/30"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.25) 50%, rgba(220,235,255,0.3) 100%)',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.5) 50%, rgba(220,235,255,0.55) 100%)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
           }}
         >
           {navItems.slice(0, 5).map((item) => (
