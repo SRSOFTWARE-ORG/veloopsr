@@ -97,62 +97,90 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border/60 flex items-center justify-between px-4 z-30">
-        <img src={veloopHeaderLogo} alt="Veloop" className="h-12 object-contain cursor-pointer" style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }} onClick={() => navigate("/")} />
+        <img
+          src={veloopHeaderLogo}
+          alt="Veloop"
+          className="h-12 object-contain cursor-pointer"
+          style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }}
+          loading="eager"
+          decoding="sync"
+          onClick={() => navigate("/")}
+        />
         <div className="flex items-center gap-1">
           <NotificationBell />
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
+          <button onClick={() => setSidebarOpen((open) => !open)} className="p-2">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-foreground/20" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl animate-slide-in-right" style={{ animation: 'slideInLeft 0.3s ease-out' }}>
-            <div className="p-5 border-b border-border/60 flex items-center justify-between">
-              <img src={veloopHeaderLogo} alt="Veloop" className="h-14 object-contain cursor-pointer" style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }} onClick={() => { navigate("/"); setSidebarOpen(false); }} />
-              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
-            </div>
-            <nav className="p-3 space-y-1">
-              {allItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/"}
-                  onClick={() => setSidebarOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    }`
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border/60">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                  {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{profile?.nome || "Usuário"}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{role}</p>
-                </div>
+      <div
+        className={`md:hidden fixed inset-0 z-40 transition-opacity duration-200 ${
+          sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!sidebarOpen}
+      >
+        <div
+          className={`absolute inset-0 bg-foreground/20 transition-opacity duration-200 ${
+            sidebarOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <aside
+          className={`absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl will-change-transform transition-transform duration-200 ease-out ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="p-5 border-b border-border/60 flex items-center justify-between">
+            <img
+              src={veloopHeaderLogo}
+              alt="Veloop"
+              className="h-14 object-contain cursor-pointer"
+              style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }}
+              loading="eager"
+              decoding="sync"
+              onClick={() => { navigate("/"); setSidebarOpen(false); }}
+            />
+            <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+          </div>
+          <nav className="p-3 space-y-1">
+            {allItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`
+                }
+              >
+                <item.icon className="w-5 h-5" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border/60">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
               </div>
-              <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
-                <LogOut className="w-4 h-4" />
-                Sair
-              </button>
+              <div>
+                <p className="text-sm font-semibold">{profile?.nome || "Usuário"}</p>
+                <p className="text-xs text-muted-foreground capitalize">{role}</p>
+              </div>
             </div>
-          </aside>
-        </div>
-      )}
+            <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
+          </div>
+        </aside>
+      </div>
 
       {/* Mobile Bottom Nav - macOS Dock style with liquid glass */}
       <div className="md:hidden fixed bottom-3 left-3 right-3 z-30">
