@@ -47,7 +47,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <div className="w-full max-w-[900px] bg-card rounded-xl shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
         {/* Left - Logo */}
-        <div className="flex-1 bg-gradient-to-br from-[hsl(200,80%,50%)] to-[hsl(142,70%,45%)] flex items-center justify-center p-10">
+        <div className="flex-1 flex items-center justify-center p-10" style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(260,70%,55%), hsl(142,70%,45%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 6s ease infinite' }}>
           <img
             src={veloopLogo}
             alt="Logo Veloop"
