@@ -22,6 +22,9 @@ import {
   Undo2,
   ShieldOff,
   Pencil,
+  MessageCircle,
+  Send,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -82,6 +85,7 @@ interface Pagamento {
 interface Cliente {
   id: string;
   nome: string;
+  telefone: string | null;
 }
 
 type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente" | "isento";
@@ -158,6 +162,7 @@ const AgendaPage = () => {
   const [editingCobranca, setEditingCobranca] = useState<Cobranca | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     cliente_id: "",
@@ -180,7 +185,7 @@ const AgendaPage = () => {
     const [cobRes, pagRes, cliRes] = await Promise.all([
       supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
       supabase.from("cobranca_pagamentos").select("*"),
-      supabase.from("clientes").select("id, nome").order("nome"),
+      supabase.from("clientes").select("id, nome, telefone").order("nome"),
     ]);
     if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
     if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
@@ -339,6 +344,47 @@ const AgendaPage = () => {
       setEditDialogOpen(false);
       setEditingCobranca(null);
       fetchAll();
+    }
+  };
+
+  const handleSendWhatsApp = async (cobranca: Cobranca, dateKey: string) => {
+    const cliente = clientes.find((c) => c.id === cobranca.cliente_id);
+    const telefone = cliente?.telefone;
+
+    if (!telefone) {
+      toast.error("Cliente não possui telefone cadastrado");
+      return;
+    }
+
+    const status = getPaymentStatus(dateKey, cobranca.id, pagamentosMap);
+    const dataFormatada = format(parseISO(dateKey), "dd/MM/yyyy");
+    const valor = formatCurrency(cobranca.valor_parcela);
+
+    let mensagem = "";
+    if (status === "pendente") {
+      mensagem = `Olá ${cobranca.cliente_nome}! 🔴\n\nIdentificamos que sua parcela de *${valor}* com vencimento em *${dataFormatada}* está em atraso.\n\nPor favor, entre em contato para regularizar.\n\n_Veloop - SR Software_`;
+    } else if (status === "a_pagar") {
+      mensagem = `Olá ${cobranca.cliente_nome}! 📅\n\nLembramos que sua parcela de *${valor}* vence em *${dataFormatada}*.\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
+    } else {
+      mensagem = `Olá ${cobranca.cliente_nome}! ✅\n\nConfirmamos o recebimento da parcela de *${valor}* referente a *${dataFormatada}*.\n\nObrigado!\n\n_Veloop - SR Software_`;
+    }
+
+    setSendingWhatsApp(`${cobranca.id}_${dateKey}`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+        body: { telefone, mensagem },
+      });
+
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.error || "Erro ao enviar");
+
+      toast.success(`WhatsApp enviado para ${cobranca.cliente_nome}!`);
+    } catch (err: any) {
+      console.error("WhatsApp error:", err);
+      toast.error(err.message || "Erro ao enviar WhatsApp. Verifique a conexão com o servidor.");
+    } finally {
+      setSendingWhatsApp(null);
     }
   };
 
@@ -658,6 +704,20 @@ const AgendaPage = () => {
                     )}
 
                     <div className="flex items-center gap-2 pl-10 pt-1 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 gap-1 text-green-600 border-green-500/30 hover:bg-green-500/10"
+                        disabled={sendingWhatsApp === `${c.id}_${selectedDateKey}`}
+                        onClick={() => handleSendWhatsApp(c, selectedDateKey!)}
+                      >
+                        {sendingWhatsApp === `${c.id}_${selectedDateKey}` ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <MessageCircle className="w-3 h-3" />
+                        )}
+                        WhatsApp
+                      </Button>
                       {isPrimaryAdmin && !isPaidOrExempt && (
                         <>
                           <Button

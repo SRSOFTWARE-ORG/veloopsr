@@ -41,6 +41,33 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
+async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean> {
+  const apiUrl = Deno.env.get("EVOLUTION_API_URL");
+  const apiKey = Deno.env.get("EVOLUTION_API_KEY");
+  if (!apiUrl || !apiKey || !telefone) return false;
+
+  const digits = telefone.replace(/\D/g, "");
+  const formattedPhone = digits.startsWith("55") && digits.length >= 12
+    ? digits
+    : `55${digits.startsWith("0") ? digits.slice(1) : digits}`;
+
+  try {
+    const res = await fetch(`${apiUrl}/message/sendText/Veloop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({ number: formattedPhone, text: mensagem }),
+    });
+    if (!res.ok) {
+      console.error("WhatsApp send failed:", await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("WhatsApp network error:", err);
+    return false;
+  }
+}
+
 async function sendWebPush(subscription: { endpoint: string; p256dh: string; auth: string }, payload: object) {
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
@@ -120,11 +147,22 @@ Deno.serve(async (req) => {
     const endOfWeek = new Date(now.getTime() + daysUntilSunday * DAY_MS);
     const endOfWeekStr = formatDateOnly(endOfWeek);
 
-    // Get all cobrancas
+    // Get all cobrancas with client info
     const { data: cobrancas, error: cobErr } = await supabase
       .from("cobrancas")
-      .select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
+      .select("id, cliente_id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
+
+    // Get client phones
+    const clienteIds = [...new Set((cobrancas || []).map((c: any) => c.cliente_id))];
+    const { data: clientesData } = await supabase
+      .from("clientes")
+      .select("id, telefone")
+      .in("id", clienteIds);
+    const clientePhoneMap = new Map<string, string>();
+    for (const cl of clientesData || []) {
+      if (cl.telefone) clientePhoneMap.set(cl.id, cl.telefone);
+    }
 
     // Get existing pagamentos with status
     const { data: pagamentos } = await supabase
@@ -146,6 +184,7 @@ Deno.serve(async (req) => {
     // Build per-date cobranca list (only unpaid)
     interface CobrancaEntry {
       id: string;
+      cliente_id: string;
       cliente_nome: string;
       valor_parcela: number;
       criado_por: string;
@@ -154,7 +193,7 @@ Deno.serve(async (req) => {
 
     const todayEntries: CobrancaEntry[] = [];
     const tomorrowEntries: CobrancaEntry[] = [];
-    const weekEntries: Map<string, CobrancaEntry[]> = new Map(); // date -> entries
+    const weekEntries: Map<string, CobrancaEntry[]> = new Map();
 
     for (const cob of cobrancas || []) {
       const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
@@ -163,6 +202,7 @@ Deno.serve(async (req) => {
 
         const entry: CobrancaEntry = {
           id: cob.id,
+          cliente_id: cob.cliente_id,
           cliente_nome: cob.cliente_nome,
           valor_parcela: cob.valor_parcela,
           criado_por: cob.criado_por,
@@ -182,7 +222,8 @@ Deno.serve(async (req) => {
     const formatValor = (v: number) =>
       new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
-    // --- TODAY notifications: "Cobrar CLIENTE hoje" ---
+    // --- TODAY notifications + WhatsApp: "Cobrar CLIENTE hoje" ---
+    let whatsappCount = 0;
     for (const entry of todayEntries) {
       const usersToNotify = new Set([entry.criado_por, ...adminIds]);
       for (const userId of usersToNotify) {
@@ -195,6 +236,15 @@ Deno.serve(async (req) => {
           `hoje_${entry.id}_${entry.date}`
         );
         if (ok) notifCount++;
+      }
+
+      // Send WhatsApp to client
+      const phone = clientePhoneMap.get(entry.cliente_id);
+      if (phone) {
+        const dataFormatada = entry.date.split("-").reverse().join("/");
+        const msg = `Olá ${entry.cliente_nome}! 📅\n\nLembramos que sua parcela de *${formatValor(entry.valor_parcela)}* vence hoje (*${dataFormatada}*).\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
+        const sent = await sendWhatsApp(phone, msg);
+        if (sent) whatsappCount++;
       }
     }
 
@@ -251,6 +301,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         notifications_created: notifCount,
+        whatsapp_sent: whatsappCount,
         today: todayEntries.length,
         tomorrow: tomorrowEntries.length,
         week_total: totalWeekEntries.length,
