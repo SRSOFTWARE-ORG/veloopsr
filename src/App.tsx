@@ -8,20 +8,31 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import IntroScreen from "@/components/IntroScreen";
 
+// Eager imports for critical pages — no lazy loading delay
+import Dashboard from "@/pages/Dashboard";
+import VendasPage from "@/pages/VendasPage";
+import ProdutosPage from "@/pages/ProdutosPage";
+import ClientesPage from "@/pages/ClientesPage";
+import AgendaPage from "@/pages/AgendaPage";
+import CaixaPage from "@/pages/CaixaPage";
+
+// Lazy for less-used pages
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const VendasPage = lazy(() => import("@/pages/VendasPage"));
-const ProdutosPage = lazy(() => import("@/pages/ProdutosPage"));
 const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
-const ClientesPage = lazy(() => import("@/pages/ClientesPage"));
-const AgendaPage = lazy(() => import("@/pages/AgendaPage"));
 const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
-const CaixaPage = lazy(() => import("@/pages/CaixaPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2, // 2 min cache
+      gcTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 const INTRO_SEEN_KEY = "veloop_intro_seen";
 
 const ScreenLoader = () => (
@@ -93,7 +104,7 @@ const App = () => {
       return;
     }
 
-    const introFailsafeTimer = window.setTimeout(handleIntroFinish, 2200);
+    const introFailsafeTimer = window.setTimeout(handleIntroFinish, 1200);
     return () => window.clearTimeout(introFailsafeTimer);
   }, [handleIntroFinish, showIntro]);
 
