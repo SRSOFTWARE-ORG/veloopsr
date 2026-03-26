@@ -198,6 +198,24 @@ const ClientesPage = () => {
     if (!form.cpf.trim()) { toast.error("CPF é obrigatório"); return; }
     if (!validateCPFOrCNPJ(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
 
+    // Verificar duplicidade de CPF
+    const cpfTrimmed = form.cpf.trim();
+    if (cpfTrimmed) {
+      const { data: cpfExistente } = await supabase
+        .from("clientes")
+        .select("id, nome")
+        .eq("cpf", cpfTrimmed)
+        .limit(1);
+
+      if (cpfExistente && cpfExistente.length > 0) {
+        const jaExiste = cpfExistente[0];
+        if (!editing || jaExiste.id !== editing.id) {
+          toast.error(`CPF já cadastrado para: ${jaExiste.nome}`);
+          return;
+        }
+      }
+    }
+
     const payload: any = {
       nome: form.nome.trim(), cpf: form.cpf.trim(), telefone: form.telefone.trim(),
       email: form.email.trim() || null, endereco: form.endereco.trim() || null,
