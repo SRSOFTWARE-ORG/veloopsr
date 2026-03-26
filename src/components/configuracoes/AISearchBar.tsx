@@ -208,10 +208,12 @@ const AISearchBar = () => {
       {expanded && !response && !loading && (
         <div className="flex flex-wrap gap-2 animate-fade-in">
           {[
+            "Disparar lembretes de cobrança",
+            "Enviar WhatsApp para cliente X",
             "Parcelas atrasadas hoje",
+            "Histórico de envios WhatsApp",
+            "Criar cobrança para cliente",
             "Resumo financeiro do mês",
-            "Alterar estoque do produto X",
-            "Marcar parcela como paga",
           ].map((s) => (
             <button
               key={s}
