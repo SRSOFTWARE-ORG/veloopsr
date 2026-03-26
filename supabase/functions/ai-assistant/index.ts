@@ -124,6 +124,92 @@ const actionTools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_whatsapp",
+      description: "Enviar mensagem WhatsApp para um cliente. Pode enviar cobrança automática (com dados de fatura) ou mensagem livre.",
+      parameters: {
+        type: "object",
+        properties: {
+          telefone: { type: "string", description: "Telefone do cliente com DDD" },
+          mensagem: { type: "string", description: "Mensagem livre (opcional se dados de cobrança forem fornecidos)" },
+          cobranca_id: { type: "string", description: "ID da cobrança (para cobrança automática)" },
+          cliente_id: { type: "string", description: "ID do cliente" },
+          cliente_nome: { type: "string", description: "Nome do cliente" },
+          cpf: { type: "string", description: "CPF do cliente" },
+          valor: { type: "number", description: "Valor da parcela" },
+          data_vencimento: { type: "string", description: "Data de vencimento YYYY-MM-DD" },
+          status_parcela: { type: "string", description: "Status da parcela" },
+        },
+        required: ["telefone"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "trigger_payment_reminders",
+      description: "Disparar manualmente a automação de lembretes de pagamento (notificações + WhatsApp para cobranças do dia/amanhã)",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar notificação interna para um ou todos os usuários",
+      parameters: {
+        type: "object",
+        properties: {
+          user_id: { type: "string", description: "ID do usuário (ou 'all_admins' para todos os admins)" },
+          titulo: { type: "string", description: "Título da notificação" },
+          mensagem: { type: "string", description: "Corpo da notificação" },
+          tipo: { type: "string", description: "Tipo: lembrete, alerta, info", default: "info" },
+        },
+        required: ["titulo", "mensagem"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "view_whatsapp_history",
+      description: "Ver histórico de envios WhatsApp de um cliente ou período",
+      parameters: {
+        type: "object",
+        properties: {
+          cpf: { type: "string", description: "CPF do cliente (opcional)" },
+          dias: { type: "number", description: "Últimos N dias (padrão 7)", default: 7 },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_cobranca",
+      description: "Criar nova cobrança para um cliente com parcelas automáticas",
+      parameters: {
+        type: "object",
+        properties: {
+          cliente_id: { type: "string", description: "ID do cliente" },
+          cliente_nome: { type: "string", description: "Nome do cliente" },
+          valor_parcela: { type: "number", description: "Valor de cada parcela" },
+          data_inicio: { type: "string", description: "Data de início YYYY-MM-DD" },
+          data_fim: { type: "string", description: "Data de fim YYYY-MM-DD" },
+          frequencia: { type: "string", enum: ["semana", "quinzena", "mes"], default: "mes" },
+          observacoes: { type: "string", description: "Observações opcionais" },
+        },
+        required: ["cliente_id", "cliente_nome", "valor_parcela", "data_inicio", "data_fim"],
+      },
+    },
+  },
 ];
 
 // Allowed fields per table for security
@@ -198,10 +284,116 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       if (error) throw error;
       return `✅ Parcela criada para ${args.data_vencimento} com status "${insert.status}"`;
     }
-    case "delete_payment_record": {
-      const { error } = await sb.from("cobranca_pagamentos").delete().eq("id", args.payment_id);
+    case "send_whatsapp": {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const body: any = { telefone: args.telefone, instancia: "Veloop" };
+      if (args.mensagem) body.mensagem = args.mensagem;
+      if (args.cobranca_id) {
+        body.cobranca_id = args.cobranca_id;
+        body.cliente_id = args.cliente_id;
+        body.cliente_nome = args.cliente_nome;
+        body.cpf = args.cpf;
+        body.valor = args.valor;
+        body.data_vencimento = args.data_vencimento;
+        body.status_parcela = args.status_parcela;
+      }
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.duplicado) return "⚠️ Mensagem já foi enviada para este cliente hoje (bloqueio anti-duplicidade)";
+      if (!data.success) return `❌ Falha no envio: ${data.error || "Erro desconhecido"}`;
+      return `✅ WhatsApp enviado com sucesso para ${args.telefone}`;
+    }
+    case "trigger_payment_reminders": {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/check-payment-reminders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data.skipped) return `⏳ ${data.reason}`;
+      return `✅ Automação executada!\n- WhatsApp enviados: ${data.whatsapp_sent || 0}\n- Notificações criadas: ${data.notifications_created || 0}\n- Duplicados ignorados: ${data.skipped_duplicates || 0}`;
+    }
+    case "send_notification": {
+      const targetUsers: string[] = [];
+      if (args.user_id === "all_admins" || !args.user_id) {
+        const { data: adminRoles } = await sb.from("user_roles").select("user_id").eq("role", "admin");
+        targetUsers.push(...(adminRoles || []).map((r: any) => r.user_id));
+      } else {
+        targetUsers.push(args.user_id);
+      }
+      for (const uid of targetUsers) {
+        await sb.from("notificacoes").insert({
+          user_id: uid,
+          titulo: args.titulo,
+          mensagem: args.mensagem,
+          tipo: args.tipo || "info",
+        });
+      }
+      return `✅ Notificação enviada para ${targetUsers.length} usuário(s)`;
+    }
+    case "view_whatsapp_history": {
+      const dias = args.dias || 7;
+      const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      let q = sb.from("envio_cobranca").select("*").gte("data_envio", since).order("data_envio", { ascending: false }).limit(50);
+      if (args.cpf) q = q.eq("cpf", args.cpf);
+      const { data, error } = await q;
       if (error) throw error;
-      return `✅ Registro de pagamento excluído`;
+      if (!data || data.length === 0) return "📭 Nenhum envio encontrado no período";
+      const lines = data.map((e: any) => `- ${e.data_envio} | ${e.cpf} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
+      return `📋 **Histórico de envios** (últimos ${dias} dias):\n${lines.join("\n")}`;
+    }
+    case "create_cobranca": {
+      // Get admin user id for criado_por
+      const { data: adminRoles } = await sb.from("user_roles").select("user_id").eq("role", "admin").limit(1);
+      const adminId = adminRoles?.[0]?.user_id;
+      if (!adminId) return "❌ Nenhum admin encontrado";
+      
+      const { data: newCob, error } = await sb.from("cobrancas").insert({
+        cliente_id: args.cliente_id,
+        cliente_nome: args.cliente_nome,
+        valor_parcela: args.valor_parcela,
+        data_inicio: args.data_inicio,
+        data_fim: args.data_fim,
+        frequencia: args.frequencia || "mes",
+        observacoes: args.observacoes || null,
+        criado_por: adminId,
+      }).select().single();
+      if (error) throw error;
+
+      // Generate payment records
+      const start = new Date(`${args.data_inicio}T00:00:00Z`);
+      const end = new Date(`${args.data_fim}T00:00:00Z`);
+      const payments: any[] = [];
+      let current = new Date(start);
+      while (current <= end) {
+        payments.push({
+          cobranca_id: newCob.id,
+          data_vencimento: current.toISOString().slice(0, 10),
+          status: "a_pagar",
+        });
+        if (args.frequencia === "semana") current = new Date(current.getTime() + 7 * 86400000);
+        else if (args.frequencia === "quinzena") current = new Date(current.getTime() + 15 * 86400000);
+        else {
+          current.setUTCMonth(current.getUTCMonth() + 1);
+        }
+      }
+      if (payments.length > 0) {
+        await sb.from("cobranca_pagamentos").insert(payments);
+      }
+      return `✅ Cobrança criada para ${args.cliente_nome} com ${payments.length} parcelas de R$ ${args.valor_parcela}`;
     }
     default:
       return "⚠️ Ação não reconhecida";
@@ -249,8 +441,17 @@ serve(async (req) => {
       produtos: produtosRes.data || [],
     };
 
-    const systemPrompt = `Você é o assistente IA do sistema Veloop com PODERES DE MODIFICAÇÃO.
-Você pode CONSULTAR e MODIFICAR dados do sistema usando as ferramentas disponíveis.
+    const systemPrompt = `Você é o assistente IA COMPLETO do sistema Veloop com PODERES DE MODIFICAÇÃO e AUTOMAÇÃO.
+Você pode CONSULTAR, MODIFICAR dados e EXECUTAR AUTOMAÇÕES do sistema.
+
+AUTOMAÇÕES DISPONÍVEIS:
+1. send_whatsapp - Enviar WhatsApp (cobrança automática com IA ou mensagem livre)
+2. trigger_payment_reminders - Disparar lembretes de pagamento (notif + WhatsApp)
+3. send_notification - Enviar notificação interna
+4. view_whatsapp_history - Ver histórico de envios WhatsApp
+5. create_cobranca - Criar cobrança com parcelas automáticas
+6. update_payment_status / update_client / update_product / update_sale / update_cobranca
+7. create_payment_record / delete_payment_record
 
 DADOS ATUAIS:
 - ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças | ${context.pagamentos.length} pagamentos | ${context.produtos.length} produtos
@@ -263,13 +464,14 @@ PRODUTOS: ${JSON.stringify(context.produtos.slice(0, 50))}
 
 REGRAS CRÍTICAS:
 - Responda SEMPRE em português brasileiro
-- Se o usuário pedir para MODIFICAR algo, use a ferramenta apropriada
+- Se o usuário pedir para MODIFICAR ou EXECUTAR algo, use a ferramenta apropriada
 - SEMPRE confirme o que vai fazer antes de executar, descrevendo a ação
 - Seja preciso com IDs - busque o ID correto nos dados antes de agir
 - Formate valores como R$ X.XXX,XX e datas como DD/MM/AAAA
 - Se não encontrar o registro, informe claramente
 - Para consultas simples, responda diretamente SEM usar ferramentas
-- Dê dicas proativas quando identificar problemas`;
+- Dê dicas proativas quando identificar problemas
+- Para WhatsApp: busque o telefone e CPF do cliente nos dados antes de enviar`;
 
     let userPrompt = query;
     if (type === "proactive_tips") {
@@ -376,6 +578,16 @@ function describeAction(action: string, args: any, ctx: any): string {
       return `Vou criar uma parcela em **${args.data_vencimento}** com status **"${args.status || "a_pagar"}"**. Deseja confirmar?`;
     case "delete_payment_record":
       return `Vou **excluir** o registro de pagamento. Deseja confirmar?`;
+    case "send_whatsapp":
+      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Deseja confirmar?`;
+    case "trigger_payment_reminders":
+      return `Vou **disparar a automação de lembretes** (WhatsApp + notificações para cobranças do dia/amanhã). Deseja confirmar?`;
+    case "send_notification":
+      return `Vou enviar **notificação**: "${args.titulo}" — ${args.mensagem}. Deseja confirmar?`;
+    case "view_whatsapp_history":
+      return `Consultando histórico de envios WhatsApp...`;
+    case "create_cobranca":
+      return `Vou criar uma **cobrança** para **${args.cliente_nome}** com parcelas de **R$ ${args.valor_parcela}** de ${args.data_inicio} a ${args.data_fim}. Deseja confirmar?`;
     default:
       return "Ação não reconhecida.";
   }
