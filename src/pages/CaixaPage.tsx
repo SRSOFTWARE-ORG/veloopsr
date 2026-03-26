@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,17 @@ import {
   Plus,
   Trash2,
   Wallet,
+  ChevronDown,
+  User,
 } from "lucide-react";
+
+interface EntradaDetalhe {
+  cliente_nome: string;
+  valor: number;
+  pago_por_nome: string;
+  pago_em: string;
+  tipo: "parcela" | "entrada";
+}
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
@@ -83,6 +94,8 @@ const CaixaPage = () => {
   const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [newSaida, setNewSaida] = useState({ valor: "", motivo: "", responsavel_id: "" });
+  const [entradasDetalhes, setEntradasDetalhes] = useState<EntradaDetalhe[]>([]);
+  const [entradasOpen, setEntradasOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -103,32 +116,48 @@ const CaixaPage = () => {
     // Fetch entradas (recebido from cobranca_pagamentos)
     const { data: pagamentos } = await supabase
       .from("cobranca_pagamentos")
-      .select("status, cobranca_id, data_vencimento")
+      .select("status, cobranca_id, data_vencimento, pago_por, pago_em")
       .gte("data_vencimento", start)
       .lte("data_vencimento", end)
       .eq("status", "pago");
 
     let totalEntrada = 0;
+    const detalhes: EntradaDetalhe[] = [];
+
+    // Fetch profiles for name mapping
+    const { data: allProfiles } = await supabase.from("profiles").select("id, nome");
+    const profileMap: Record<string, string> = {};
+    allProfiles?.forEach((p) => { profileMap[p.id] = p.nome; });
 
     if (pagamentos && pagamentos.length > 0) {
       const cobrancaIds = [...new Set(pagamentos.map((p) => p.cobranca_id))];
       const { data: cobrancas } = await supabase
         .from("cobrancas")
-        .select("id, valor_parcela")
+        .select("id, valor_parcela, cliente_nome")
         .in("id", cobrancaIds);
 
-      const valorMap: Record<string, number> = {};
-      cobrancas?.forEach((c) => { valorMap[c.id] = Number(c.valor_parcela); });
+      const cobMap: Record<string, { valor: number; nome: string }> = {};
+      cobrancas?.forEach((c) => { cobMap[c.id] = { valor: Number(c.valor_parcela), nome: c.cliente_nome }; });
 
       pagamentos.forEach((p) => {
-        totalEntrada += valorMap[p.cobranca_id] || 0;
+        const cob = cobMap[p.cobranca_id];
+        if (cob) {
+          totalEntrada += cob.valor;
+          detalhes.push({
+            cliente_nome: cob.nome,
+            valor: cob.valor,
+            pago_por_nome: p.pago_por ? (profileMap[p.pago_por] || "Sistema") : "Sistema",
+            pago_em: p.pago_em || "",
+            tipo: "parcela",
+          });
+        }
       });
     }
 
     // Also add entradas from vendas (valor_entrada)
     const { data: vendas } = await supabase
       .from("vendas")
-      .select("valor_entrada, created_at")
+      .select("valor_entrada, created_at, cliente_nome, vendedor_id")
       .eq("status", "concluida");
 
     if (vendas) {
@@ -137,11 +166,19 @@ const CaixaPage = () => {
         const entrada = Number(v.valor_entrada) || 0;
         if (entrada > 0 && vendaDate >= start && vendaDate <= end) {
           totalEntrada += entrada;
+          detalhes.push({
+            cliente_nome: v.cliente_nome,
+            valor: entrada,
+            pago_por_nome: v.vendedor_id ? (profileMap[v.vendedor_id] || "Vendedor") : "Sistema",
+            pago_em: v.created_at || "",
+            tipo: "entrada",
+          });
         }
       });
     }
 
     setEntradaTotal(totalEntrada);
+    setEntradasDetalhes(detalhes.sort((a, b) => (b.pago_em || "").localeCompare(a.pago_em || "")));
 
     // Fetch saídas
     const { data: saidasData } = await supabase
@@ -289,19 +326,55 @@ const CaixaPage = () => {
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 slide-up delay-2">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground">Entradas</p>
-              <p className="text-sm font-bold tabular-nums text-emerald-700">
-                {formatCurrency(entradaTotal)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <Collapsible open={entradasOpen} onOpenChange={setEntradasOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardContent className="p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground">Entradas</p>
+                  <p className="text-sm font-bold tabular-nums text-emerald-700">
+                    {formatCurrency(entradaTotal)}
+                  </p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${entradasOpen ? "rotate-180" : ""}`} />
+              </CardContent>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t px-4 py-2 space-y-2 max-h-60 overflow-y-auto">
+                {entradasDetalhes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-2">Nenhuma entrada no período</p>
+                ) : (
+                  entradasDetalhes.map((d, i) => (
+                    <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0 border-border/50">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">{d.cliente_nome}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <User className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">
+                            {d.pago_por_nome}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">•</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {d.pago_em ? new Date(d.pago_em).toLocaleDateString("pt-BR") : "—"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/70">
+                          {d.tipo === "entrada" ? "Entrada da venda" : "Parcela paga"}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                        +{formatCurrency(d.valor)}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
