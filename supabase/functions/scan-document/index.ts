@@ -46,9 +46,10 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um assistente especializado em identificar e extrair dados de documentos financeiros brasileiros.
+            content: `Você é um assistente especializado em identificar e extrair ABSOLUTAMENTE TODOS os dados visíveis de documentos financeiros brasileiros.
 Primeiro identifique o tipo do documento: boleto bancário, carnê de pagamento ou nota fiscal.
-Depois extraia os dados relevantes conforme o tipo identificado.
+Depois extraia TODOS os dados relevantes conforme o tipo identificado. NÃO omita nenhum dado visível.
+Leia com extrema atenção cada campo, incluindo endereço completo, CPF, telefone, RG, filiação, etc.
 O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
           },
           {
