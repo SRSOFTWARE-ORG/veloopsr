@@ -286,6 +286,22 @@ const DocumentosPage = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+
+      // Check for existing document with the same filename — replace it
+      const { data: existingDocs } = await supabase
+        .from("documentos")
+        .select("id, nome_arquivo")
+        .eq("nome_arquivo", file.name);
+
+      if (existingDocs && existingDocs.length > 0) {
+        for (const oldDoc of existingDocs) {
+          // Remove linked vendas/cobrancas from the old document
+          await removeOldLinkedRecords(oldDoc.nome_arquivo);
+          // Delete the old document record
+          await supabase.from("documentos").delete().eq("id", oldDoc.id);
+        }
+      }
+
       const fileName = buildSafeStorageKey(file, i);
       const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
 
