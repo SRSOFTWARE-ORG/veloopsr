@@ -640,7 +640,17 @@ const AgendaPage = () => {
                       De {format(parseISO(c.data_inicio), "dd/MM/yyyy")} até{" "}
                       {format(parseISO(c.data_fim), "dd/MM/yyyy")}
                       {" · "}
-                      {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
+                      {(() => {
+                        const allDates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
+                        const total = allDates.length;
+                        const resolved = allDates.filter((d) => {
+                          const k = format(d, "yyyy-MM-dd");
+                          const s = getPaymentStatus(k, c.id, pagamentosMap);
+                          return s === "pago" || s === "isento";
+                        }).length;
+                        const remaining = total - resolved;
+                        return `${remaining}/${total} parcelas restantes`;
+                      })()}
                     </div>
                     {c.observacoes && (
                       <p className="text-xs text-muted-foreground pl-10 italic break-words">{c.observacoes}</p>
@@ -735,7 +745,17 @@ const AgendaPage = () => {
                     </p>
                   </div>
                   <Badge variant="outline" className="w-fit text-xs">
-                    {generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length} parcelas
+                    {(() => {
+                      const allDates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
+                      const total = allDates.length;
+                      const resolved = allDates.filter((d) => {
+                        const k = format(d, "yyyy-MM-dd");
+                        const s = getPaymentStatus(k, c.id, pagamentosMap);
+                        return s === "pago" || s === "isento";
+                      }).length;
+                      const remaining = total - resolved;
+                      return `${remaining}/${total} parcelas`;
+                    })()}
                   </Badge>
                 </CardContent>
               </Card>
