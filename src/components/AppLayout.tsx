@@ -115,9 +115,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
       {/* Gradient transition below header */}
       <div
-        className="md:hidden fixed top-14 left-0 right-0 h-4 z-20 pointer-events-none"
+        className="md:hidden fixed top-14 left-0 right-0 h-8 z-20 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, hsl(0 0% 100%) 0%, transparent 100%)',
+          background: 'linear-gradient(to bottom, hsl(0 0% 100% / 0.85) 0%, hsl(0 0% 100% / 0.4) 40%, transparent 100%)',
         }}
       />
 
