@@ -56,11 +56,16 @@ O nome do arquivo é: "${nome_arquivo}" - use como dica se necessário.`
             content: [
               {
                 type: "text",
-                text: `Analise este documento financeiro brasileiro. Primeiro identifique o tipo (boleto, carnê ou nota fiscal), depois extraia os dados.
+                text: `Analise este documento financeiro brasileiro. Primeiro identifique o tipo (boleto, carnê ou nota fiscal), depois extraia TODOS os dados visíveis.
+
+IMPORTANTE: Extraia ABSOLUTAMENTE TODOS os dados que estiverem visíveis no documento, sem exceção. Leia com atenção cada campo.
 
 Para BOLETO, extraia:
 - Nome do pagador/sacado
-- CPF/CNPJ do pagador
+- CPF/CNPJ do pagador (formato 000.000.000-00 ou 00.000.000/0001-00)
+- Telefone do pagador (se visível, formato (00) 00000-0000)
+- Endereço do pagador (rua, número)
+- Bairro, cidade, UF, CEP do pagador
 - Valor do boleto
 - Data de vencimento (YYYY-MM-DD)
 - Número do documento
@@ -68,8 +73,13 @@ Para BOLETO, extraia:
 
 Para CARNÊ, extraia:
 - Nome do cliente
-- CPF do cliente
-- Telefone do cliente
+- CPF do cliente (formato 000.000.000-00)
+- Telefone do cliente (formato (00) 00000-0000)
+- Endereço, bairro, cidade, UF, CEP
+- RG, emissor, data emissão
+- Data de nascimento (YYYY-MM-DD)
+- Nome do pai, nome da mãe
+- Naturalidade, estado civil
 - Valor total
 - Valor de cada parcela
 - Número total de parcelas
@@ -80,12 +90,14 @@ Para CARNÊ, extraia:
 Para NOTA FISCAL, extraia:
 - Nome do cliente/destinatário
 - CPF/CNPJ do cliente
+- Telefone do cliente
+- Endereço, bairro, cidade, UF, CEP
 - Valor total da nota
 - Data de emissão (YYYY-MM-DD)
 - Número da nota fiscal
 - Nome do emitente
 
-Seja preciso nos valores e datas.`
+NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preciso nos valores e datas.`
               },
               {
                 type: "image_url",
