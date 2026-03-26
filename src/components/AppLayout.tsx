@@ -44,7 +44,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const allItems = isPrimaryAdmin ? [...navItems, ...adminItems] : navItems;
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(270deg, hsl(200,80%,50%), hsl(160,60%,45%), hsl(142,70%,50%), hsl(200,80%,50%))', backgroundSize: '200% 100%', animation: 'gradientSlide 3s ease infinite' }}>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/60 fixed inset-y-0 left-0 z-30">
         <div className="p-5 border-b border-border/60 flex items-center justify-between">
