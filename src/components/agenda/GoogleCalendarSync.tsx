@@ -10,6 +10,7 @@ const GoogleCalendarSync = () => {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [autoExported, setAutoExported] = useState(false);
 
   const checkStatus = useCallback(async () => {
     if (!user) return;
@@ -18,14 +19,34 @@ const GoogleCalendarSync = () => {
         body: { action: "status", user_id: user.id },
       });
       setConnected(!!data?.connected);
+      return !!data?.connected;
     } catch {
       setConnected(false);
+      return false;
     }
   }, [user]);
 
+  // Auto-export when connected
+  const autoExport = useCallback(async () => {
+    if (!user || autoExported) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+        body: { action: "export", user_id: user.id },
+      });
+      if (!error && data?.events_created > 0) {
+        toast.success(`${data.events_created} eventos exportados automaticamente`);
+      }
+    } catch {
+      // Silent fail for auto-export
+    }
+    setAutoExported(true);
+  }, [user, autoExported]);
+
   useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
+    checkStatus().then((isConnected) => {
+      if (isConnected) autoExport();
+    });
+  }, [checkStatus, autoExport]);
 
   const handleConnect = async () => {
     if (!user) return;
