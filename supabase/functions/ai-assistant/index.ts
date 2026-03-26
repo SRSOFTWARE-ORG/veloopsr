@@ -578,6 +578,16 @@ function describeAction(action: string, args: any, ctx: any): string {
       return `Vou criar uma parcela em **${args.data_vencimento}** com status **"${args.status || "a_pagar"}"**. Deseja confirmar?`;
     case "delete_payment_record":
       return `Vou **excluir** o registro de pagamento. Deseja confirmar?`;
+    case "send_whatsapp":
+      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Deseja confirmar?`;
+    case "trigger_payment_reminders":
+      return `Vou **disparar a automação de lembretes** (WhatsApp + notificações para cobranças do dia/amanhã). Deseja confirmar?`;
+    case "send_notification":
+      return `Vou enviar **notificação**: "${args.titulo}" — ${args.mensagem}. Deseja confirmar?`;
+    case "view_whatsapp_history":
+      return `Consultando histórico de envios WhatsApp...`;
+    case "create_cobranca":
+      return `Vou criar uma **cobrança** para **${args.cliente_nome}** com parcelas de **R$ ${args.valor_parcela}** de ${args.data_inicio} a ${args.data_fim}. Deseja confirmar?`;
     default:
       return "Ação não reconhecida.";
   }
