@@ -164,13 +164,10 @@ const NotificationBell = () => {
       setTestCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
-          // Send test notification via DB insert (triggers realtime + sound)
-          supabase.from("notificacoes").insert({
-            user_id: user!.id,
-            titulo: "🔔 Teste de Notificação",
-            mensagem: "Se você ouviu o som, as notificações estão funcionando!",
-            tipo: "teste",
-          }).then(() => {});
+          // Send test via edge function (triggers real Web Push + in-app)
+          supabase.functions.invoke("send-test-push").then(({ error }) => {
+            if (error) console.error("Test push error:", error);
+          });
           return null;
         }
         return prev - 1;
