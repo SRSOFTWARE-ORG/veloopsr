@@ -155,7 +155,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Mobile Bottom Nav - macOS Dock style with liquid glass */}
       <div className="md:hidden fixed bottom-3 left-3 right-3 z-30">
-        <nav className="flex items-center justify-around py-1 px-2 rounded-[18px] bg-white/30 dark:bg-white/8 border border-white/50 dark:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]" style={{ backdropFilter: 'blur(60px) saturate(180%)' }}>
+        <nav className="flex items-center justify-around py-1 px-2 rounded-[18px] bg-white/15 dark:bg-white/5 border border-white/30 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.25)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]" style={{ backdropFilter: 'blur(60px) saturate(180%)' }}>
           {navItems.slice(0, 5).map((item) => (
             <NavLink
               key={item.to}
