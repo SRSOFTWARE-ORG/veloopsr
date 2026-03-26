@@ -105,7 +105,7 @@ const SegurancaPage = () => {
         {!isReadOnly && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
+              <Button size="sm" className="btn-3d"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
