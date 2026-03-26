@@ -57,7 +57,7 @@ const ConfiguracoesPage = () => {
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({ nome: "", email: "", password: "" });
-  const [editVendedor, setEditVendedor] = useState<{ id: string; nome: string } | null>(null);
+  const [editVendedor, setEditVendedor] = useState<{ id: string; nome: string; email?: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -232,7 +232,7 @@ const ConfiguracoesPage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome }); setEditDialogOpen(true); }}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
                   {u.id !== user?.id && (
