@@ -292,10 +292,10 @@ const ClientesPage = () => {
       {isPrimaryAdmin ? (
         <Tabs defaultValue="clientes" className="w-full">
           <TabsList className="w-full mb-4">
-            <TabsTrigger value="clientes" className="flex-1 gap-1.5">
+            <TabsTrigger value="clientes" className="flex-1 gap-1.5 tab-animated">
               <Users className="w-4 h-4" /> Clientes
             </TabsTrigger>
-            <TabsTrigger value="subclientes" className="flex-1 gap-1.5">
+            <TabsTrigger value="subclientes" className="flex-1 gap-1.5 tab-animated">
               <UserPlus className="w-4 h-4" /> Subclientes
             </TabsTrigger>
           </TabsList>
