@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, UserPlus, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
+import { Shield, UserPlus, Eye, EyeOff, Pencil, Trash2, ChevronDown, Smartphone } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -256,62 +256,70 @@ const ConfiguracoesPage = () => {
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 pt-2">
               {u.role === "vendedor" && (
-                <>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Permissões</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Pode editar preço</span>
-                    <Switch checked={u.permissions.pode_editar_preco} onCheckedChange={(v) => updatePermission(u.id, "pode_editar_preco", v)} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Pode dar desconto</span>
-                    <Switch checked={u.permissions.pode_dar_desconto} onCheckedChange={(v) => updatePermission(u.id, "pode_dar_desconto", v)} />
-                  </div>
-                  {u.permissions.pode_dar_desconto && (
-                    <div className="flex items-center justify-between gap-3 pl-4">
-                      <span className="text-sm text-muted-foreground">Limite de desconto (%)</span>
-                      <Input type="number" className="w-20 h-8 text-sm" value={u.permissions.limite_desconto} onChange={(e) => updatePermission(u.id, "limite_desconto", parseFloat(e.target.value) || 0)} min={0} max={100} />
+                <details className="group">
+                  <summary className="flex items-center justify-between cursor-pointer py-2 px-2 rounded-lg hover:bg-secondary/50 transition-colors list-none">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Permissões</span>
                     </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Pode ver faturamento geral</span>
-                    <Switch checked={u.permissions.pode_ver_faturamento} onCheckedChange={(v) => updatePermission(u.id, "pode_ver_faturamento", v)} />
-                  </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-300 group-open:rotate-180" />
+                  </summary>
+                  <div className="space-y-3 pt-2 pb-1 px-1 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Pode editar preço</span>
+                      <Switch checked={u.permissions.pode_editar_preco} onCheckedChange={(v) => updatePermission(u.id, "pode_editar_preco", v)} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Pode dar desconto</span>
+                      <Switch checked={u.permissions.pode_dar_desconto} onCheckedChange={(v) => updatePermission(u.id, "pode_dar_desconto", v)} />
+                    </div>
+                    {u.permissions.pode_dar_desconto && (
+                      <div className="flex items-center justify-between gap-3 pl-4">
+                        <span className="text-sm text-muted-foreground">Limite de desconto (%)</span>
+                        <Input type="number" className="w-20 h-8 text-sm" value={u.permissions.limite_desconto} onChange={(e) => updatePermission(u.id, "limite_desconto", parseFloat(e.target.value) || 0)} min={0} max={100} />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Pode ver faturamento geral</span>
+                      <Switch checked={u.permissions.pode_ver_faturamento} onCheckedChange={(v) => updatePermission(u.id, "pode_ver_faturamento", v)} />
+                    </div>
 
-                  <div className="border-t border-border/40 pt-3 mt-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Comissão</p>
-                    <div className="flex items-center gap-3">
-                      <Select
-                        value={u.permissions.tipo_comissao}
-                        onValueChange={(v) => updatePermission(u.id, "tipo_comissao", v)}
-                      >
-                        <SelectTrigger className="w-36 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percentual">Percentual (%)</SelectItem>
-                          <SelectItem value="fixo">Valor Fixo (R$)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        className="w-24 h-8 text-sm"
-                        value={u.permissions.valor_comissao}
-                        onChange={(e) => updatePermission(u.id, "valor_comissao", parseFloat(e.target.value) || 0)}
-                        min={0}
-                        max={u.permissions.tipo_comissao === "percentual" ? 30 : 99999}
-                        placeholder={u.permissions.tipo_comissao === "percentual" ? "0-30%" : "R$"}
-                      />
+                    <div className="border-t border-border/40 pt-3 mt-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Comissão</p>
+                      <div className="flex items-center gap-3">
+                        <Select
+                          value={u.permissions.tipo_comissao}
+                          onValueChange={(v) => updatePermission(u.id, "tipo_comissao", v)}
+                        >
+                          <SelectTrigger className="w-36 h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentual">Percentual (%)</SelectItem>
+                            <SelectItem value="fixo">Valor Fixo (R$)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          className="w-24 h-8 text-sm"
+                          value={u.permissions.valor_comissao}
+                          onChange={(e) => updatePermission(u.id, "valor_comissao", parseFloat(e.target.value) || 0)}
+                          min={0}
+                          max={u.permissions.tipo_comissao === "percentual" ? 30 : 99999}
+                          placeholder={u.permissions.tipo_comissao === "percentual" ? "0-30%" : "R$"}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-border/40">
+                      <p className="text-xs text-muted-foreground italic">
+                        Vendedores não podem excluir registros (vendas, produtos, clientes ou documentos).
+                      </p>
                     </div>
                   </div>
-
-                  <div className="pt-2 border-t border-border/40">
-                    <p className="text-xs text-muted-foreground italic">
-                      Vendedores não podem excluir registros (vendas, produtos, clientes ou documentos).
-                    </p>
-                  </div>
-                </>
+                </details>
               )}
             </CardContent>
           </Card>
@@ -325,7 +333,19 @@ const ConfiguracoesPage = () => {
         )}
       </div>
 
-      <PermissionsManager />
+      <details className="group mt-4">
+        <summary className="flex items-center justify-between cursor-pointer py-3 px-4 rounded-xl bg-card border border-border hover:bg-secondary/50 transition-colors list-none"
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-primary" />
+            <span className="text-sm font-semibold">Permissões do Dispositivo</span>
+          </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-300 group-open:rotate-180" />
+        </summary>
+        <div className="mt-2 animate-fade-in">
+          <PermissionsManager />
+        </div>
+      </details>
 
       <EditVendedorDialog vendedor={editVendedor} open={editDialogOpen} onOpenChange={setEditDialogOpen} onSaved={fetchUsers} />
 
