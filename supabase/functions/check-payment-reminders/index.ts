@@ -119,10 +119,10 @@ async function generateFormalMessage(clienteNome: string, cpf: string, valor: st
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) ${clienteNome},\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtenciosamente,\n_Veloop - SR Software_`;
+    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) *${clienteNome}*,\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   } catch (err) {
     console.error("AI generation error:", err);
-    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   }
 }
 
