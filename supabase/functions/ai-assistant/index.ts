@@ -6,6 +6,208 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const actionTools = [
+  {
+    type: "function",
+    function: {
+      name: "update_payment_status",
+      description: "Marcar parcela como paga, isenta ou a_pagar",
+      parameters: {
+        type: "object",
+        properties: {
+          payment_id: { type: "string", description: "ID do pagamento (cobranca_pagamentos)" },
+          status: { type: "string", enum: ["pago", "isento", "a_pagar"], description: "Novo status" },
+        },
+        required: ["payment_id", "status"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_client",
+      description: "Atualizar dados de um cliente (nome, telefone, cpf, endereco, bairro, cidade, uf, cep, email, observacoes etc)",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente" },
+          fields: {
+            type: "object",
+            description: "Campos a atualizar: nome, telefone, cpf, endereco, bairro, cidade, uf, cep, email, observacoes, data_nascimento, rg, nome_pai, nome_mae, estado_civil, naturalidade",
+          },
+        },
+        required: ["client_id", "fields"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_product",
+      description: "Atualizar dados de um produto (nome, preço, estoque, categoria)",
+      parameters: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "ID do produto" },
+          fields: {
+            type: "object",
+            description: "Campos: nome, preco_venda, preco_custo, preco_pix, preco_credito, preco_boleto, preco_carne, estoque_atual, estoque_minimo, categoria, subcategoria",
+          },
+        },
+        required: ["product_id", "fields"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_sale",
+      description: "Atualizar dados de uma venda (valor_total, valor_entrada, valor_parcela, num_parcelas, status, observacoes, forma_pagamento)",
+      parameters: {
+        type: "object",
+        properties: {
+          sale_id: { type: "string", description: "ID da venda" },
+          fields: {
+            type: "object",
+            description: "Campos: valor_total, valor_entrada, valor_parcela, num_parcelas, status, observacoes, forma_pagamento, data_inicio_pagamento, frequencia_parcela",
+          },
+        },
+        required: ["sale_id", "fields"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_cobranca",
+      description: "Atualizar dados de uma cobrança (valor_parcela, frequencia, data_inicio, data_fim, observacoes)",
+      parameters: {
+        type: "object",
+        properties: {
+          cobranca_id: { type: "string", description: "ID da cobrança" },
+          fields: {
+            type: "object",
+            description: "Campos: valor_parcela, frequencia, data_inicio, data_fim, observacoes, cliente_nome",
+          },
+        },
+        required: ["cobranca_id", "fields"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_payment_record",
+      description: "Criar novo registro de pagamento para uma cobrança",
+      parameters: {
+        type: "object",
+        properties: {
+          cobranca_id: { type: "string" },
+          data_vencimento: { type: "string", description: "YYYY-MM-DD" },
+          status: { type: "string", enum: ["pago", "a_pagar", "isento"], default: "a_pagar" },
+        },
+        required: ["cobranca_id", "data_vencimento"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_payment_record",
+      description: "Excluir um registro de pagamento específico",
+      parameters: {
+        type: "object",
+        properties: {
+          payment_id: { type: "string", description: "ID do pagamento" },
+        },
+        required: ["payment_id"],
+      },
+    },
+  },
+];
+
+// Allowed fields per table for security
+const ALLOWED_FIELDS: Record<string, string[]> = {
+  clientes: ["nome", "telefone", "cpf", "endereco", "bairro", "cidade", "uf", "cep", "email", "observacoes", "data_nascimento", "rg", "rg_emissor", "rg_data_emissao", "nome_pai", "nome_mae", "estado_civil", "naturalidade", "complemento", "tipo", "inscricao_estadual"],
+  produtos: ["nome", "preco_venda", "preco_custo", "preco_pix", "preco_credito", "preco_boleto", "preco_carne", "estoque_atual", "estoque_minimo", "categoria", "subcategoria", "codigo_barras"],
+  vendas: ["valor_total", "valor_entrada", "valor_parcela", "num_parcelas", "status", "observacoes", "forma_pagamento", "data_inicio_pagamento", "frequencia_parcela", "cliente_nome", "cliente_cpf", "cliente_telefone"],
+  cobrancas: ["valor_parcela", "frequencia", "data_inicio", "data_fim", "observacoes", "cliente_nome"],
+};
+
+function sanitizeFields(table: string, fields: Record<string, any>): Record<string, any> {
+  const allowed = ALLOWED_FIELDS[table] || [];
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (allowed.includes(k) && v !== null && v !== undefined && v !== "") {
+      clean[k] = v;
+    }
+  }
+  return clean;
+}
+
+async function executeAction(sb: any, action: string, args: any): Promise<string> {
+  switch (action) {
+    case "update_payment_status": {
+      const update: any = { status: args.status };
+      if (args.status === "pago") {
+        update.pago_em = new Date().toISOString();
+      } else {
+        update.pago_em = null;
+        update.pago_por = null;
+      }
+      const { error } = await sb.from("cobranca_pagamentos").update(update).eq("id", args.payment_id);
+      if (error) throw error;
+      return `✅ Pagamento atualizado para "${args.status}"`;
+    }
+    case "update_client": {
+      const clean = sanitizeFields("clientes", args.fields);
+      if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
+      const { error } = await sb.from("clientes").update(clean).eq("id", args.client_id);
+      if (error) throw error;
+      return `✅ Cliente atualizado: ${Object.keys(clean).join(", ")}`;
+    }
+    case "update_product": {
+      const clean = sanitizeFields("produtos", args.fields);
+      if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
+      const { error } = await sb.from("produtos").update(clean).eq("id", args.product_id);
+      if (error) throw error;
+      return `✅ Produto atualizado: ${Object.keys(clean).join(", ")}`;
+    }
+    case "update_sale": {
+      const clean = sanitizeFields("vendas", args.fields);
+      if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
+      const { error } = await sb.from("vendas").update(clean).eq("id", args.sale_id);
+      if (error) throw error;
+      return `✅ Venda atualizada: ${Object.keys(clean).join(", ")}`;
+    }
+    case "update_cobranca": {
+      const clean = sanitizeFields("cobrancas", args.fields);
+      if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
+      const { error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id);
+      if (error) throw error;
+      return `✅ Cobrança atualizada: ${Object.keys(clean).join(", ")}`;
+    }
+    case "create_payment_record": {
+      const insert: any = {
+        cobranca_id: args.cobranca_id,
+        data_vencimento: args.data_vencimento,
+        status: args.status || "a_pagar",
+      };
+      if (insert.status === "pago") insert.pago_em = new Date().toISOString();
+      const { error } = await sb.from("cobranca_pagamentos").insert(insert);
+      if (error) throw error;
+      return `✅ Parcela criada para ${args.data_vencimento} com status "${insert.status}"`;
+    }
+    case "delete_payment_record": {
+      const { error } = await sb.from("cobranca_pagamentos").delete().eq("id", args.payment_id);
+      if (error) throw error;
+      return `✅ Registro de pagamento excluído`;
+    }
+    default:
+      return "⚠️ Ação não reconhecida";
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -17,16 +219,26 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { query, type } = await req.json();
-    if (!query) throw new Error("Query não fornecida");
+    const { query, type, confirm_action } = await req.json();
 
-    // Gather context from database
+    // If confirming a previously proposed action, execute it directly
+    if (confirm_action) {
+      const { action, args } = confirm_action;
+      const result = await executeAction(sb, action, args);
+      return new Response(JSON.stringify({ response: result, action_executed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!query && type !== "proactive_tips") throw new Error("Query não fornecida");
+
+    // Gather context
     const [clientesRes, vendasRes, cobrancasRes, pagamentosRes, produtosRes] = await Promise.all([
       sb.from("clientes").select("id, nome, cpf, telefone, endereco, cidade, uf").limit(200),
       sb.from("vendas").select("id, cliente_nome, cliente_cpf, valor_total, valor_entrada, valor_parcela, num_parcelas, forma_pagamento, status, data_inicio_pagamento, created_at").order("created_at", { ascending: false }).limit(100),
-      sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia").limit(100),
+      sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, cliente_id").limit(100),
       sb.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status, pago_em").limit(500),
-      sb.from("produtos").select("id, nome, preco_venda, estoque_atual, categoria").limit(200),
+      sb.from("produtos").select("id, nome, preco_venda, preco_custo, estoque_atual, categoria").limit(200),
     ]);
 
     const context = {
@@ -37,15 +249,11 @@ serve(async (req) => {
       produtos: produtosRes.data || [],
     };
 
-    const systemPrompt = `Você é o assistente IA do sistema Veloop, especializado em gestão de vendas, cobranças e clientes.
-Você tem acesso COMPLETO ao banco de dados atual do sistema. Use os dados fornecidos para responder com precisão.
+    const systemPrompt = `Você é o assistente IA do sistema Veloop com PODERES DE MODIFICAÇÃO.
+Você pode CONSULTAR e MODIFICAR dados do sistema usando as ferramentas disponíveis.
 
-DADOS ATUAIS DO SISTEMA:
-- ${context.clientes.length} clientes cadastrados
-- ${context.vendas.length} vendas registradas
-- ${context.cobrancas.length} cobranças ativas
-- ${context.pagamentos.length} registros de pagamentos
-- ${context.produtos.length} produtos no catálogo
+DADOS ATUAIS:
+- ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças | ${context.pagamentos.length} pagamentos | ${context.produtos.length} produtos
 
 CLIENTES: ${JSON.stringify(context.clientes.slice(0, 50))}
 VENDAS: ${JSON.stringify(context.vendas.slice(0, 30))}
@@ -53,21 +261,32 @@ COBRANÇAS: ${JSON.stringify(context.cobrancas.slice(0, 30))}
 PAGAMENTOS: ${JSON.stringify(context.pagamentos.slice(0, 100))}
 PRODUTOS: ${JSON.stringify(context.produtos.slice(0, 50))}
 
-REGRAS:
+REGRAS CRÍTICAS:
 - Responda SEMPRE em português brasileiro
-- Seja preciso com valores monetários (R$) e datas
-- Se encontrar inconsistências nos dados, aponte-as proativamente
-- Para pesquisas, retorne dados específicos encontrados
-- Dê dicas de melhoria quando relevante
-- Formate valores como R$ X.XXX,XX
-- Formate datas como DD/MM/AAAA
-- Seja conciso mas completo`;
+- Se o usuário pedir para MODIFICAR algo, use a ferramenta apropriada
+- SEMPRE confirme o que vai fazer antes de executar, descrevendo a ação
+- Seja preciso com IDs - busque o ID correto nos dados antes de agir
+- Formate valores como R$ X.XXX,XX e datas como DD/MM/AAAA
+- Se não encontrar o registro, informe claramente
+- Para consultas simples, responda diretamente SEM usar ferramentas
+- Dê dicas proativas quando identificar problemas`;
 
     let userPrompt = query;
     if (type === "proactive_tips") {
-      userPrompt = `Analise os dados do sistema e forneça 2-3 dicas úteis e práticas para o administrador. 
-Foque em: pagamentos atrasados, inconsistências, oportunidades de melhoria, alertas importantes.
-Seja breve e direto. Use emojis para destaque visual. Cada dica em uma linha.`;
+      userPrompt = `Analise os dados e forneça 2-3 dicas úteis. Foque em: pagamentos atrasados, inconsistências, alertas. Seja breve. Use emojis.`;
+    }
+
+    const body: any = {
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    };
+
+    // Add tools for action requests (not for tips)
+    if (type !== "proactive_tips") {
+      body.tools = actionTools;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -76,18 +295,12 @@ Seja breve e direto. Use emojis para destaque visual. Cada dica em uma linha.`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em instantes." }), {
+        return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -102,9 +315,33 @@ Seja breve e direto. Use emojis para destaque visual. Cada dica em uma linha.`;
     }
 
     const result = await response.json();
-    const content = result.choices?.[0]?.message?.content || "Sem resposta";
+    const message = result.choices?.[0]?.message;
 
-    return new Response(JSON.stringify({ response: content }), {
+    // Check if AI wants to call a tool (action)
+    if (message?.tool_calls && message.tool_calls.length > 0) {
+      const toolCall = message.tool_calls[0];
+      const actionName = toolCall.function.name;
+      const actionArgs = JSON.parse(toolCall.function.arguments);
+
+      // Build a human-readable description
+      let description = message.content || "";
+      if (!description) {
+        description = describeAction(actionName, actionArgs, context);
+      }
+
+      return new Response(JSON.stringify({
+        response: description,
+        pending_action: {
+          action: actionName,
+          args: actionArgs,
+          description: description,
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ response: message?.content || "Sem resposta" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
@@ -114,3 +351,32 @@ Seja breve e direto. Use emojis para destaque visual. Cada dica em uma linha.`;
     });
   }
 });
+
+function describeAction(action: string, args: any, ctx: any): string {
+  switch (action) {
+    case "update_payment_status":
+      return `Vou alterar o status do pagamento para **"${args.status}"**. Deseja confirmar?`;
+    case "update_client": {
+      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return `Vou atualizar o cliente com: **${fields}**. Deseja confirmar?`;
+    }
+    case "update_product": {
+      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return `Vou atualizar o produto com: **${fields}**. Deseja confirmar?`;
+    }
+    case "update_sale": {
+      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return `Vou atualizar a venda com: **${fields}**. Deseja confirmar?`;
+    }
+    case "update_cobranca": {
+      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return `Vou atualizar a cobrança com: **${fields}**. Deseja confirmar?`;
+    }
+    case "create_payment_record":
+      return `Vou criar uma parcela em **${args.data_vencimento}** com status **"${args.status || "a_pagar"}"**. Deseja confirmar?`;
+    case "delete_payment_record":
+      return `Vou **excluir** o registro de pagamento. Deseja confirmar?`;
+    default:
+      return "Ação não reconhecida.";
+  }
+}
