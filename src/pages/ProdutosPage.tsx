@@ -418,7 +418,7 @@ const ProdutosPage = () => {
 
       {/* Scan Results Dialog */}
       <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto mx-4 rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] border-0 bg-card/95 backdrop-blur-sm" style={{ perspective: "800px" }}>
+        <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[85vh] overflow-y-auto rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] border-0 bg-card/95 backdrop-blur-sm" style={{ perspective: "800px" }}>
           <DialogHeader className="pb-1">
             <DialogTitle className="text-lg font-bold text-center">Produtos Escaneados</DialogTitle>
           </DialogHeader>
