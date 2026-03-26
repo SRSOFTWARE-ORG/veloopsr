@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Lock, Mail, User } from "lucide-react";
-import veloopLogo from "@/assets/veloop-logo.jpg";
+import veloopLogo from "@/assets/veloop-logo.png";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -51,7 +51,7 @@ const LoginPage = () => {
           <img
             src={veloopLogo}
             alt="Logo Veloop"
-            className="max-w-[80%] max-h-[300px] object-contain drop-shadow-2xl"
+            className="max-w-[90%] max-h-[400px] object-contain drop-shadow-2xl"
           />
         </div>
 
