@@ -153,15 +153,19 @@ Deno.serve(async (req) => {
       .select("id, cliente_id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
 
-    // Get client phones
+    // Get client phones and CPFs
     const clienteIds = [...new Set((cobrancas || []).map((c: any) => c.cliente_id))];
     const { data: clientesData } = await supabase
       .from("clientes")
-      .select("id, telefone")
+      .select("id, telefone, cpf, nome")
       .in("id", clienteIds);
     const clientePhoneMap = new Map<string, string>();
+    const clienteCpfMap = new Map<string, string>();
+    const clienteNomeMap = new Map<string, string>();
     for (const cl of clientesData || []) {
       if (cl.telefone) clientePhoneMap.set(cl.id, cl.telefone);
+      if (cl.cpf) clienteCpfMap.set(cl.id, cl.cpf);
+      if (cl.nome) clienteNomeMap.set(cl.id, cl.nome);
     }
 
     // Get existing pagamentos with status
