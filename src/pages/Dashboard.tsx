@@ -191,7 +191,7 @@ const Dashboard = () => {
                     <p className="truncate text-sm font-semibold">{venda.cliente_nome}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
                       <span className="text-xs font-bold tabular-nums">
-                        R$ {Number(venda.valor_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        {formatCurrency(venda.valor_total)}
                       </span>
                       {(venda.num_parcelas || 0) > 1 && (
                         <span className="text-xs text-muted-foreground">
