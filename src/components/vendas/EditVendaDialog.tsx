@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/masks";
 import {
   Dialog,
   DialogContent,

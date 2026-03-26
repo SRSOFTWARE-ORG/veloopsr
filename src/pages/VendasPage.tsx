@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/masks";
-import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
