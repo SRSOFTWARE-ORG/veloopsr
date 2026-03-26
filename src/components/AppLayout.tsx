@@ -110,7 +110,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-foreground/20" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl slide-up">
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl animate-slide-in-right" style={{ animation: 'slideInLeft 0.3s ease-out' }}>
             <div className="p-5 border-b border-border/60 flex items-center justify-between">
               <img src={veloopHeaderLogo} alt="Veloop" className="h-14 object-contain cursor-pointer" style={{ filter: 'drop-shadow(0 4px 3px rgba(0,0,0,0.25))' }} onClick={() => { navigate("/"); setSidebarOpen(false); }} />
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
