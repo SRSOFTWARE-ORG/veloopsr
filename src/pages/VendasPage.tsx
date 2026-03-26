@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/masks";
+import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -596,14 +597,24 @@ const VendasPage = () => {
                   </button>
                 </div>
                 {temEntrada && (
-                  <Input
-                    type="number"
-                    placeholder="Valor da entrada (R$)"
-                    value={entrada || ""}
-                    onChange={(e) => setEntrada(parseFloat(e.target.value) || 0)}
-                    min={0}
-                    step={0.01}
-                  />
+                  <>
+                    <Label className="text-sm">Valor da entrada</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">R$</span>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        className="pl-10"
+                        value={entrada ? entrada.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          setEntrada(raw ? parseInt(raw, 10) / 100 : 0);
+                        }}
+                        min={0}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
 

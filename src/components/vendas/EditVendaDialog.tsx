@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/masks";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,12 +175,9 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
           {/* Valor Total */}
           <div className="space-y-2">
             <Label>Valor Total (R$)</Label>
-            <Input
-              type="number"
-              value={valorTotal || ""}
-              onChange={(e) => setValorTotal(parseFloat(e.target.value) || 0)}
-              min={0}
-              step={0.01}
+            <CurrencyInput
+              value={valorTotal}
+              onValueChange={(v) => setValorTotal(v)}
             />
           </div>
 
@@ -223,12 +222,9 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
               {/* Entrada */}
               <div className="space-y-2">
                 <Label>Valor de Entrada (R$)</Label>
-                <Input
-                  type="number"
-                  value={valorEntrada || ""}
-                  onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
-                  min={0}
-                  step={0.01}
+                <CurrencyInput
+                  value={valorEntrada}
+                  onValueChange={(v) => setValorEntrada(v)}
                 />
               </div>
 
@@ -276,12 +272,9 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
                     Recalcular
                   </Button>
                 </div>
-                <Input
-                  type="number"
-                  value={valorParcela || ""}
-                  onChange={(e) => setValorParcela(parseFloat(e.target.value) || 0)}
-                  min={0}
-                  step={0.01}
+                <CurrencyInput
+                  value={valorParcela}
+                  onValueChange={(v) => setValorParcela(v)}
                 />
                 {Math.abs(valorParcela - parcelaCalculada) > 0.01 && (
                   <p className="text-xs text-muted-foreground">
