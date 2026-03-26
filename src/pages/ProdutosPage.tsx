@@ -332,7 +332,7 @@ const ProdutosPage = () => {
                   <Plus className="w-4 h-4 mr-1" /> Novo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] border-0 bg-card/95 backdrop-blur-sm" style={{ perspective: "800px" }}>
                 <DialogHeader>
                   <DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
                 </DialogHeader>
