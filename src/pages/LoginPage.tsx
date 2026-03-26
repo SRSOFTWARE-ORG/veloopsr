@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Lock, Mail, User, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, User, Eye, EyeOff, Phone } from "lucide-react";
+import { maskPhone } from "@/lib/masks";
 import veloopLogo from "@/assets/veloop-logo-transparent.png";
 
 const LoginPage = () => {
