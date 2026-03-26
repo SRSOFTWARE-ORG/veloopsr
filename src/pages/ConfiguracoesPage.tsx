@@ -186,7 +186,7 @@ const ConfiguracoesPage = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
+            <Button size="sm" className="gap-2 btn-3d">
               <UserPlus className="w-4 h-4" />
               Novo Vendedor
             </Button>
