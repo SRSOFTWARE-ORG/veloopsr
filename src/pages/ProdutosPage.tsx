@@ -127,6 +127,10 @@ const ProdutosPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!form.nome.trim()) { toast.error("Nome do produto é obrigatório"); return; }
+    const precoVenda = parseFloat(form.preco_venda);
+    if (!precoVenda || precoVenda <= 0) { toast.error("Preço de venda deve ser maior que R$ 0,00"); return; }
+
     let imagem_url = editingProduct?.imagem_url || null;
 
     // Upload image if selected
