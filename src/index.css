@@ -79,7 +79,7 @@
 
 @layer utilities {
   .stat-card {
-    @apply bg-card rounded-xl p-5 shadow-sm border border-border/60 transition-shadow duration-200;
+    @apply bg-card rounded-xl p-5 shadow-sm border border-border/60 transition-shadow duration-200 min-w-0 overflow-hidden;
   }
   .stat-card:hover {
     box-shadow: 0 4px 24px 0 hsl(var(--primary) / 0.08);
