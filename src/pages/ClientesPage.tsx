@@ -392,7 +392,7 @@ const ClientesPage = () => {
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
+              <Button size="sm" className="btn-3d"><Plus className="w-4 h-4 mr-1" /> Novo</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
