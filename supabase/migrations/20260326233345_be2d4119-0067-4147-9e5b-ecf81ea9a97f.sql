@@ -1,0 +1,1 @@
+DELETE FROM cobranca_pagamentos WHERE id = '81b947a7-0c65-4f1e-8a8c-643223cf5685';
