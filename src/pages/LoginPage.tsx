@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Lock, Mail, User } from "lucide-react";
-import veloopLogo from "@/assets/veloop-logo.png";
+import veloopLogo from "@/assets/veloop-logo-hq.png";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
