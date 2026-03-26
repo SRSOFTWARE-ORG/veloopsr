@@ -38,6 +38,7 @@ import PermissionsManager from "@/components/PermissionsManager";
 interface UserWithPermissions {
   id: string;
   nome: string;
+  email?: string;
   role: string;
   permissions: {
     pode_editar_preco: boolean;
@@ -67,15 +68,17 @@ const ConfiguracoesPage = () => {
   }, [isAdmin]);
 
   const fetchUsers = async () => {
-    const [profilesRes, rolesRes, permsRes] = await Promise.all([
+    const [profilesRes, rolesRes, permsRes, emailsRes] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("user_roles").select("*"),
       supabase.from("permissions").select("*"),
+      supabase.functions.invoke("list-user-emails"),
     ]);
 
     const profiles = profilesRes.data || [];
     const roles = rolesRes.data || [];
     const perms = permsRes.data || [];
+    const emailMap: Record<string, string> = emailsRes.data?.emails || {};
 
     const merged: UserWithPermissions[] = profiles.map((p) => {
       const role = roles.find((r) => r.user_id === p.id);
@@ -83,6 +86,7 @@ const ConfiguracoesPage = () => {
       return {
         id: p.id,
         nome: p.nome,
+        email: emailMap[p.id] || "",
         role: role?.role || "vendedor",
         permissions: {
           pode_editar_preco: perm?.pode_editar_preco ?? false,
@@ -228,6 +232,7 @@ const ConfiguracoesPage = () => {
                   </div>
                   <div>
                     <span className="block">{u.nome}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{u.email}</span>
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
