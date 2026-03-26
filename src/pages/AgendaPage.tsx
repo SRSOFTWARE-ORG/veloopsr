@@ -438,9 +438,16 @@ const AgendaPage = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Valor da parcela (R$) *</Label>
-                <Input type="number" min={0} step="0.01" placeholder="0,00" value={form.valor_parcela}
-                  onChange={(e) => setForm((p) => ({ ...p, valor_parcela: e.target.value }))} />
+                <Label>Valor da parcela *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">R$</span>
+                  <Input type="text" inputMode="numeric" placeholder="0,00" className="pl-10"
+                    value={form.valor_parcela && Number(form.valor_parcela) > 0 ? Number(form.valor_parcela).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setForm((p) => ({ ...p, valor_parcela: raw ? String(parseInt(raw, 10) / 100) : "" }));
+                    }} />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Frequência *</Label>
@@ -745,9 +752,16 @@ const AgendaPage = () => {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label>Valor da parcela (R$) *</Label>
-              <Input type="number" min={0} step="0.01" value={editForm.valor_parcela}
-                onChange={(e) => setEditForm((p) => ({ ...p, valor_parcela: e.target.value }))} />
+              <Label>Valor da parcela *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">R$</span>
+                <Input type="text" inputMode="numeric" className="pl-10"
+                  value={editForm.valor_parcela && Number(editForm.valor_parcela) > 0 ? Number(editForm.valor_parcela).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    setEditForm((p) => ({ ...p, valor_parcela: raw ? String(parseInt(raw, 10) / 100) : "" }));
+                  }} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Frequência *</Label>

@@ -220,15 +220,21 @@ const CaixaPage = () => {
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  placeholder="0,00"
-                  value={newSaida.valor}
-                  onChange={(e) => setNewSaida((p) => ({ ...p, valor: e.target.value }))}
-                  min={0}
-                  step={0.01}
-                />
+                <Label>Valor</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">R$</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    className="pl-10"
+                    value={newSaida.valor && Number(newSaida.valor) > 0 ? Number(newSaida.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setNewSaida((p) => ({ ...p, valor: raw ? String(parseInt(raw, 10) / 100) : "" }));
+                    }}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Responsável pela retirada</Label>
