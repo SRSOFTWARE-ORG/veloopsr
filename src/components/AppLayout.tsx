@@ -1,4 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import veloopHeaderLogo from "@/assets/veloop-header-logo.png";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import {
