@@ -86,6 +86,7 @@ interface Cliente {
   id: string;
   nome: string;
   telefone: string | null;
+  cpf: string | null;
 }
 
 type StatusFilter = "todos" | "a_pagar" | "pago" | "pendente" | "isento";
@@ -185,7 +186,7 @@ const AgendaPage = () => {
     const [cobRes, pagRes, cliRes] = await Promise.all([
       supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
       supabase.from("cobranca_pagamentos").select("*"),
-      supabase.from("clientes").select("id, nome, telefone").order("nome"),
+      supabase.from("clientes").select("id, nome, telefone, cpf").order("nome"),
     ]);
     if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
     if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
@@ -350,34 +351,45 @@ const AgendaPage = () => {
   const handleSendWhatsApp = async (cobranca: Cobranca, dateKey: string) => {
     const cliente = clientes.find((c) => c.id === cobranca.cliente_id);
     const telefone = cliente?.telefone;
+    const cpf = cliente?.cpf;
 
     if (!telefone) {
       toast.error("Cliente não possui telefone cadastrado");
       return;
     }
 
-    const status = getPaymentStatus(dateKey, cobranca.id, pagamentosMap);
-    const dataFormatada = format(parseISO(dateKey), "dd/MM/yyyy");
-    const valor = formatCurrency(cobranca.valor_parcela);
-
-    let mensagem = "";
-    if (status === "pendente") {
-      mensagem = `Olá ${cobranca.cliente_nome}! 🔴\n\nIdentificamos que sua parcela de *${valor}* com vencimento em *${dataFormatada}* está em atraso.\n\nPor favor, entre em contato para regularizar.\n\n_Veloop - SR Software_`;
-    } else if (status === "a_pagar") {
-      mensagem = `Olá ${cobranca.cliente_nome}! 📅\n\nLembramos que sua parcela de *${valor}* vence em *${dataFormatada}*.\n\nQualquer dúvida estamos à disposição!\n\n_Veloop - SR Software_`;
-    } else {
-      mensagem = `Olá ${cobranca.cliente_nome}! ✅\n\nConfirmamos o recebimento da parcela de *${valor}* referente a *${dataFormatada}*.\n\nObrigado!\n\n_Veloop - SR Software_`;
+    if (!cpf) {
+      toast.error("Cliente não possui CPF cadastrado");
+      return;
     }
+
+    const status = getPaymentStatus(dateKey, cobranca.id, pagamentosMap);
 
     setSendingWhatsApp(`${cobranca.id}_${dateKey}`);
 
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { telefone, mensagem },
+        body: {
+          telefone,
+          cobranca_id: cobranca.id,
+          cliente_id: cobranca.cliente_id,
+          cliente_nome: cliente?.nome || cobranca.cliente_nome,
+          cpf,
+          valor: cobranca.valor_parcela,
+          data_vencimento: dateKey,
+          status_parcela: status,
+        },
       });
 
       if (error) throw error;
-      if (data && !data.success) throw new Error(data.error || "Erro ao enviar");
+      if (data && !data.success) {
+        if (data.duplicado) {
+          toast.warning("Mensagem já enviada para este cliente hoje. Não será reenviada.");
+        } else {
+          throw new Error(data.error || "Erro ao enviar");
+        }
+        return;
+      }
 
       toast.success(`WhatsApp enviado para ${cobranca.cliente_nome}!`);
     } catch (err: any) {
