@@ -89,6 +89,9 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
 
   const handleSave = async () => {
     if (!venda) return;
+    if (valorTotal <= 0) { toast.error("Valor total deve ser maior que R$ 0,00"); return; }
+    if (formaPagamento === "parcelado" && valorParcela <= 0) { toast.error("Valor da parcela deve ser maior que R$ 0,00"); return; }
+    if (!clienteNome.trim()) { toast.error("Nome do cliente é obrigatório"); return; }
     setSaving(true);
     try {
       const { error } = await supabase

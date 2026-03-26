@@ -218,6 +218,9 @@ const VendasPage = () => {
   const finalizarVenda = async (status: "simulacao" | "concluida") => {
     if (!selectedCliente) { toast.error("Selecione um cliente"); return; }
     if (cart.length === 0) { toast.error("Adicione produtos"); return; }
+    if (total <= 0) { toast.error("Valor total deve ser maior que R$ 0,00"); return; }
+    if (formaPagamento === "parcelado" && valorParcela <= 0) { toast.error("Valor da parcela deve ser maior que R$ 0,00"); return; }
+    if (temEntrada && entrada <= 0) { toast.error("Valor da entrada deve ser maior que R$ 0,00"); return; }
 
     const { data: venda, error } = await supabase
       .from("vendas")
