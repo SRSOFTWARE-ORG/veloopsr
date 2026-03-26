@@ -182,15 +182,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </aside>
       </div>
 
-      {/* Mobile Bottom Nav - iOS Liquid Glass */}
+      {/* Mobile Bottom Nav - Liquid Glass */}
       <div className="md:hidden fixed bottom-3 left-3 right-3 z-30">
         <nav
-          className="flex items-center justify-around py-1.5 px-2 rounded-[22px] border border-white/20"
+          className="flex items-center justify-around py-1.5 px-2 rounded-[22px] border border-border/40 bg-card/80"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 50%, rgba(200,220,255,0.12) 100%)',
-            backdropFilter: 'blur(80px) saturate(200%) brightness(1.1)',
-            WebkitBackdropFilter: 'blur(80px) saturate(200%) brightness(1.1)',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.12), 0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(40px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(150%)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.4)',
           }}
         >
           {navItems.slice(0, 5).map((item) => (
@@ -202,23 +201,16 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 `flex flex-col items-center justify-center gap-0 px-3 py-1 rounded-2xl transition-all duration-200 ${
                   isActive
                     ? "scale-110"
-                    : "text-white/70 hover:text-white active:scale-95"
+                    : "text-muted-foreground hover:text-foreground active:scale-95"
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <div
-                    className={`relative p-1.5 rounded-xl transition-all duration-200 ${
-                      isActive
-                        ? "bg-white/20 shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
-                        : ""
-                    }`}
-                    style={isActive ? { backdropFilter: 'blur(20px)' } : undefined}
-                  >
-                    <item.icon className={`w-5 h-5 shrink-0 transition-all duration-200 ${isActive ? "text-white" : ""}`} />
+                  <div className={`relative p-1.5 rounded-xl transition-all duration-200 ${isActive ? "bg-primary/15" : ""}`}>
+                    <item.icon className={`w-5 h-5 shrink-0 transition-all duration-200 ${isActive ? "text-primary" : ""}`} />
                   </div>
-                  <span className={`text-[9px] font-medium truncate max-w-full transition-all duration-200 ${isActive ? "text-white font-semibold" : ""}`}>
+                  <span className={`text-[9px] font-medium truncate max-w-full transition-all duration-200 ${isActive ? "text-primary font-semibold" : ""}`}>
                     {item.label}
                   </span>
                 </>
