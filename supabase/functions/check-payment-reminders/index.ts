@@ -147,11 +147,22 @@ Deno.serve(async (req) => {
     const endOfWeek = new Date(now.getTime() + daysUntilSunday * DAY_MS);
     const endOfWeekStr = formatDateOnly(endOfWeek);
 
-    // Get all cobrancas
+    // Get all cobrancas with client info
     const { data: cobrancas, error: cobErr } = await supabase
       .from("cobrancas")
-      .select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
+      .select("id, cliente_id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
+
+    // Get client phones
+    const clienteIds = [...new Set((cobrancas || []).map((c: any) => c.cliente_id))];
+    const { data: clientesData } = await supabase
+      .from("clientes")
+      .select("id, telefone")
+      .in("id", clienteIds);
+    const clientePhoneMap = new Map<string, string>();
+    for (const cl of clientesData || []) {
+      if (cl.telefone) clientePhoneMap.set(cl.id, cl.telefone);
+    }
 
     // Get existing pagamentos with status
     const { data: pagamentos } = await supabase
