@@ -85,7 +85,49 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   }
 }
 
-async function createNotification(
+async function generateFormalMessage(clienteNome: string, cpf: string, valor: string, dataVencimento: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    // Fallback template if no AI key
+    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento para evitar encargos.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  }
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          {
+            role: "system",
+            content: "Você é um assistente de cobranças profissional. Gere mensagens formais, educadas e objetivas para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 6 linhas). Sempre finalize com 'Atenciosamente,\\n_Veloop - SR Software_'."
+          },
+          {
+            role: "user",
+            content: `Gere uma mensagem formal de lembrete de pagamento com os seguintes dados:\n- Nome completo do cliente: ${clienteNome}\n- CPF: ${cpf}\n- Valor da parcela: ${valor}\n- Data de vencimento: ${dataVencimento} (amanhã)\n\nA mensagem deve informar que a parcela vence amanhã e pedir que o cliente providencie o pagamento.`
+          }
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("AI gateway error:", res.status, await res.text());
+      return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || `Prezado(a) ${clienteNome},\n\nSua parcela de *${valor}* vence amanhã (*${dataVencimento}*).\nCPF: ${cpf}\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  } catch (err) {
+    console.error("AI generation error:", err);
+    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+  }
+}
+
+
   supabase: any,
   userId: string,
   titulo: string,
@@ -153,15 +195,19 @@ Deno.serve(async (req) => {
       .select("id, cliente_id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, criado_por");
     if (cobErr) throw cobErr;
 
-    // Get client phones
+    // Get client phones and CPFs
     const clienteIds = [...new Set((cobrancas || []).map((c: any) => c.cliente_id))];
     const { data: clientesData } = await supabase
       .from("clientes")
-      .select("id, telefone")
+      .select("id, telefone, cpf, nome")
       .in("id", clienteIds);
     const clientePhoneMap = new Map<string, string>();
+    const clienteCpfMap = new Map<string, string>();
+    const clienteNomeMap = new Map<string, string>();
     for (const cl of clientesData || []) {
       if (cl.telefone) clientePhoneMap.set(cl.id, cl.telefone);
+      if (cl.cpf) clienteCpfMap.set(cl.id, cl.cpf);
+      if (cl.nome) clienteNomeMap.set(cl.id, cl.nome);
     }
 
     // Get existing pagamentos with status
@@ -264,7 +310,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- WEEKLY SUMMARY: "Essa semana tem X cobranças" ---
+    // --- TOMORROW WhatsApp: AI-generated formal message ---
+    for (const entry of tomorrowEntries) {
+      const phone = clientePhoneMap.get(entry.cliente_id);
+      if (!phone) continue;
+
+      const nomeCompleto = clienteNomeMap.get(entry.cliente_id) || entry.cliente_nome;
+      const cpf = clienteCpfMap.get(entry.cliente_id) || "não informado";
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const valorFormatado = formatValor(entry.valor_parcela);
+
+      const msg = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada);
+      const sent = await sendWhatsApp(phone, msg);
+      if (sent) whatsappCount++;
+    }
+
+
     const totalWeekEntries = Array.from(weekEntries.values()).flat();
     if (totalWeekEntries.length > 0 && dayOfWeek === 1) {
       // Only send weekly summary on Mondays
