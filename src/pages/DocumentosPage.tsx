@@ -143,7 +143,7 @@ const DocumentosPage = () => {
         await processNotaData(doc, extracted);
       }
 
-      await supabase.from("documentos").update({ processado: true } as any).eq("id", doc.id);
+      await supabase.from("documentos").update({ processado: true, cliente_nome: extracted.cliente_nome } as any).eq("id", doc.id);
       return true;
     } catch (err) {
       console.error(`Erro ao escanear ${doc.nome_arquivo}:`, err);
@@ -170,7 +170,23 @@ const DocumentosPage = () => {
     return newCliente?.id || null;
   };
 
+  // Remove old vendas/cobrancas linked to a document filename
+  const removeOldLinkedRecords = async (nomeArquivo: string) => {
+    // Delete vendas that reference this document
+    await supabase.from("vendas").delete().ilike("observacoes", `%${nomeArquivo}%`);
+    // Delete cobrancas that reference this document
+    const { data: oldCobrancas } = await supabase.from("cobrancas").select("id").ilike("observacoes", `%${nomeArquivo}%`);
+    if (oldCobrancas && oldCobrancas.length > 0) {
+      const ids = oldCobrancas.map((c) => c.id);
+      await supabase.from("cobranca_pagamentos").delete().in("cobranca_id", ids);
+      await supabase.from("cobrancas").delete().in("id", ids);
+    }
+  };
+
   const processCarneData = async (doc: Documento, extracted: any) => {
+    // Remove any previous records from this same document
+    await removeOldLinkedRecords(doc.nome_arquivo);
+
     const clienteNome = extracted.cliente_nome;
     const startDate = extracted.data_primeira_parcela || new Date().toISOString().split("T")[0];
     const numParcelas = extracted.num_parcelas || 1;
@@ -201,6 +217,7 @@ const DocumentosPage = () => {
       frequencia_parcela: freq,
       data_inicio_pagamento: startDate,
       status: "concluida",
+      observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
     });
 
     const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf, extracted.cliente_telefone);
@@ -220,6 +237,8 @@ const DocumentosPage = () => {
   };
 
   const processBoletoData = async (doc: Documento, extracted: any) => {
+    await removeOldLinkedRecords(doc.nome_arquivo);
+
     const clienteNome = extracted.cliente_nome;
     const dataVencimento = extracted.data_vencimento || new Date().toISOString().split("T")[0];
 
@@ -240,10 +259,11 @@ const DocumentosPage = () => {
   };
 
   const processNotaData = async (doc: Documento, extracted: any) => {
+    await removeOldLinkedRecords(doc.nome_arquivo);
+
     const clienteNome = extracted.cliente_nome;
     await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
 
-    // Create a venda record from nota fiscal
     await supabase.from("vendas").insert({
       cliente_nome: clienteNome,
       cliente_cpf: extracted.cliente_cpf || null,
@@ -266,6 +286,22 @@ const DocumentosPage = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+
+      // Check for existing document with the same filename — replace it
+      const { data: existingDocs } = await supabase
+        .from("documentos")
+        .select("id, nome_arquivo")
+        .eq("nome_arquivo", file.name);
+
+      if (existingDocs && existingDocs.length > 0) {
+        for (const oldDoc of existingDocs) {
+          // Remove linked vendas/cobrancas from the old document
+          await removeOldLinkedRecords(oldDoc.nome_arquivo);
+          // Delete the old document record
+          await supabase.from("documentos").delete().eq("id", oldDoc.id);
+        }
+      }
+
       const fileName = buildSafeStorageKey(file, i);
       const { error: uploadError } = await supabase.storage.from("documentos_vendas").upload(fileName, file);
 
