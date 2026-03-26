@@ -88,8 +88,7 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
 async function generateFormalMessage(clienteNome: string, cpf: string, valor: string, dataVencimento: string): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
-    // Fallback template if no AI key
-    return `Prezado(a) ${clienteNome},\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nPor favor, providencie o pagamento até a data de vencimento para evitar encargos.\n\nAtenciosamente,\n_Veloop - SR Software_`;
+    return `Prezado(a) *${clienteNome}*,\n\nInformamos que sua parcela no valor de *${valor}* vence amanhã, dia *${dataVencimento}*.\n\nCPF vinculado: ${cpf}\n\nSolicitamos a gentileza de providenciar o pagamento até a data de vencimento.\n\nAtt.,\n*SR SOFTWARE*\n_Powered by Veloop_`;
   }
 
   try {
