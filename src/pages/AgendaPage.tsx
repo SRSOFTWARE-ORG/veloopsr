@@ -22,6 +22,9 @@ import {
   Undo2,
   ShieldOff,
   Pencil,
+  MessageCircle,
+  Send,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
