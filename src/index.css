@@ -177,3 +177,30 @@ html, body, #root {
 .delay-4 { animation-delay: 240ms; }
 .delay-5 { animation-delay: 300ms; }
 .delay-6 { animation-delay: 360ms; }
+
+/* 3D zoom button effect */
+.btn-3d {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+}
+.btn-3d:hover, .btn-3d:active {
+  transform: perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.06) translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.08);
+}
+
+/* Tab animation */
+.tab-animated {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tab-animated:hover {
+  transform: scale(1.03);
+}
+.tab-animated[data-state="active"] {
+  animation: tabPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tabPop {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
