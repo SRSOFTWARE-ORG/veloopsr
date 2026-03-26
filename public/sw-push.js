@@ -10,6 +10,7 @@ self.addEventListener("push", (event) => {
       body: data.mensagem || data.body || "",
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-192x192.png",
+      sound: "/notification-sound.mp3",
       vibrate: [200, 100, 200],
       tag: data.tag || "veloop-notification",
       data: data.dados || {},
