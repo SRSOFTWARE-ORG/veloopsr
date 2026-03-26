@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { formatCurrency } from "@/lib/masks";
 import GoogleCalendarSync from "@/components/agenda/GoogleCalendarSync";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -478,7 +479,7 @@ const AgendaPage = () => {
                     {generatePaymentDates(form.data_inicio, form.data_fim, form.frequencia).length} parcelas
                   </p>
                   <p className="text-muted-foreground">
-                    de R$ {parseFloat(form.valor_parcela || "0").toFixed(2)} · {frequenciaLabels[form.frequencia]}
+                    de {formatCurrency(parseFloat(form.valor_parcela || "0"))} · {frequenciaLabels[form.frequencia]}
                   </p>
                 </div>
               )}
@@ -621,7 +622,7 @@ const AgendaPage = () => {
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <DollarSign className="w-3 h-3 shrink-0" />
-                              R$ {Number(c.valor_parcela).toFixed(2)}
+                              {formatCurrency(c.valor_parcela)}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3 shrink-0" />
@@ -740,7 +741,7 @@ const AgendaPage = () => {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
                     <p className="text-xs text-muted-foreground break-words">
-                      R$ {Number(c.valor_parcela).toFixed(2)} · {frequenciaLabels[c.frequencia]} · até{" "}
+                      {formatCurrency(c.valor_parcela)} · {frequenciaLabels[c.frequencia]} · até{" "}
                       {format(parseISO(c.data_fim), "dd/MM/yyyy")}
                     </p>
                   </div>
@@ -812,7 +813,7 @@ const AgendaPage = () => {
                   {generatePaymentDates(editForm.data_inicio, editForm.data_fim, editForm.frequencia).length} parcelas
                 </p>
                 <p className="text-muted-foreground">
-                  de R$ {parseFloat(editForm.valor_parcela || "0").toFixed(2)} · {frequenciaLabels[editForm.frequencia]}
+                  de {formatCurrency(parseFloat(editForm.valor_parcela || "0"))} · {frequenciaLabels[editForm.frequencia]}
                 </p>
               </div>
             )}
