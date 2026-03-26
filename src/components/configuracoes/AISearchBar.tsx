@@ -174,7 +174,7 @@ const AISearchBar = () => {
                 size="sm"
                 onClick={handleConfirmAction}
                 disabled={executing}
-                className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {executing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 {executing ? "Executando..." : "Confirmar"}
