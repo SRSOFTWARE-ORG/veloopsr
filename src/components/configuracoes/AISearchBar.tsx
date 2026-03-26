@@ -99,10 +99,10 @@ const AISearchBar = () => {
 
       {/* Proactive Tips */}
       {tips && !response && (
-        <div className="rounded-xl border border-amber-200/50 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800/30 p-3 animate-fade-in">
+        <div className="rounded-xl border border-accent/50 bg-accent/10 p-3 animate-fade-in">
           <div className="flex items-center gap-2 mb-2">
-            <Lightbulb className="w-4 h-4 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Dicas da IA</span>
+            <Lightbulb className="w-4 h-4 text-accent-foreground" />
+            <span className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">Dicas da IA</span>
             <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={loadTips} disabled={tipsLoading}>
               {tipsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Atualizar"}
             </Button>
