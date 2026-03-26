@@ -184,7 +184,6 @@ const DocumentosPage = () => {
   };
 
   const processCarneData = async (doc: Documento, extracted: any) => {
-    // Remove any previous records from this same document
     await removeOldLinkedRecords(doc.nome_arquivo);
 
     const clienteNome = extracted.cliente_nome;
@@ -204,35 +203,57 @@ const DocumentosPage = () => {
     }
     const endDate = end.toISOString().split("T")[0];
 
-    await supabase.from("vendas").insert({
-      cliente_nome: clienteNome,
-      cliente_cpf: extracted.cliente_cpf || null,
-      cliente_telefone: extracted.cliente_telefone || null,
-      valor_total: valorTotal,
-      valor_entrada: valorEntrada,
-      num_parcelas: numParcelas,
-      valor_parcela: valorParcela,
-      vendedor_id: user!.id,
-      forma_pagamento: "parcelado",
-      frequencia_parcela: freq,
-      data_inicio_pagamento: startDate,
-      status: "concluida",
-      observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
-    });
+    // Check if a venda already exists for this client with similar value (avoid duplicates from different doc names)
+    const { data: existingVendas } = await supabase
+      .from("vendas")
+      .select("id")
+      .ilike("cliente_nome", clienteNome)
+      .eq("valor_total", valorTotal)
+      .eq("status", "concluida")
+      .limit(1);
+
+    if (!existingVendas || existingVendas.length === 0) {
+      await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        cliente_telefone: extracted.cliente_telefone || null,
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
+        num_parcelas: numParcelas,
+        valor_parcela: valorParcela,
+        vendedor_id: user!.id,
+        forma_pagamento: "parcelado",
+        frequencia_parcela: freq,
+        data_inicio_pagamento: startDate,
+        status: "concluida",
+        observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
+      });
+    }
 
     const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf, extracted.cliente_telefone);
 
     if (clienteId) {
-      await supabase.from("cobrancas").insert({
-        cliente_id: clienteId,
-        cliente_nome: clienteNome,
-        valor_parcela: valorParcela,
-        data_inicio: startDate,
-        data_fim: endDate,
-        frequencia: freq,
-        criado_por: user!.id,
-        observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
-      });
+      // Check if a cobrança already exists for this client with same value/dates
+      const { data: existingCob } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .eq("valor_parcela", valorParcela)
+        .eq("data_inicio", startDate)
+        .limit(1);
+
+      if (!existingCob || existingCob.length === 0) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: clienteId,
+          cliente_nome: clienteNome,
+          valor_parcela: valorParcela,
+          data_inicio: startDate,
+          data_fim: endDate,
+          frequencia: freq,
+          criado_por: user!.id,
+          observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
+        });
+      }
     }
   };
 
@@ -245,16 +266,27 @@ const DocumentosPage = () => {
     const clienteId = await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
 
     if (clienteId) {
-      await supabase.from("cobrancas").insert({
-        cliente_id: clienteId,
-        cliente_nome: clienteNome,
-        valor_parcela: extracted.valor || 0,
-        data_inicio: dataVencimento,
-        data_fim: dataVencimento,
-        frequencia: "mes",
-        criado_por: user!.id,
-        observacoes: `Boleto: ${doc.nome_arquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
-      });
+      // Check if a cobrança already exists for this client with same value/date
+      const { data: existingCob } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .eq("valor_parcela", extracted.valor || 0)
+        .eq("data_inicio", dataVencimento)
+        .limit(1);
+
+      if (!existingCob || existingCob.length === 0) {
+        await supabase.from("cobrancas").insert({
+          cliente_id: clienteId,
+          cliente_nome: clienteNome,
+          valor_parcela: extracted.valor || 0,
+          data_inicio: dataVencimento,
+          data_fim: dataVencimento,
+          frequencia: "mes",
+          criado_por: user!.id,
+          observacoes: `Boleto: ${doc.nome_arquivo}${extracted.beneficiario ? ` | Beneficiário: ${extracted.beneficiario}` : ""}${extracted.numero_documento ? ` | Doc: ${extracted.numero_documento}` : ""}`,
+        });
+      }
     }
   };
 
@@ -264,15 +296,28 @@ const DocumentosPage = () => {
     const clienteNome = extracted.cliente_nome;
     await findOrCreateCliente(clienteNome, extracted.cliente_cpf);
 
-    await supabase.from("vendas").insert({
-      cliente_nome: clienteNome,
-      cliente_cpf: extracted.cliente_cpf || null,
-      valor_total: extracted.valor || extracted.valor_total || 0,
-      vendedor_id: user!.id,
-      forma_pagamento: "pix",
-      status: "concluida",
-      observacoes: `Nota Fiscal: ${doc.nome_arquivo}${extracted.numero_documento ? ` | NF: ${extracted.numero_documento}` : ""}${extracted.beneficiario ? ` | Emitente: ${extracted.beneficiario}` : ""}`,
-    });
+    const valorNota = extracted.valor || extracted.valor_total || 0;
+
+    // Check if a venda already exists for this client with similar value (from carnê import)
+    const { data: existingVendas } = await supabase
+      .from("vendas")
+      .select("id")
+      .ilike("cliente_nome", clienteNome)
+      .eq("valor_total", valorNota)
+      .eq("status", "concluida")
+      .limit(1);
+
+    if (!existingVendas || existingVendas.length === 0) {
+      await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        valor_total: valorNota,
+        vendedor_id: user!.id,
+        forma_pagamento: "pix",
+        status: "concluida",
+        observacoes: `Nota Fiscal: ${doc.nome_arquivo}${extracted.numero_documento ? ` | NF: ${extracted.numero_documento}` : ""}${extracted.beneficiario ? ` | Emitente: ${extracted.beneficiario}` : ""}`,
+      });
+    }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
