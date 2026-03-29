@@ -37,12 +37,12 @@ function formatCurrency(valor: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
 }
 
-function getTipoCobranca(dataVencimento: string): "D-1" | "D0" | "atrasado" | "futuro" {
+function getTipoCobranca(dataVencimento: string): "P" | "V" | "atrasado" | "futuro" {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const tomorrow = new Date(now.getTime() + 86400000).toISOString().slice(0, 10);
-  if (dataVencimento === today) return "D0";
-  if (dataVencimento === tomorrow) return "D-1";
+  if (dataVencimento === today) return "V";
+  if (dataVencimento === tomorrow) return "P";
   if (dataVencimento < today) return "atrasado";
   return "futuro";
 }
@@ -52,19 +52,19 @@ async function generateAIMessage(
   cpf: string,
   valor: string,
   dataFormatada: string,
-  tipo: "D-1" | "D0" | "atrasado" | "futuro"
+  tipo: "P" | "V" | "atrasado" | "futuro"
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
   const tomMap: Record<string, string> = {
-    "D-1": "preventivo e cordial, informando que a fatura vence AMANHÃ",
-    "D0": "mais urgente e direto, informando que a fatura vence HOJE",
+    "P": "preventivo e cordial, informando que a fatura vence AMANHÃ",
+    "V": "mais urgente e direto, informando que a fatura vence HOJE",
     "atrasado": "firme e respeitoso, informando que a fatura está EM ATRASO",
     "futuro": "informativo e cordial, informando sobre a próxima fatura",
   };
   const diaRefMap: Record<string, string> = {
-    "D-1": "amanhã",
-    "D0": "hoje",
+    "P": "amanhã",
+    "V": "hoje",
     "atrasado": `no dia ${dataFormatada} (em atraso)`,
     "futuro": `no dia ${dataFormatada}`,
   };
