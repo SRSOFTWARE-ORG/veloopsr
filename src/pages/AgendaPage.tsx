@@ -737,15 +737,33 @@ const AgendaPage = () => {
                         variant="outline"
                         size="sm"
                         className="text-xs h-7 gap-1 text-green-600 border-green-500/30 hover:bg-green-500/10"
+                        onClick={() => {
+                          const cliente = clientes.find((cl) => cl.id === c.cliente_id);
+                          const telefone = cliente?.telefone?.replace(/\D/g, "");
+                          if (!telefone) {
+                            toast.error("Cliente não possui telefone cadastrado");
+                            return;
+                          }
+                          const num = telefone.startsWith("55") ? telefone : `55${telefone}`;
+                          window.open(`https://wa.me/${num}`, "_blank");
+                        }}
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        WhatsApp
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
                         disabled={sendingWhatsApp === `${c.id}_${selectedDateKey}`}
                         onClick={() => handleSendWhatsApp(c, selectedDateKey!)}
                       >
                         {sendingWhatsApp === `${c.id}_${selectedDateKey}` ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
-                          <MessageCircle className="w-3 h-3" />
+                          <Send className="w-3 h-3" />
                         )}
-                        WhatsApp
+                        Cobrar
                       </Button>
                       {isPrimaryAdmin && !isPaidOrExempt && (
                         <>
