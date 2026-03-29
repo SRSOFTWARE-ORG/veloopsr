@@ -85,6 +85,7 @@ const VendasPage = () => {
   const [editVenda, setEditVenda] = useState<Venda | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [expandedVendaId, setExpandedVendaId] = useState<string | null>(null);
   const [step, setStep] = useState(1); // 1=produtos, 2=cliente, 3=pagamento, 4=resumo
 
   // Cart state
