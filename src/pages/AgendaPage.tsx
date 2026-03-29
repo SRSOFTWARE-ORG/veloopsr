@@ -401,11 +401,45 @@ const AgendaPage = () => {
     }
   };
 
-  // Build date -> cobrancas map
+  // Build map of entrada cobrancas by client name (uppercase)
+  const entradaMap = useMemo(() => {
+    const map = new Map<string, Cobranca>();
+    cobrancas.forEach((c) => {
+      if (c.observacoes?.startsWith("Entrada")) {
+        map.set(c.cliente_nome.trim().toUpperCase(), c);
+      }
+    });
+    return map;
+  }, [cobrancas]);
+
+  // Merged cobrancas: exclude standalone entradas that have a matching carnê
+  const mergedCobrancas = useMemo(() => {
+    return cobrancas.filter((c) => {
+      if (!c.observacoes?.startsWith("Entrada")) return true;
+      // Keep entrada only if there's NO matching carnê for this client
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const hasCarne = cobrancas.some(
+        (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clientKey && !ob.observacoes?.startsWith("Entrada")
+      );
+      return !hasCarne;
+    });
+  }, [cobrancas]);
+
+  // Build date -> cobrancas map (uses merged list + adds entrada date to carnê dates)
   const dateMap = useMemo(() => {
     const map = new Map<string, Cobranca[]>();
-    cobrancas.forEach((c) => {
+    mergedCobrancas.forEach((c) => {
       const dates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
+      // If this carnê has a matching entrada, add the entrada date too
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const entrada = entradaMap.get(clientKey);
+      if (entrada && !c.observacoes?.startsWith("Entrada")) {
+        const entradaDate = format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+        const alreadyHas = dates.some((d) => format(d, "yyyy-MM-dd") === entradaDate);
+        if (!alreadyHas) {
+          dates.unshift(parseISO(entrada.data_inicio));
+        }
+      }
       dates.forEach((d) => {
         const key = format(d, "yyyy-MM-dd");
         if (!map.has(key)) map.set(key, []);
@@ -413,7 +447,7 @@ const AgendaPage = () => {
       });
     });
     return map;
-  }, [cobrancas]);
+  }, [mergedCobrancas, entradaMap]);
 
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
