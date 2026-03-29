@@ -193,7 +193,7 @@ const App = () => {
               <Route
                 path="/configuracoes"
                 element={
-                  <ProtectedRoute requirePrimaryAdmin>
+                  <ProtectedRoute>
                     <ConfiguracoesPage />
                   </ProtectedRoute>
                 }
