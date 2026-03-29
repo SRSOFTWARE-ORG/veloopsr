@@ -268,29 +268,41 @@ const VendasPage = () => {
         }
       }
 
-      // Auto-register entrada in cobranca system
+      // Auto-register entrada in cobranca system (with dedup guard)
       if (temEntrada && entrada > 0) {
         const entradaDate = dataEntrada || new Date().toISOString().split("T")[0];
-        const { data: cob } = await supabase.from("cobrancas").insert({
-          cliente_id: selectedCliente.id,
-          cliente_nome: selectedCliente.nome,
-          valor_parcela: entrada,
-          data_inicio: entradaDate,
-          data_fim: entradaDate,
-          frequencia: "mes",
-          criado_por: user!.id,
-          observacoes: `Entrada da venda #${venda.id.slice(0, 8)}`,
-        }).select().single();
+        
+        // DEDUP: Check if entrada already exists for this client on this date
+        const { data: existingEntrada } = await supabase
+          .from("cobrancas")
+          .select("id")
+          .eq("cliente_id", selectedCliente.id)
+          .eq("data_inicio", entradaDate)
+          .ilike("observacoes", "Entrada%")
+          .limit(1);
 
-        if (cob) {
-          await supabase.from("cobranca_pagamentos").insert({
-            cobranca_id: cob.id,
-            data_vencimento: entradaDate,
-            status: "pago",
-            pago_em: new Date().toISOString(),
-            pago_por: user!.id,
-            tipo_pagamento: "entrada",
-          });
+        if (!existingEntrada || existingEntrada.length === 0) {
+          const { data: cob } = await supabase.from("cobrancas").insert({
+            cliente_id: selectedCliente.id,
+            cliente_nome: selectedCliente.nome,
+            valor_parcela: entrada,
+            data_inicio: entradaDate,
+            data_fim: entradaDate,
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `Entrada da venda #${venda.id.slice(0, 8)}`,
+          }).select().single();
+
+          if (cob) {
+            await supabase.from("cobranca_pagamentos").insert({
+              cobranca_id: cob.id,
+              data_vencimento: entradaDate,
+              status: "pago",
+              pago_em: new Date().toISOString(),
+              pago_por: user!.id,
+              tipo_pagamento: "entrada",
+            });
+          }
         }
       }
     }

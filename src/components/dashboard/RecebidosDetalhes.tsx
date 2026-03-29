@@ -90,23 +90,29 @@ const RecebidosDetalhes = ({ open, onOpenChange, start, end }: RecebidosDetalhes
       });
     }
 
-    // 2) Entradas de vendas concluídas
+    // 2) Entradas de vendas concluídas — SÓ adiciona se NÃO existir
+    // registro equivalente em cobranca_pagamentos (tipo_pagamento='entrada')
+    // para evitar DUPLICAÇÃO
     const { data: vendas } = await supabase
       .from("vendas")
       .select("id, cliente_nome, valor_entrada, created_at, data_entrada")
       .eq("status", "concluida");
 
     if (vendas) {
+      // Build set of (cliente_nome_normalized, data) from already-tracked entradas
+      const trackedEntradas = new Set(
+        result
+          .filter((r) => r.tipo === "entrada")
+          .map((r) => `${r.cliente_nome.trim().toUpperCase()}_${r.data}`)
+      );
+
       vendas.forEach((v) => {
         const entradaVal = Number(v.valor_entrada) || 0;
         if (entradaVal <= 0) return;
         const dataEntrada = (v as any).data_entrada || v.created_at?.split("T")[0] || "";
         if (dataEntrada >= start && dataEntrada <= end) {
-          // avoid double counting if already tracked via cobranca_pagamentos
-          const alreadyTracked = result.some(
-            (r) => r.tipo === "entrada" && r.venda_id === v.id
-          );
-          if (!alreadyTracked) {
+          const dedupKey = `${v.cliente_nome.trim().toUpperCase()}_${dataEntrada}`;
+          if (!trackedEntradas.has(dedupKey)) {
             result.push({
               id: `venda-${v.id}`,
               tipo: "entrada",
@@ -115,6 +121,7 @@ const RecebidosDetalhes = ({ open, onOpenChange, start, end }: RecebidosDetalhes
               data: dataEntrada,
               venda_id: v.id,
             });
+            trackedEntradas.add(dedupKey);
           }
         }
       });

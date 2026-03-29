@@ -703,6 +703,38 @@ const AgendaPage = () => {
                                 {frequenciaLabels[c.frequencia]}
                               </span>
                             )}
+                            {/* Show entrada + parcelas summary */}
+                            {(() => {
+                              const clienteNome = c.cliente_nome.trim().toUpperCase();
+                              // Find entrada cobrança for same client
+                              const entradaCob = cobrancas.find(
+                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && ob.observacoes?.startsWith("Entrada")
+                              );
+                              // Find carnê cobrança for same client
+                              const carneCob = cobrancas.find(
+                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && !ob.observacoes?.startsWith("Entrada")
+                              );
+
+                              if (isEntrada && carneCob) {
+                                const numParcelas = generatePaymentDates(carneCob.data_inicio, carneCob.data_fim, carneCob.frequencia).length;
+                                const valorTotal = c.valor_parcela + (numParcelas * carneCob.valor_parcela);
+                                return (
+                                  <span className="text-[10px] font-medium text-foreground/70">
+                                    Entrada {formatCurrency(c.valor_parcela)} + {numParcelas}x {formatCurrency(carneCob.valor_parcela)} = {formatCurrency(valorTotal)}
+                                  </span>
+                                );
+                              }
+                              if (!isEntrada && entradaCob) {
+                                const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
+                                const valorTotal = entradaCob.valor_parcela + (numParcelas * c.valor_parcela);
+                                return (
+                                  <span className="text-[10px] font-medium text-foreground/70">
+                                    Entrada {formatCurrency(entradaCob.valor_parcela)} + {numParcelas}x {formatCurrency(c.valor_parcela)} = {formatCurrency(valorTotal)}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                       </div>
