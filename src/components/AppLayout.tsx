@@ -147,7 +147,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="p-5 border-b border-border/60 flex items-center justify-between">
+          <div className="p-5 flex items-center justify-between">
             <img
               src={veloopHeaderLogo}
               alt="Veloop"
