@@ -18,12 +18,26 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      devOptions: {
+        enabled: false,
+      },
       includeAssets: ["favicon.ico", "robots.txt", "icons/*.png"],
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/vajadqjzwveuxzmcywvn\.supabase\.co\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "supabase-api",
+              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+            },
+          },
+        ],
       },
       manifest: {
+        id: "/",
         name: "Veloop - SR Software",
         short_name: "Veloop",
         description: "Sistema de gestão e PDV móvel para SR Software",
@@ -33,6 +47,28 @@ export default defineConfig(({ mode }) => ({
         orientation: "any",
         scope: "/",
         start_url: "/",
+        lang: "pt-BR",
+        categories: ["business", "productivity"],
+        shortcuts: [
+          {
+            name: "Vendas",
+            short_name: "Vendas",
+            url: "/vendas",
+            icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+          },
+          {
+            name: "Clientes",
+            short_name: "Clientes",
+            url: "/clientes",
+            icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+          },
+          {
+            name: "Produtos",
+            short_name: "Produtos",
+            url: "/produtos",
+            icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+          },
+        ],
         icons: [
           {
             src: "/icons/icon-192x192.png",
