@@ -401,11 +401,45 @@ const AgendaPage = () => {
     }
   };
 
-  // Build date -> cobrancas map
+  // Build map of entrada cobrancas by client name (uppercase)
+  const entradaMap = useMemo(() => {
+    const map = new Map<string, Cobranca>();
+    cobrancas.forEach((c) => {
+      if (c.observacoes?.startsWith("Entrada")) {
+        map.set(c.cliente_nome.trim().toUpperCase(), c);
+      }
+    });
+    return map;
+  }, [cobrancas]);
+
+  // Merged cobrancas: exclude standalone entradas that have a matching carnê
+  const mergedCobrancas = useMemo(() => {
+    return cobrancas.filter((c) => {
+      if (!c.observacoes?.startsWith("Entrada")) return true;
+      // Keep entrada only if there's NO matching carnê for this client
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const hasCarne = cobrancas.some(
+        (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clientKey && !ob.observacoes?.startsWith("Entrada")
+      );
+      return !hasCarne;
+    });
+  }, [cobrancas]);
+
+  // Build date -> cobrancas map (uses merged list + adds entrada date to carnê dates)
   const dateMap = useMemo(() => {
     const map = new Map<string, Cobranca[]>();
-    cobrancas.forEach((c) => {
+    mergedCobrancas.forEach((c) => {
       const dates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
+      // If this carnê has a matching entrada, add the entrada date too
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const entrada = entradaMap.get(clientKey);
+      if (entrada && !c.observacoes?.startsWith("Entrada")) {
+        const entradaDate = format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+        const alreadyHas = dates.some((d) => format(d, "yyyy-MM-dd") === entradaDate);
+        if (!alreadyHas) {
+          dates.unshift(parseISO(entrada.data_inicio));
+        }
+      }
       dates.forEach((d) => {
         const key = format(d, "yyyy-MM-dd");
         if (!map.has(key)) map.set(key, []);
@@ -413,7 +447,7 @@ const AgendaPage = () => {
       });
     });
     return map;
-  }, [cobrancas]);
+  }, [mergedCobrancas, entradaMap]);
 
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
@@ -446,15 +480,15 @@ const AgendaPage = () => {
   const startPadding = startOfMonth(currentMonth).getDay();
 
   const upcomingItems = useMemo(() => {
-    if (statusFilter === "todos") return cobrancas.slice(0, 10);
-    return cobrancas.filter((c) => {
+    if (statusFilter === "todos") return mergedCobrancas.slice(0, 10);
+    return mergedCobrancas.filter((c) => {
       const dates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
       return dates.some((d) => {
         const key = format(d, "yyyy-MM-dd");
         return getPaymentStatus(key, c.id, pagamentosMap) === statusFilter;
       });
     }).slice(0, 10);
-  }, [cobrancas, statusFilter, pagamentosMap]);
+  }, [mergedCobrancas, statusFilter, pagamentosMap]);
 
   function getDotColor(key: string): string {
     const statuses = dayStatusMap.get(key);
@@ -663,21 +697,26 @@ const AgendaPage = () => {
             </Card>
           ) : (
             selectedCobrancas.map((c) => {
-               const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
+              const clientKey = c.cliente_nome.trim().toUpperCase();
+              const entrada = entradaMap.get(clientKey);
+              const isEntradaDate = entrada && selectedDateKey === format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+
+              // For the entrada date, use the entrada's cobranca for status check
+              const statusCobrancaId = isEntradaDate && entrada ? entrada.id : c.id;
+              const status = getPaymentStatus(selectedDateKey!, statusCobrancaId, pagamentosMap);
               const config = statusConfig[status];
               const StatusIcon = config.icon;
               const isPaidOrExempt = status === "pago" || status === "isento";
-              const pagKey = `${c.id}_${selectedDateKey}`;
-              const pagamento = pagamentosMap.get(pagKey);
-              const isEntrada = (pagamento as any)?.tipo_pagamento === "entrada" || c.observacoes?.startsWith("Entrada");
+
+              const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
 
               return (
                 <Card key={c.id} className={cn("border", isPaidOrExempt && "opacity-75")}>
                   <CardContent className="space-y-2 py-4">
                     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isEntrada ? "bg-emerald-500/10" : "bg-primary/10")}>
-                          {isEntrada ? (
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isEntradaDate ? "bg-emerald-500/10" : "bg-primary/10")}>
+                          {isEntradaDate ? (
                             <DollarSign className="w-4 h-4 text-emerald-600" />
                           ) : (
                             <User className="w-4 h-4 text-primary" />
@@ -686,7 +725,7 @@ const AgendaPage = () => {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
-                            {isEntrada && (
+                            {isEntradaDate && (
                               <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
                                 Entrada
                               </Badge>
@@ -695,52 +734,28 @@ const AgendaPage = () => {
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <DollarSign className="w-3 h-3 shrink-0" />
-                              {formatCurrency(c.valor_parcela)}
+                              {isEntradaDate && entrada
+                                ? formatCurrency(entrada.valor_parcela)
+                                : formatCurrency(c.valor_parcela)}
                             </span>
-                            {!isEntrada && (
+                            {!isEntradaDate && (
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3 shrink-0" />
                                 {frequenciaLabels[c.frequencia]}
                               </span>
                             )}
-                            {/* Show entrada + parcelas summary */}
-                            {(() => {
-                              const clienteNome = c.cliente_nome.trim().toUpperCase();
-                              // Find entrada cobrança for same client
-                              const entradaCob = cobrancas.find(
-                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && ob.observacoes?.startsWith("Entrada")
-                              );
-                              // Find carnê cobrança for same client
-                              const carneCob = cobrancas.find(
-                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && !ob.observacoes?.startsWith("Entrada")
-                              );
-
-                              if (isEntrada && carneCob) {
-                                const numParcelas = generatePaymentDates(carneCob.data_inicio, carneCob.data_fim, carneCob.frequencia).length;
-                                const valorTotal = c.valor_parcela + (numParcelas * carneCob.valor_parcela);
-                                return (
-                                  <span className="text-[10px] font-medium text-foreground/70">
-                                    Entrada {formatCurrency(c.valor_parcela)} + {numParcelas}x {formatCurrency(carneCob.valor_parcela)} = {formatCurrency(valorTotal)}
-                                  </span>
-                                );
-                              }
-                              if (!isEntrada && entradaCob) {
-                                const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
-                                const valorTotal = entradaCob.valor_parcela + (numParcelas * c.valor_parcela);
-                                return (
-                                  <span className="text-[10px] font-medium text-foreground/70">
-                                    Entrada {formatCurrency(entradaCob.valor_parcela)} + {numParcelas}x {formatCurrency(c.valor_parcela)} = {formatCurrency(valorTotal)}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
+                            {/* Show combined summary */}
+                            {entrada && (
+                              <span className="text-[10px] font-medium text-foreground/70">
+                                Entrada {formatCurrency(entrada.valor_parcela)} + {numParcelas}x {formatCurrency(c.valor_parcela)} = {formatCurrency(entrada.valor_parcela + (numParcelas * c.valor_parcela))}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                       <Badge variant="outline" className={cn("w-fit max-w-full text-xs border", config.color)}>
                         <StatusIcon className="w-3 h-3 mr-1 shrink-0" />
-                        {isEntrada ? (status === "pago" ? "Entrada Paga" : config.label) : config.label}
+                        {isEntradaDate ? (status === "pago" ? "Entrada Paga" : config.label) : config.label}
                       </Badge>
                     </div>
 
@@ -803,7 +818,7 @@ const AgendaPage = () => {
                             variant="outline"
                             size="sm"
                             className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "pago")}
+                            onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "pago")}
                           >
                             <CheckCircle2 className="w-3 h-3" />
                             Pago
@@ -812,7 +827,7 @@ const AgendaPage = () => {
                             variant="outline"
                             size="sm"
                             className="text-xs h-7 gap-1 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
-                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "isento")}
+                            onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "isento")}
                           >
                             <ShieldOff className="w-3 h-3" />
                             Isentar
@@ -824,7 +839,7 @@ const AgendaPage = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs h-7 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
-                          onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "a_pagar")}
+                          onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "a_pagar")}
                         >
                           <Undo2 className="w-3 h-3" />
                           Desfazer
@@ -875,21 +890,29 @@ const AgendaPage = () => {
             </Card>
           ) : (
              upcomingItems.map((c) => {
-              const isEntrada = c.observacoes?.startsWith("Entrada");
+              const clientKey = c.cliente_nome.trim().toUpperCase();
+              const entrada = entradaMap.get(clientKey);
+              const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
+
               return (
               <Card key={c.id}>
                 <CardContent className="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
-                      {isEntrada && (
+                      {entrada && (
                         <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
                           Entrada
                         </Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground break-words">
-                      {formatCurrency(c.valor_parcela)} · {isEntrada ? "Pagamento único" : `${frequenciaLabels[c.frequencia]} · até ${format(parseISO(c.data_fim), "dd/MM/yyyy")}`}
+                      {formatCurrency(c.valor_parcela)} · {frequenciaLabels[c.frequencia]} · até {format(parseISO(c.data_fim), "dd/MM/yyyy")}
+                      {entrada && (
+                        <span className="ml-1 text-foreground/70 font-medium">
+                          (Entrada {formatCurrency(entrada.valor_parcela)} + {numParcelas}x{formatCurrency(c.valor_parcela)})
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Badge variant="outline" className="w-fit text-xs">
