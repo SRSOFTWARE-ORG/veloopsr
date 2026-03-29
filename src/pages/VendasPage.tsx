@@ -206,6 +206,7 @@ const VendasPage = () => {
     setFormaPagamento("parcelado");
     setTemEntrada(false);
     setEntrada(0);
+    setDataEntrada(new Date().toISOString().split("T")[0]);
     setDesconto(0);
     setFrequencia("mes");
     setNumParcelas(1);
