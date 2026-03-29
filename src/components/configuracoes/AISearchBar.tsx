@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Send, X, Loader2, Lightbulb, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, Send, X, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -12,52 +12,47 @@ interface PendingAction {
   description: string;
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 const AISearchBar = () => {
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
-  const [tips, setTips] = useState("");
-  const [tipsLoading, setTipsLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [executing, setExecuting] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    loadTips();
-  }, []);
-
-  const loadTips = async () => {
-    setTipsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { query: "", type: "proactive_tips" },
-      });
-      if (error) throw error;
-      if (data?.response) setTips(data.response);
-    } catch (e: any) {
-      console.error("Tips error:", e);
-    } finally {
-      setTipsLoading(false);
-    }
-  };
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    const userMsg = query.trim();
+    setQuery("");
     setLoading(true);
     setExpanded(true);
-    setResponse("");
     setPendingAction(null);
+
+    const newMessages: ChatMessage[] = [...messages, { role: "user", content: userMsg }];
+    setMessages(newMessages);
+
     try {
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { query: query.trim(), type: "search" },
+        body: {
+          query: userMsg,
+          type: "search",
+          history: newMessages.slice(-10),
+        },
       });
       if (error) throw error;
       if (data?.error) {
         toast.error(data.error);
         return;
       }
-      setResponse(data?.response || "Sem resposta");
+      const aiResponse = data?.response || "Sem resposta";
+      setMessages((prev) => [...prev, { role: "assistant", content: aiResponse }]);
       if (data?.pending_action) {
         setPendingAction(data.pending_action);
       }
@@ -65,6 +60,7 @@ const AISearchBar = () => {
       toast.error(e.message || "Erro ao consultar IA");
     } finally {
       setLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
   };
 
@@ -80,7 +76,8 @@ const AISearchBar = () => {
         toast.error(data.error);
         return;
       }
-      setResponse(data?.response || "✅ Ação executada");
+      const result = data?.response || "✅ Ação executada";
+      setMessages((prev) => [...prev, { role: "assistant", content: result }]);
       setPendingAction(null);
       toast.success("Ação executada com sucesso!");
     } catch (e: any) {
@@ -92,7 +89,7 @@ const AISearchBar = () => {
 
   const handleCancelAction = () => {
     setPendingAction(null);
-    setResponse("❌ Ação cancelada pelo usuário.");
+    setMessages((prev) => [...prev, { role: "assistant", content: "❌ Ação cancelada pelo usuário." }]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -100,6 +97,13 @@ const AISearchBar = () => {
       e.preventDefault();
       handleSearch();
     }
+  };
+
+  const handleClear = () => {
+    setMessages([]);
+    setQuery("");
+    setPendingAction(null);
+    setExpanded(false);
   };
 
   return (
@@ -116,11 +120,11 @@ const AISearchBar = () => {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => setExpanded(true)}
-            placeholder="Pergunte ou comande a IA... Ex: 'Marque parcela do André como paga'"
+            placeholder="Comande a IA... Ex: 'Exclua o cliente X', 'Altere preço do produto Y'"
             className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-sm"
           />
-          {query && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setQuery(""); setResponse(""); setPendingAction(null); }}>
+          {(query || messages.length > 0) && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleClear}>
               <X className="w-4 h-4" />
             </Button>
           )}
@@ -135,89 +139,75 @@ const AISearchBar = () => {
         </div>
       </div>
 
-      {/* Proactive Tips */}
-      {tips && !response && !loading && (
-        <div className="rounded-xl border border-accent/50 bg-accent/10 p-3 animate-fade-in">
-          <div className="flex items-center gap-2 mb-2">
-            <Lightbulb className="w-4 h-4 text-accent-foreground" />
-            <span className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">Dicas da IA</span>
-            <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={loadTips} disabled={tipsLoading}>
-              {tipsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Atualizar"}
-            </Button>
-          </div>
-          <div className="text-sm text-foreground/80 prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{tips}</ReactMarkdown>
-          </div>
-        </div>
-      )}
+      {/* Chat History */}
+      {expanded && messages.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-card shadow-md max-h-[400px] overflow-y-auto">
+          <div className="p-4 space-y-3">
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
+              </div>
+            ))}
 
-      {/* AI Response */}
-      {expanded && response && (
-        <div className="rounded-xl border border-primary/20 bg-card p-4 animate-fade-in shadow-md">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-semibold text-primary uppercase tracking-wide">
-              {pendingAction ? "Ação Pendente" : "Resposta da IA"}
-            </span>
-            <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => { setResponse(""); setExpanded(false); setPendingAction(null); }}>
-              Fechar
-            </Button>
-          </div>
-          <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{response}</ReactMarkdown>
-          </div>
+            {/* Action Confirmation */}
+            {pendingAction && (
+              <div className="flex items-center gap-3 pt-2 border-t border-border/40">
+                <Button
+                  size="sm"
+                  onClick={handleConfirmAction}
+                  disabled={executing}
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {executing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  {executing ? "Executando..." : "Confirmar"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleCancelAction} disabled={executing} className="gap-2">
+                  <XCircle className="w-4 h-4" />
+                  Cancelar
+                </Button>
+              </div>
+            )}
 
-          {/* Action Confirmation Buttons */}
-          {pendingAction && (
-            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-border/40">
-              <Button
-                size="sm"
-                onClick={handleConfirmAction}
-                disabled={executing}
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {executing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                {executing ? "Executando..." : "Confirmar"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancelAction}
-                disabled={executing}
-                className="gap-2"
-              >
-                <XCircle className="w-4 h-4" />
-                Cancelar
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="rounded-xl border border-primary/20 bg-card p-4 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-5 h-5 text-primary animate-spin" />
-            <span className="text-sm text-muted-foreground">Analisando dados do sistema...</span>
+            {/* Loading */}
+            {loading && (
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                <span className="text-sm text-muted-foreground">Processando...</span>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
         </div>
       )}
 
       {/* Quick Suggestions */}
-      {expanded && !response && !loading && (
+      {expanded && messages.length === 0 && !loading && (
         <div className="flex flex-wrap gap-2 animate-fade-in">
           {[
+            "Excluir cliente inadimplente",
+            "Alterar preço de um produto",
+            "Deletar venda duplicada",
             "Disparar lembretes de cobrança",
-            "Enviar WhatsApp para cliente X",
-            "Parcelas atrasadas hoje",
-            "Histórico de envios WhatsApp",
-            "Criar cobrança para cliente",
+            "Enviar WhatsApp para cliente",
             "Resumo financeiro do mês",
           ].map((s) => (
             <button
               key={s}
-              onClick={() => { setQuery(s); }}
+              onClick={() => setQuery(s)}
               className="text-xs px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/10 text-foreground/70 hover:text-foreground transition-colors"
             >
               {s}

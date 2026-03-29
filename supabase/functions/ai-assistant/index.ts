@@ -26,15 +26,12 @@ const actionTools = [
     type: "function",
     function: {
       name: "update_client",
-      description: "Atualizar dados de um cliente (nome, telefone, cpf, endereco, bairro, cidade, uf, cep, email, observacoes etc)",
+      description: "Atualizar dados de um cliente",
       parameters: {
         type: "object",
         properties: {
           client_id: { type: "string", description: "ID do cliente" },
-          fields: {
-            type: "object",
-            description: "Campos a atualizar: nome, telefone, cpf, endereco, bairro, cidade, uf, cep, email, observacoes, data_nascimento, rg, nome_pai, nome_mae, estado_civil, naturalidade",
-          },
+          fields: { type: "object", description: "Campos a atualizar" },
         },
         required: ["client_id", "fields"],
       },
@@ -43,16 +40,27 @@ const actionTools = [
   {
     type: "function",
     function: {
+      name: "delete_client",
+      description: "Excluir um cliente permanentemente",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente" },
+        },
+        required: ["client_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_product",
-      description: "Atualizar dados de um produto (nome, preço, estoque, categoria)",
+      description: "Atualizar dados de um produto",
       parameters: {
         type: "object",
         properties: {
           product_id: { type: "string", description: "ID do produto" },
-          fields: {
-            type: "object",
-            description: "Campos: nome, preco_venda, preco_custo, preco_pix, preco_credito, preco_boleto, preco_carne, estoque_atual, estoque_minimo, categoria, subcategoria",
-          },
+          fields: { type: "object", description: "Campos a atualizar" },
         },
         required: ["product_id", "fields"],
       },
@@ -61,16 +69,27 @@ const actionTools = [
   {
     type: "function",
     function: {
+      name: "delete_product",
+      description: "Excluir um produto permanentemente",
+      parameters: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "ID do produto" },
+        },
+        required: ["product_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_sale",
-      description: "Atualizar dados de uma venda (valor_total, valor_entrada, valor_parcela, num_parcelas, status, observacoes, forma_pagamento)",
+      description: "Atualizar dados de uma venda",
       parameters: {
         type: "object",
         properties: {
           sale_id: { type: "string", description: "ID da venda" },
-          fields: {
-            type: "object",
-            description: "Campos: valor_total, valor_entrada, valor_parcela, num_parcelas, status, observacoes, forma_pagamento, data_inicio_pagamento, frequencia_parcela",
-          },
+          fields: { type: "object", description: "Campos a atualizar" },
         },
         required: ["sale_id", "fields"],
       },
@@ -79,18 +98,43 @@ const actionTools = [
   {
     type: "function",
     function: {
+      name: "delete_sale",
+      description: "Excluir uma venda e seus itens permanentemente",
+      parameters: {
+        type: "object",
+        properties: {
+          sale_id: { type: "string", description: "ID da venda" },
+        },
+        required: ["sale_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_cobranca",
-      description: "Atualizar dados de uma cobrança (valor_parcela, frequencia, data_inicio, data_fim, observacoes)",
+      description: "Atualizar dados de uma cobrança",
       parameters: {
         type: "object",
         properties: {
           cobranca_id: { type: "string", description: "ID da cobrança" },
-          fields: {
-            type: "object",
-            description: "Campos: valor_parcela, frequencia, data_inicio, data_fim, observacoes, cliente_nome",
-          },
+          fields: { type: "object", description: "Campos a atualizar" },
         },
         required: ["cobranca_id", "fields"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_cobranca",
+      description: "Excluir uma cobrança e seus pagamentos permanentemente",
+      parameters: {
+        type: "object",
+        properties: {
+          cobranca_id: { type: "string", description: "ID da cobrança" },
+        },
+        required: ["cobranca_id"],
       },
     },
   },
@@ -128,19 +172,19 @@ const actionTools = [
     type: "function",
     function: {
       name: "send_whatsapp",
-      description: "Enviar mensagem WhatsApp para um cliente. Pode enviar cobrança automática (com dados de fatura) ou mensagem livre.",
+      description: "Enviar mensagem WhatsApp para um cliente",
       parameters: {
         type: "object",
         properties: {
           telefone: { type: "string", description: "Telefone do cliente com DDD" },
-          mensagem: { type: "string", description: "Mensagem livre (opcional se dados de cobrança forem fornecidos)" },
-          cobranca_id: { type: "string", description: "ID da cobrança (para cobrança automática)" },
-          cliente_id: { type: "string", description: "ID do cliente" },
-          cliente_nome: { type: "string", description: "Nome do cliente" },
-          cpf: { type: "string", description: "CPF do cliente" },
-          valor: { type: "number", description: "Valor da parcela" },
-          data_vencimento: { type: "string", description: "Data de vencimento YYYY-MM-DD" },
-          status_parcela: { type: "string", description: "Status da parcela" },
+          mensagem: { type: "string", description: "Mensagem livre" },
+          cobranca_id: { type: "string" },
+          cliente_id: { type: "string" },
+          cliente_nome: { type: "string" },
+          cpf: { type: "string" },
+          valor: { type: "number" },
+          data_vencimento: { type: "string" },
+          status_parcela: { type: "string" },
         },
         required: ["telefone"],
       },
@@ -150,12 +194,8 @@ const actionTools = [
     type: "function",
     function: {
       name: "trigger_payment_reminders",
-      description: "Disparar manualmente a automação de lembretes de pagamento (notificações + WhatsApp para cobranças do dia/amanhã)",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Disparar manualmente a automação de lembretes de pagamento",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -166,10 +206,10 @@ const actionTools = [
       parameters: {
         type: "object",
         properties: {
-          user_id: { type: "string", description: "ID do usuário (ou 'all_admins' para todos os admins)" },
-          titulo: { type: "string", description: "Título da notificação" },
-          mensagem: { type: "string", description: "Corpo da notificação" },
-          tipo: { type: "string", description: "Tipo: lembrete, alerta, info", default: "info" },
+          user_id: { type: "string", description: "ID do usuário ou 'all_admins'" },
+          titulo: { type: "string" },
+          mensagem: { type: "string" },
+          tipo: { type: "string", default: "info" },
         },
         required: ["titulo", "mensagem"],
       },
@@ -179,12 +219,12 @@ const actionTools = [
     type: "function",
     function: {
       name: "view_whatsapp_history",
-      description: "Ver histórico de envios WhatsApp de um cliente ou período",
+      description: "Ver histórico de envios WhatsApp",
       parameters: {
         type: "object",
         properties: {
-          cpf: { type: "string", description: "CPF do cliente (opcional)" },
-          dias: { type: "number", description: "Últimos N dias (padrão 7)", default: 7 },
+          cpf: { type: "string" },
+          dias: { type: "number", default: 7 },
         },
         required: [],
       },
@@ -198,26 +238,55 @@ const actionTools = [
       parameters: {
         type: "object",
         properties: {
-          cliente_id: { type: "string", description: "ID do cliente" },
-          cliente_nome: { type: "string", description: "Nome do cliente" },
-          valor_parcela: { type: "number", description: "Valor de cada parcela" },
-          data_inicio: { type: "string", description: "Data de início YYYY-MM-DD" },
-          data_fim: { type: "string", description: "Data de fim YYYY-MM-DD" },
+          cliente_id: { type: "string" },
+          cliente_nome: { type: "string" },
+          valor_parcela: { type: "number" },
+          data_inicio: { type: "string" },
+          data_fim: { type: "string" },
           frequencia: { type: "string", enum: ["semana", "quinzena", "mes"], default: "mes" },
-          observacoes: { type: "string", description: "Observações opcionais" },
+          observacoes: { type: "string" },
         },
         required: ["cliente_id", "cliente_nome", "valor_parcela", "data_inicio", "data_fim"],
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_dispositivo",
+      description: "Excluir um dispositivo permanentemente",
+      parameters: {
+        type: "object",
+        properties: {
+          dispositivo_id: { type: "string", description: "ID do dispositivo" },
+        },
+        required: ["dispositivo_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_dispositivo",
+      description: "Atualizar dados de um dispositivo (status_seguranca, modelo, observacoes, etc)",
+      parameters: {
+        type: "object",
+        properties: {
+          dispositivo_id: { type: "string" },
+          fields: { type: "object", description: "Campos: status_seguranca, modelo, nome_dispositivo, observacoes, memoria, imei2, serial_number" },
+        },
+        required: ["dispositivo_id", "fields"],
+      },
+    },
+  },
 ];
 
-// Allowed fields per table for security
 const ALLOWED_FIELDS: Record<string, string[]> = {
   clientes: ["nome", "telefone", "cpf", "endereco", "bairro", "cidade", "uf", "cep", "email", "observacoes", "data_nascimento", "rg", "rg_emissor", "rg_data_emissao", "nome_pai", "nome_mae", "estado_civil", "naturalidade", "complemento", "tipo", "inscricao_estadual"],
   produtos: ["nome", "preco_venda", "preco_custo", "preco_pix", "preco_credito", "preco_boleto", "preco_carne", "estoque_atual", "estoque_minimo", "categoria", "subcategoria", "codigo_barras"],
   vendas: ["valor_total", "valor_entrada", "valor_parcela", "num_parcelas", "status", "observacoes", "forma_pagamento", "data_inicio_pagamento", "frequencia_parcela", "cliente_nome", "cliente_cpf", "cliente_telefone"],
   cobrancas: ["valor_parcela", "frequencia", "data_inicio", "data_fim", "observacoes", "cliente_nome"],
+  dispositivos: ["status_seguranca", "modelo", "nome_dispositivo", "observacoes", "memoria", "imei2", "serial_number", "imei_serial"],
 };
 
 function sanitizeFields(table: string, fields: Record<string, any>): Record<string, any> {
@@ -252,12 +321,22 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       if (error) throw error;
       return `✅ Cliente atualizado: ${Object.keys(clean).join(", ")}`;
     }
+    case "delete_client": {
+      const { error } = await sb.from("clientes").delete().eq("id", args.client_id);
+      if (error) throw error;
+      return `✅ Cliente excluído permanentemente`;
+    }
     case "update_product": {
       const clean = sanitizeFields("produtos", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
       const { error } = await sb.from("produtos").update(clean).eq("id", args.product_id);
       if (error) throw error;
       return `✅ Produto atualizado: ${Object.keys(clean).join(", ")}`;
+    }
+    case "delete_product": {
+      const { error } = await sb.from("produtos").delete().eq("id", args.product_id);
+      if (error) throw error;
+      return `✅ Produto excluído permanentemente`;
     }
     case "update_sale": {
       const clean = sanitizeFields("vendas", args.fields);
@@ -266,12 +345,24 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       if (error) throw error;
       return `✅ Venda atualizada: ${Object.keys(clean).join(", ")}`;
     }
+    case "delete_sale": {
+      await sb.from("venda_itens").delete().eq("venda_id", args.sale_id);
+      const { error } = await sb.from("vendas").delete().eq("id", args.sale_id);
+      if (error) throw error;
+      return `✅ Venda e seus itens excluídos permanentemente`;
+    }
     case "update_cobranca": {
       const clean = sanitizeFields("cobrancas", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
       const { error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id);
       if (error) throw error;
       return `✅ Cobrança atualizada: ${Object.keys(clean).join(", ")}`;
+    }
+    case "delete_cobranca": {
+      await sb.from("cobranca_pagamentos").delete().eq("cobranca_id", args.cobranca_id);
+      const { error } = await sb.from("cobrancas").delete().eq("id", args.cobranca_id);
+      if (error) throw error;
+      return `✅ Cobrança e seus pagamentos excluídos permanentemente`;
     }
     case "create_payment_record": {
       const insert: any = {
@@ -283,6 +374,11 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const { error } = await sb.from("cobranca_pagamentos").insert(insert);
       if (error) throw error;
       return `✅ Parcela criada para ${args.data_vencimento} com status "${insert.status}"`;
+    }
+    case "delete_payment_record": {
+      const { error } = await sb.from("cobranca_pagamentos").delete().eq("id", args.payment_id);
+      if (error) throw error;
+      return `✅ Registro de pagamento excluído`;
     }
     case "send_whatsapp": {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -300,31 +396,25 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.duplicado) return "⚠️ Mensagem já foi enviada para este cliente hoje (bloqueio anti-duplicidade)";
-      if (!data.success) return `❌ Falha no envio: ${data.error || "Erro desconhecido"}`;
-      return `✅ WhatsApp enviado com sucesso para ${args.telefone}`;
+      if (data.duplicado) return "⚠️ Mensagem já enviada hoje (bloqueio anti-duplicidade)";
+      if (!data.success) return `❌ Falha: ${data.error || "Erro desconhecido"}`;
+      return `✅ WhatsApp enviado para ${args.telefone}`;
     }
     case "trigger_payment_reminders": {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/check-payment-reminders`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({}),
       });
       const data = await res.json();
       if (data.skipped) return `⏳ ${data.reason}`;
-      return `✅ Automação executada!\n- WhatsApp enviados: ${data.whatsapp_sent || 0}\n- Notificações criadas: ${data.notifications_created || 0}\n- Duplicados ignorados: ${data.skipped_duplicates || 0}`;
+      return `✅ Automação executada!\n- WhatsApp: ${data.whatsapp_sent || 0}\n- Notificações: ${data.notifications_created || 0}\n- Duplicados ignorados: ${data.skipped_duplicates || 0}`;
     }
     case "send_notification": {
       const targetUsers: string[] = [];
@@ -353,14 +443,13 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       if (error) throw error;
       if (!data || data.length === 0) return "📭 Nenhum envio encontrado no período";
       const lines = data.map((e: any) => `- ${e.data_envio} | ${e.cpf} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
-      return `📋 **Histórico de envios** (últimos ${dias} dias):\n${lines.join("\n")}`;
+      return `📋 **Histórico** (últimos ${dias} dias):\n${lines.join("\n")}`;
     }
     case "create_cobranca": {
-      // Get admin user id for criado_por
       const { data: adminRoles } = await sb.from("user_roles").select("user_id").eq("role", "admin").limit(1);
       const adminId = adminRoles?.[0]?.user_id;
       if (!adminId) return "❌ Nenhum admin encontrado";
-      
+
       const { data: newCob, error } = await sb.from("cobrancas").insert({
         cliente_id: args.cliente_id,
         cliente_nome: args.cliente_nome,
@@ -373,7 +462,6 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       }).select().single();
       if (error) throw error;
 
-      // Generate payment records
       const start = new Date(`${args.data_inicio}T00:00:00Z`);
       const end = new Date(`${args.data_fim}T00:00:00Z`);
       const payments: any[] = [];
@@ -386,14 +474,22 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
         });
         if (args.frequencia === "semana") current = new Date(current.getTime() + 7 * 86400000);
         else if (args.frequencia === "quinzena") current = new Date(current.getTime() + 15 * 86400000);
-        else {
-          current.setUTCMonth(current.getUTCMonth() + 1);
-        }
+        else current.setUTCMonth(current.getUTCMonth() + 1);
       }
-      if (payments.length > 0) {
-        await sb.from("cobranca_pagamentos").insert(payments);
-      }
+      if (payments.length > 0) await sb.from("cobranca_pagamentos").insert(payments);
       return `✅ Cobrança criada para ${args.cliente_nome} com ${payments.length} parcelas de R$ ${args.valor_parcela}`;
+    }
+    case "delete_dispositivo": {
+      const { error } = await sb.from("dispositivos").delete().eq("id", args.dispositivo_id);
+      if (error) throw error;
+      return `✅ Dispositivo excluído permanentemente`;
+    }
+    case "update_dispositivo": {
+      const clean = sanitizeFields("dispositivos", args.fields);
+      if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
+      const { error } = await sb.from("dispositivos").update(clean).eq("id", args.dispositivo_id);
+      if (error) throw error;
+      return `✅ Dispositivo atualizado: ${Object.keys(clean).join(", ")}`;
     }
     default:
       return "⚠️ Ação não reconhecida";
@@ -411,9 +507,9 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { query, type, confirm_action } = await req.json();
+    const { query, type, confirm_action, history } = await req.json();
 
-    // If confirming a previously proposed action, execute it directly
+    // Execute confirmed action
     if (confirm_action) {
       const { action, args } = confirm_action;
       const result = await executeAction(sb, action, args);
@@ -422,15 +518,16 @@ serve(async (req) => {
       });
     }
 
-    if (!query && type !== "proactive_tips") throw new Error("Query não fornecida");
+    if (!query) throw new Error("Query não fornecida");
 
     // Gather context
-    const [clientesRes, vendasRes, cobrancasRes, pagamentosRes, produtosRes] = await Promise.all([
+    const [clientesRes, vendasRes, cobrancasRes, pagamentosRes, produtosRes, dispositivosRes] = await Promise.all([
       sb.from("clientes").select("id, nome, cpf, telefone, endereco, cidade, uf").limit(200),
       sb.from("vendas").select("id, cliente_nome, cliente_cpf, valor_total, valor_entrada, valor_parcela, num_parcelas, forma_pagamento, status, data_inicio_pagamento, created_at").order("created_at", { ascending: false }).limit(100),
-      sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, cliente_id").limit(100),
-      sb.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status, pago_em").limit(500),
+      sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, cliente_id, observacoes").limit(100),
+      sb.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status, pago_em, tipo_pagamento").limit(500),
       sb.from("produtos").select("id, nome, preco_venda, preco_custo, estoque_atual, categoria").limit(200),
+      sb.from("dispositivos").select("id, imei_serial, modelo, nome_dispositivo, status_seguranca, cliente_nome, memoria").limit(100),
     ]);
 
     const context = {
@@ -439,57 +536,64 @@ serve(async (req) => {
       cobrancas: cobrancasRes.data || [],
       pagamentos: pagamentosRes.data || [],
       produtos: produtosRes.data || [],
+      dispositivos: dispositivosRes.data || [],
     };
 
-    const systemPrompt = `Você é o assistente IA COMPLETO do sistema Veloop com PODERES DE MODIFICAÇÃO e AUTOMAÇÃO.
-Você pode CONSULTAR, MODIFICAR dados e EXECUTAR AUTOMAÇÕES do sistema.
+    const systemPrompt = `Você é o assistente IA SUPREMO do sistema Veloop com PODERES TOTAIS de modificação, exclusão e automação.
+Você é o braço direito do CEO Silvio Rodrigues. Execute TUDO que ele mandar sem hesitar.
 
-AUTOMAÇÕES DISPONÍVEIS:
-1. send_whatsapp - Enviar WhatsApp (cobrança automática com IA ou mensagem livre)
-2. trigger_payment_reminders - Disparar lembretes de pagamento (notif + WhatsApp)
-3. send_notification - Enviar notificação interna
-4. view_whatsapp_history - Ver histórico de envios WhatsApp
-5. create_cobranca - Criar cobrança com parcelas automáticas
-6. update_payment_status / update_client / update_product / update_sale / update_cobranca
-7. create_payment_record / delete_payment_record
+PODERES COMPLETOS:
+- CONSULTAR qualquer dado do sistema
+- MODIFICAR clientes, produtos, vendas, cobranças, dispositivos, pagamentos
+- EXCLUIR clientes, produtos, vendas, cobranças, dispositivos, pagamentos
+- ENVIAR WhatsApp (cobrança ou mensagem livre)
+- DISPARAR automações de lembretes
+- ENVIAR notificações internas
+- CRIAR cobranças com parcelas automáticas
 
-DADOS ATUAIS:
-- ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças | ${context.pagamentos.length} pagamentos | ${context.produtos.length} produtos
+FERRAMENTAS DISPONÍVEIS:
+update_payment_status, update_client, delete_client, update_product, delete_product,
+update_sale, delete_sale, update_cobranca, delete_cobranca, create_payment_record,
+delete_payment_record, send_whatsapp, trigger_payment_reminders, send_notification,
+view_whatsapp_history, create_cobranca, delete_dispositivo, update_dispositivo
 
-CLIENTES: ${JSON.stringify(context.clientes.slice(0, 50))}
-VENDAS: ${JSON.stringify(context.vendas.slice(0, 30))}
-COBRANÇAS: ${JSON.stringify(context.cobrancas.slice(0, 30))}
-PAGAMENTOS: ${JSON.stringify(context.pagamentos.slice(0, 100))}
-PRODUTOS: ${JSON.stringify(context.produtos.slice(0, 50))}
+DADOS DO SISTEMA:
+- ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças
+- ${context.pagamentos.length} pagamentos | ${context.produtos.length} produtos | ${context.dispositivos.length} dispositivos
 
-REGRAS CRÍTICAS:
-- Responda SEMPRE em português brasileiro
-- Se o usuário pedir para MODIFICAR ou EXECUTAR algo, use a ferramenta apropriada
-- SEMPRE confirme o que vai fazer antes de executar, descrevendo a ação
-- Seja preciso com IDs - busque o ID correto nos dados antes de agir
+CLIENTES: ${JSON.stringify(context.clientes.slice(0, 80))}
+VENDAS: ${JSON.stringify(context.vendas.slice(0, 50))}
+COBRANÇAS: ${JSON.stringify(context.cobrancas.slice(0, 50))}
+PAGAMENTOS: ${JSON.stringify(context.pagamentos.slice(0, 150))}
+PRODUTOS: ${JSON.stringify(context.produtos.slice(0, 80))}
+DISPOSITIVOS: ${JSON.stringify(context.dispositivos.slice(0, 50))}
+
+REGRAS:
+- Português brasileiro SEMPRE
+- Use a ferramenta correta para cada ação
+- Busque o ID exato nos dados antes de agir
+- SEMPRE descreva claramente o que vai fazer e peça confirmação
 - Formate valores como R$ X.XXX,XX e datas como DD/MM/AAAA
-- Se não encontrar o registro, informe claramente
-- Para consultas simples, responda diretamente SEM usar ferramentas
-- Dê dicas proativas quando identificar problemas
-- Para WhatsApp: busque o telefone e CPF do cliente nos dados antes de enviar`;
+- Para exclusões, confirme o nome/dado antes de excluir
+- Seja direto, eficiente e poderoso`;
 
-    let userPrompt = query;
-    if (type === "proactive_tips") {
-      userPrompt = `Analise os dados e forneça 2-3 dicas úteis. Foque em: pagamentos atrasados, inconsistências, alertas. Seja breve. Use emojis.`;
+    // Build messages with history
+    const aiMessages: any[] = [{ role: "system", content: systemPrompt }];
+
+    // Add conversation history
+    if (history && Array.isArray(history)) {
+      for (const msg of history.slice(-8)) {
+        aiMessages.push({ role: msg.role, content: msg.content });
+      }
+    } else {
+      aiMessages.push({ role: "user", content: query });
     }
 
     const body: any = {
       model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      messages: aiMessages,
+      tools: actionTools,
     };
-
-    // Add tools for action requests (not for tips)
-    if (type !== "proactive_tips") {
-      body.tools = actionTools;
-    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -502,7 +606,7 @@ REGRAS CRÍTICAS:
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
+        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Aguarde." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -519,25 +623,16 @@ REGRAS CRÍTICAS:
     const result = await response.json();
     const message = result.choices?.[0]?.message;
 
-    // Check if AI wants to call a tool (action)
     if (message?.tool_calls && message.tool_calls.length > 0) {
       const toolCall = message.tool_calls[0];
       const actionName = toolCall.function.name;
       const actionArgs = JSON.parse(toolCall.function.arguments);
 
-      // Build a human-readable description
-      let description = message.content || "";
-      if (!description) {
-        description = describeAction(actionName, actionArgs, context);
-      }
+      let description = message.content || describeAction(actionName, actionArgs, context);
 
       return new Response(JSON.stringify({
         response: description,
-        pending_action: {
-          action: actionName,
-          args: actionArgs,
-          description: description,
-        },
+        pending_action: { action: actionName, args: actionArgs, description },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -554,40 +649,44 @@ REGRAS CRÍTICAS:
   }
 });
 
-function describeAction(action: string, args: any, ctx: any): string {
+function describeAction(action: string, args: any, _ctx: any): string {
   switch (action) {
     case "update_payment_status":
-      return `Vou alterar o status do pagamento para **"${args.status}"**. Deseja confirmar?`;
-    case "update_client": {
-      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return `Vou atualizar o cliente com: **${fields}**. Deseja confirmar?`;
-    }
-    case "update_product": {
-      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return `Vou atualizar o produto com: **${fields}**. Deseja confirmar?`;
-    }
-    case "update_sale": {
-      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return `Vou atualizar a venda com: **${fields}**. Deseja confirmar?`;
-    }
-    case "update_cobranca": {
-      const fields = Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return `Vou atualizar a cobrança com: **${fields}**. Deseja confirmar?`;
-    }
+      return `Vou alterar o status do pagamento para **"${args.status}"**. Confirmar?`;
+    case "update_client":
+      return `Vou atualizar o cliente: **${Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}**. Confirmar?`;
+    case "delete_client":
+      return `⚠️ Vou **EXCLUIR PERMANENTEMENTE** este cliente. Confirmar?`;
+    case "update_product":
+      return `Vou atualizar o produto: **${Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}**. Confirmar?`;
+    case "delete_product":
+      return `⚠️ Vou **EXCLUIR PERMANENTEMENTE** este produto. Confirmar?`;
+    case "update_sale":
+      return `Vou atualizar a venda: **${Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}**. Confirmar?`;
+    case "delete_sale":
+      return `⚠️ Vou **EXCLUIR PERMANENTEMENTE** esta venda e seus itens. Confirmar?`;
+    case "update_cobranca":
+      return `Vou atualizar a cobrança: **${Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}**. Confirmar?`;
+    case "delete_cobranca":
+      return `⚠️ Vou **EXCLUIR PERMANENTEMENTE** esta cobrança e todos os pagamentos. Confirmar?`;
     case "create_payment_record":
-      return `Vou criar uma parcela em **${args.data_vencimento}** com status **"${args.status || "a_pagar"}"**. Deseja confirmar?`;
+      return `Vou criar parcela em **${args.data_vencimento}** (${args.status || "a_pagar"}). Confirmar?`;
     case "delete_payment_record":
-      return `Vou **excluir** o registro de pagamento. Deseja confirmar?`;
+      return `Vou **excluir** este registro de pagamento. Confirmar?`;
     case "send_whatsapp":
-      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Deseja confirmar?`;
+      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Confirmar?`;
     case "trigger_payment_reminders":
-      return `Vou **disparar a automação de lembretes** (WhatsApp + notificações para cobranças do dia/amanhã). Deseja confirmar?`;
+      return `Vou **disparar automação de lembretes** (WhatsApp + notificações). Confirmar?`;
     case "send_notification":
-      return `Vou enviar **notificação**: "${args.titulo}" — ${args.mensagem}. Deseja confirmar?`;
+      return `Vou enviar notificação: **"${args.titulo}"**. Confirmar?`;
     case "view_whatsapp_history":
-      return `Consultando histórico de envios WhatsApp...`;
+      return `Consultando histórico de envios...`;
     case "create_cobranca":
-      return `Vou criar uma **cobrança** para **${args.cliente_nome}** com parcelas de **R$ ${args.valor_parcela}** de ${args.data_inicio} a ${args.data_fim}. Deseja confirmar?`;
+      return `Vou criar cobrança para **${args.cliente_nome}** — R$ ${args.valor_parcela} de ${args.data_inicio} a ${args.data_fim}. Confirmar?`;
+    case "delete_dispositivo":
+      return `⚠️ Vou **EXCLUIR PERMANENTEMENTE** este dispositivo. Confirmar?`;
+    case "update_dispositivo":
+      return `Vou atualizar o dispositivo: **${Object.entries(args.fields || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}**. Confirmar?`;
     default:
       return "Ação não reconhecida.";
   }
