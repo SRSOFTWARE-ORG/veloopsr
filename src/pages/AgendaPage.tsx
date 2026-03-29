@@ -454,28 +454,41 @@ const AgendaPage = () => {
     end: endOfMonth(currentMonth),
   });
 
+  // Helper: get the correct cobranca ID for status check on a given date
+  const getStatusCobrancaId = useCallback((c: Cobranca, dateKey: string) => {
+    const clientKey = c.cliente_nome.trim().toUpperCase();
+    const entrada = entradaMap.get(clientKey);
+    if (entrada && !c.observacoes?.startsWith("Entrada")) {
+      const entradaDate = format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+      if (dateKey === entradaDate) return entrada.id;
+    }
+    return c.id;
+  }, [entradaMap]);
+
   const selectedDateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
   const selectedCobrancas = useMemo(() => {
     if (!selectedDateKey) return [];
     const items = dateMap.get(selectedDateKey) || [];
     if (statusFilter === "todos") return items;
     return items.filter((c) => {
-      const status = getPaymentStatus(selectedDateKey, c.id, pagamentosMap);
+      const cobId = getStatusCobrancaId(c, selectedDateKey);
+      const status = getPaymentStatus(selectedDateKey, cobId, pagamentosMap);
       return status === statusFilter;
     });
-  }, [selectedDateKey, dateMap, statusFilter, pagamentosMap]);
+  }, [selectedDateKey, dateMap, statusFilter, pagamentosMap, getStatusCobrancaId]);
 
   const dayStatusMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     dateMap.forEach((cobList, key) => {
       const statuses = new Set<string>();
       cobList.forEach((c) => {
-        statuses.add(getPaymentStatus(key, c.id, pagamentosMap));
+        const cobId = getStatusCobrancaId(c, key);
+        statuses.add(getPaymentStatus(key, cobId, pagamentosMap));
       });
       map.set(key, statuses);
     });
     return map;
-  }, [dateMap, pagamentosMap]);
+  }, [dateMap, pagamentosMap, getStatusCobrancaId]);
 
   const startPadding = startOfMonth(currentMonth).getDay();
 
