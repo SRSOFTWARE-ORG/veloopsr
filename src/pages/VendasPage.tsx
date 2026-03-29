@@ -22,6 +22,8 @@ import {
   ChevronLeft,
   CalendarDays,
   Pencil,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   Dialog,
@@ -382,64 +384,125 @@ const VendasPage = () => {
       </div>
 
       <div className="space-y-2">
-        {filteredVendas.map((v, i) => (
-          <Card key={v.id} className={`slide-up delay-${Math.min(i + 2, 6)}`}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <ShoppingCart className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{v.cliente_nome}</p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs font-bold tabular-nums">
-                    {formatCurrency(v.valor_total)}
-                  </span>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getStatusColor(v.status || "")}`}>
-                    {getStatusLabel(v.status || "")}
-                  </span>
-                  {(v.num_parcelas || 0) > 1 && (
-                    <span className="text-xs text-muted-foreground">
-                      {v.num_parcelas}x {formatCurrency(v.valor_parcela)}
-                      {v.frequencia_parcela && ` · ${frequenciaLabels[v.frequencia_parcela] || v.frequencia_parcela}`}
-                    </span>
-                  )}
+         {filteredVendas.map((v, i) => {
+          const isExpanded = expandedVendaId === v.id;
+          const valorTotalComEntrada = (v.valor_entrada || 0) > 0 ? (v.valor_entrada || 0) + v.valor_total : v.valor_total;
+          return (
+            <Card key={v.id} className={`slide-up delay-${Math.min(i + 2, 6)}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{v.cliente_nome}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs font-bold tabular-nums">
+                        {formatCurrency(v.valor_total)}
+                      </span>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${getStatusColor(v.status || "")}`}>
+                        {getStatusLabel(v.status || "")}
+                      </span>
+                      {(v.num_parcelas || 0) > 1 && (
+                        <span className="text-xs text-muted-foreground">
+                          {v.num_parcelas}x {formatCurrency(v.valor_parcela)}
+                          {v.frequencia_parcela && ` · ${frequenciaLabels[v.frequencia_parcela] || v.frequencia_parcela}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => setExpandedVendaId(isExpanded ? null : v.id)}
+                    >
+                      {isExpanded ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                    {v.cliente_telefone && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => sendWhatsApp(v)}>
+                        <MessageCircle className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {isPrimaryAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => { setEditVenda(v); setEditDialogOpen(true); }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {isPrimaryAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={async () => {
+                          if (!confirm("Excluir esta venda?")) return;
+                          await supabase.from("vendas").delete().eq("id", v.id);
+                          toast.success("Venda excluída");
+                          fetchVendas();
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {v.cliente_telefone && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => sendWhatsApp(v)}>
-                    <MessageCircle className="w-4 h-4" />
-                  </Button>
+
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-border/50 space-y-2 animate-fade-in">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {(v.valor_entrada || 0) > 0 && (
+                        <>
+                          <span className="text-muted-foreground">Entrada</span>
+                          <span className="text-right font-medium text-green-600 tabular-nums">{formatCurrency(v.valor_entrada || 0)}</span>
+                        </>
+                      )}
+                      {(v.num_parcelas || 0) > 1 && (
+                        <>
+                          <span className="text-muted-foreground">Parcelas</span>
+                          <span className="text-right font-medium tabular-nums">{v.num_parcelas}x {formatCurrency(v.valor_parcela)}</span>
+                        </>
+                      )}
+                      {(v.valor_entrada || 0) > 0 && (
+                        <>
+                          <span className="text-muted-foreground">Valor Total (com entrada)</span>
+                          <span className="text-right font-extrabold tabular-nums">{formatCurrency(valorTotalComEntrada)}</span>
+                        </>
+                      )}
+                      <span className="text-muted-foreground">Forma de Pagamento</span>
+                      <span className="text-right font-medium capitalize">{v.forma_pagamento === "avista" ? "À vista" : v.forma_pagamento === "parcelado" ? "Parcelado" : v.forma_pagamento || "—"}</span>
+                      {v.frequencia_parcela && (v.num_parcelas || 0) > 1 && (
+                        <>
+                          <span className="text-muted-foreground">Frequência</span>
+                          <span className="text-right font-medium">{frequenciaLabels[v.frequencia_parcela] || v.frequencia_parcela}</span>
+                        </>
+                      )}
+                      {v.data_inicio_pagamento && (
+                        <>
+                          <span className="text-muted-foreground">1º Pagamento</span>
+                          <span className="text-right font-medium">{new Date(v.data_inicio_pagamento + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                        </>
+                      )}
+                      {v.desconto_percentual > 0 && (
+                        <>
+                          <span className="text-muted-foreground">Desconto</span>
+                          <span className="text-right font-medium text-destructive">{v.desconto_percentual}%</span>
+                        </>
+                      )}
+                      <span className="text-muted-foreground">Data da Venda</span>
+                      <span className="text-right font-medium">{v.created_at ? new Date(v.created_at).toLocaleDateString("pt-BR") : "—"}</span>
+                    </div>
+                  </div>
                 )}
-                {isPrimaryAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => { setEditVenda(v); setEditDialogOpen(true); }}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                )}
-                {isPrimaryAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={async () => {
-                      if (!confirm("Excluir esta venda?")) return;
-                      await supabase.from("vendas").delete().eq("id", v.id);
-                      toast.success("Venda excluída");
-                      fetchVendas();
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
         {filteredVendas.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
