@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Clock, CheckCircle2 } from "lucide-react";
+import { DollarSign, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import RecebidosDetalhes from "./RecebidosDetalhes";
+import PendentesDetalhes from "./PendentesDetalhes";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
