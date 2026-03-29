@@ -663,36 +663,52 @@ const AgendaPage = () => {
             </Card>
           ) : (
             selectedCobrancas.map((c) => {
-              const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
+               const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
               const config = statusConfig[status];
               const StatusIcon = config.icon;
               const isPaidOrExempt = status === "pago" || status === "isento";
+              const pagKey = `${c.id}_${selectedDateKey}`;
+              const pagamento = pagamentosMap.get(pagKey);
+              const isEntrada = (pagamento as any)?.tipo_pagamento === "entrada" || c.observacoes?.startsWith("Entrada");
 
               return (
                 <Card key={c.id} className={cn("border", isPaidOrExempt && "opacity-75")}>
                   <CardContent className="space-y-2 py-4">
                     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <User className="w-4 h-4 text-primary" />
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isEntrada ? "bg-emerald-500/10" : "bg-primary/10")}>
+                          {isEntrada ? (
+                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <User className="w-4 h-4 text-primary" />
+                          )}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                            {isEntrada && (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
+                                Entrada
+                              </Badge>
+                            )}
+                          </div>
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <DollarSign className="w-3 h-3 shrink-0" />
                               {formatCurrency(c.valor_parcela)}
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 shrink-0" />
-                              {frequenciaLabels[c.frequencia]}
-                            </span>
+                            {!isEntrada && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 shrink-0" />
+                                {frequenciaLabels[c.frequencia]}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                       <Badge variant="outline" className={cn("w-fit max-w-full text-xs border", config.color)}>
                         <StatusIcon className="w-3 h-3 mr-1 shrink-0" />
-                        {config.label}
+                        {isEntrada ? (status === "pago" ? "Entrada Paga" : config.label) : config.label}
                       </Badge>
                     </div>
 
