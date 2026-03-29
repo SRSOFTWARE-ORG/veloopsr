@@ -824,14 +824,22 @@ const AgendaPage = () => {
               </CardContent>
             </Card>
           ) : (
-            upcomingItems.map((c) => (
+             upcomingItems.map((c) => {
+              const isEntrada = c.observacoes?.startsWith("Entrada");
+              return (
               <Card key={c.id}>
                 <CardContent className="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
+                      {isEntrada && (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
+                          Entrada
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground break-words">
-                      {formatCurrency(c.valor_parcela)} · {frequenciaLabels[c.frequencia]} · até{" "}
-                      {format(parseISO(c.data_fim), "dd/MM/yyyy")}
+                      {formatCurrency(c.valor_parcela)} · {isEntrada ? "Pagamento único" : `${frequenciaLabels[c.frequencia]} · até ${format(parseISO(c.data_fim), "dd/MM/yyyy")}`}
                     </p>
                   </div>
                   <Badge variant="outline" className="w-fit text-xs">
