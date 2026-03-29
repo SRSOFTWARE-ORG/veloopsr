@@ -120,8 +120,13 @@ const DocumentosPage = () => {
 
   const scanDocumentAndProcess = async (doc: Documento) => {
     try {
-      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-document", {
-        body: { pdf_url: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
+      // Use scan-pdv for PDV documents, scan-document for others
+      const isPdv = doc.tipo === "pdv";
+      const functionName = isPdv ? "scan-pdv" : "scan-document";
+      const bodyKey = isPdv ? "file_url" : "pdf_url";
+
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke(functionName, {
+        body: { [bodyKey]: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
       });
 
       if (scanError) throw scanError;
@@ -130,19 +135,23 @@ const DocumentosPage = () => {
       const extracted = scanResult?.data;
       if (!extracted?.cliente_nome) throw new Error("Dados insuficientes");
 
-      const tipoDetectado = extracted.tipo_documento || "boleto";
+      if (isPdv) {
+        await processPdvData(doc, extracted);
+      } else {
+        const tipoDetectado = extracted.tipo_documento || "boleto";
 
-      // Update document type if AI detected differently
-      if (tipoDetectado !== doc.tipo) {
-        await supabase.from("documentos").update({ tipo: tipoDetectado } as any).eq("id", doc.id);
-      }
+        // Update document type if AI detected differently
+        if (tipoDetectado !== doc.tipo) {
+          await supabase.from("documentos").update({ tipo: tipoDetectado } as any).eq("id", doc.id);
+        }
 
-      if (tipoDetectado === "carne") {
-        await processCarneData(doc, extracted);
-      } else if (tipoDetectado === "boleto") {
-        await processBoletoData(doc, extracted);
-      } else if (tipoDetectado === "nota_fiscal") {
-        await processNotaData(doc, extracted);
+        if (tipoDetectado === "carne") {
+          await processCarneData(doc, extracted);
+        } else if (tipoDetectado === "boleto") {
+          await processBoletoData(doc, extracted);
+        } else if (tipoDetectado === "nota_fiscal") {
+          await processNotaData(doc, extracted);
+        }
       }
 
       await supabase.from("documentos").update({ processado: true, cliente_nome: extracted.cliente_nome } as any).eq("id", doc.id);
