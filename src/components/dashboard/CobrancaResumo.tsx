@@ -156,24 +156,26 @@ const CobrancaResumo = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
-          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-primary/10 p-3">
+          <button onClick={() => setRecebidosOpen(true)} className="flex min-w-0 items-center gap-2 rounded-lg bg-primary/10 p-3 text-left transition-colors hover:bg-primary/20 cursor-pointer w-full">
             <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] text-muted-foreground">Recebido</p>
               <p className="truncate text-sm font-bold tabular-nums text-primary">
                 {recebido.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
-          </div>
-          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-destructive/10 p-3">
+            <ChevronRight className="w-4 h-4 text-primary/50 shrink-0" />
+          </button>
+          <button onClick={() => setPendentesOpen(true)} className="flex min-w-0 items-center gap-2 rounded-lg bg-destructive/10 p-3 text-left transition-colors hover:bg-destructive/20 cursor-pointer w-full">
             <Clock className="w-5 h-5 text-destructive shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] text-muted-foreground">Pendente</p>
               <p className="truncate text-sm font-bold tabular-nums text-destructive">
                 {pendente.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
-          </div>
+            <ChevronRight className="w-4 h-4 text-destructive/50 shrink-0" />
+          </button>
         </div>
 
         {total > 0 ? (
