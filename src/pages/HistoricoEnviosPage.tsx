@@ -132,8 +132,8 @@ const HistoricoEnviosPage = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="P">P (A pagar)</SelectItem>
-            <SelectItem value="V">V (Vencida)</SelectItem>
+            <SelectItem value="D-1">P (A pagar)</SelectItem>
+            <SelectItem value="D0">V (Vencida)</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -192,8 +192,8 @@ const HistoricoEnviosPage = () => {
                       <TableCell className="font-mono text-xs">{envio.cpf}</TableCell>
                       <TableCell className="font-mono text-xs">{envio.telefone}</TableCell>
                       <TableCell>
-                        <Badge variant={envio.tipo_envio === "P" ? "secondary" : "default"}>
-                          {envio.tipo_envio === "P" ? "P (A pagar)" : envio.tipo_envio === "V" ? "V (Vencida)" : envio.tipo_envio}
+                        <Badge variant={envio.tipo_envio === "D-1" ? "secondary" : "default"}>
+                          {envio.tipo_envio === "D-1" ? "P (A pagar)" : envio.tipo_envio === "D0" ? "V (Vencida)" : envio.tipo_envio}
                         </Badge>
                       </TableCell>
                       <TableCell>
