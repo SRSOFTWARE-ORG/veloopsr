@@ -42,6 +42,8 @@ const CobrancaResumo = () => {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [recebido, setRecebido] = useState(0);
   const [pendente, setPendente] = useState(0);
+  const [recebidosOpen, setRecebidosOpen] = useState(false);
+  const [pendentesOpen, setPendentesOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
