@@ -99,6 +99,7 @@ const VendasPage = () => {
   const [formaPagamento, setFormaPagamento] = useState<"avista" | "parcelado">("parcelado");
   const [temEntrada, setTemEntrada] = useState(false);
   const [entrada, setEntrada] = useState(0);
+  const [dataEntrada, setDataEntrada] = useState(() => new Date().toISOString().split("T")[0]);
   const [desconto, setDesconto] = useState(0);
   const [frequencia, setFrequencia] = useState("mes");
   const [numParcelas, setNumParcelas] = useState(1);
