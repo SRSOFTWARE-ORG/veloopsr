@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MessageSquare, CheckCircle2, XCircle, Search, RefreshCw } from "lucide-react";
+import { MessageSquare, CheckCircle2, XCircle, Search, RefreshCw, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -146,6 +146,22 @@ const HistoricoEnviosPage = () => {
             <SelectItem value="falha">Falha</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1 text-destructive hover:bg-destructive/10"
+          onClick={async () => {
+            if (!confirm(`Apagar todos os ${filtered.length} registros filtrados?`)) return;
+            const ids = filtered.map((e) => e.id);
+            await supabase.from("envio_cobranca").delete().in("id", ids);
+            toast.success(`${ids.length} registro(s) excluído(s)`);
+            setEnvios((prev) => prev.filter((e) => !ids.includes(e.id)));
+          }}
+          disabled={filtered.length === 0}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Limpar
+        </Button>
       </div>
 
       {/* Table */}
@@ -162,6 +178,7 @@ const HistoricoEnviosPage = () => {
                   <TableHead>Status Fatura</TableHead>
                   <TableHead>Envio</TableHead>
                   <TableHead className="max-w-[200px]">Mensagem</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -212,6 +229,21 @@ const HistoricoEnviosPage = () => {
                         <p className="text-xs text-muted-foreground truncate" title={envio.mensagem}>
                           {envio.mensagem?.slice(0, 80)}...
                         </p>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={async () => {
+                            if (!confirm("Excluir este registro?")) return;
+                            await supabase.from("envio_cobranca").delete().eq("id", envio.id);
+                            toast.success("Registro excluído");
+                            setEnvios((prev) => prev.filter((e) => e.id !== envio.id));
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
