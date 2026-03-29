@@ -130,6 +130,7 @@ const CobrancaResumo = () => {
   const total = recebido + pendente;
 
   return (
+    <>
     <Card className="slide-up delay-5">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
