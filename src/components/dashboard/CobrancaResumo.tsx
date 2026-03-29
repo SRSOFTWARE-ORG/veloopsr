@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Clock, CheckCircle2 } from "lucide-react";
+import { DollarSign, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import RecebidosDetalhes from "./RecebidosDetalhes";
+import PendentesDetalhes from "./PendentesDetalhes";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
@@ -40,6 +42,8 @@ const CobrancaResumo = () => {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [recebido, setRecebido] = useState(0);
   const [pendente, setPendente] = useState(0);
+  const [recebidosOpen, setRecebidosOpen] = useState(false);
+  const [pendentesOpen, setPendentesOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -126,6 +130,7 @@ const CobrancaResumo = () => {
   const total = recebido + pendente;
 
   return (
+    <>
     <Card className="slide-up delay-5">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
@@ -152,24 +157,26 @@ const CobrancaResumo = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
-          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-primary/10 p-3">
+          <button onClick={() => setRecebidosOpen(true)} className="flex min-w-0 items-center gap-2 rounded-lg bg-primary/10 p-3 text-left transition-colors hover:bg-primary/20 cursor-pointer w-full">
             <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] text-muted-foreground">Recebido</p>
               <p className="truncate text-sm font-bold tabular-nums text-primary">
                 {recebido.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
-          </div>
-          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-destructive/10 p-3">
+            <ChevronRight className="w-4 h-4 text-primary/50 shrink-0" />
+          </button>
+          <button onClick={() => setPendentesOpen(true)} className="flex min-w-0 items-center gap-2 rounded-lg bg-destructive/10 p-3 text-left transition-colors hover:bg-destructive/20 cursor-pointer w-full">
             <Clock className="w-5 h-5 text-destructive shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] text-muted-foreground">Pendente</p>
               <p className="truncate text-sm font-bold tabular-nums text-destructive">
                 {pendente.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
               </p>
             </div>
-          </div>
+            <ChevronRight className="w-4 h-4 text-destructive/50 shrink-0" />
+          </button>
         </div>
 
         {total > 0 ? (
@@ -216,6 +223,20 @@ const CobrancaResumo = () => {
         )}
       </CardContent>
     </Card>
+
+    <RecebidosDetalhes
+      open={recebidosOpen}
+      onOpenChange={setRecebidosOpen}
+      start={getDateRange(periodo).start}
+      end={getDateRange(periodo).end}
+    />
+    <PendentesDetalhes
+      open={pendentesOpen}
+      onOpenChange={setPendentesOpen}
+      start={getDateRange(periodo).start}
+      end={getDateRange(periodo).end}
+    />
+    </>
   );
 };
 

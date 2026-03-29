@@ -288,6 +288,7 @@ export type Database = {
           pago_em: string | null
           pago_por: string | null
           status: string
+          tipo_pagamento: string
         }
         Insert: {
           cobranca_id: string
@@ -297,6 +298,7 @@ export type Database = {
           pago_em?: string | null
           pago_por?: string | null
           status?: string
+          tipo_pagamento?: string
         }
         Update: {
           cobranca_id?: string
@@ -306,6 +308,7 @@ export type Database = {
           pago_em?: string | null
           pago_por?: string | null
           status?: string
+          tipo_pagamento?: string
         }
         Relationships: [
           {
@@ -897,6 +900,7 @@ export type Database = {
           cliente_nome: string
           cliente_telefone: string | null
           created_at: string | null
+          data_entrada: string | null
           data_inicio_pagamento: string | null
           desconto_percentual: number | null
           forma_pagamento: string | null
@@ -916,6 +920,7 @@ export type Database = {
           cliente_nome: string
           cliente_telefone?: string | null
           created_at?: string | null
+          data_entrada?: string | null
           data_inicio_pagamento?: string | null
           desconto_percentual?: number | null
           forma_pagamento?: string | null
@@ -935,6 +940,7 @@ export type Database = {
           cliente_nome?: string
           cliente_telefone?: string | null
           created_at?: string | null
+          data_entrada?: string | null
           data_inicio_pagamento?: string | null
           desconto_percentual?: number | null
           forma_pagamento?: string | null
