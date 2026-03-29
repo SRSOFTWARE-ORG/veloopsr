@@ -146,6 +146,22 @@ const HistoricoEnviosPage = () => {
             <SelectItem value="falha">Falha</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1 text-destructive hover:bg-destructive/10"
+          onClick={async () => {
+            if (!confirm(`Apagar todos os ${filtered.length} registros filtrados?`)) return;
+            const ids = filtered.map((e) => e.id);
+            await supabase.from("envio_cobranca").delete().in("id", ids);
+            toast.success(`${ids.length} registro(s) excluído(s)`);
+            setEnvios((prev) => prev.filter((e) => !ids.includes(e.id)));
+          }}
+          disabled={filtered.length === 0}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Limpar
+        </Button>
       </div>
 
       {/* Table */}
