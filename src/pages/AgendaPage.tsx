@@ -890,21 +890,29 @@ const AgendaPage = () => {
             </Card>
           ) : (
              upcomingItems.map((c) => {
-              const isEntrada = c.observacoes?.startsWith("Entrada");
+              const clientKey = c.cliente_nome.trim().toUpperCase();
+              const entrada = entradaMap.get(clientKey);
+              const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
+
               return (
               <Card key={c.id}>
                 <CardContent className="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
-                      {isEntrada && (
+                      {entrada && (
                         <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
                           Entrada
                         </Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground break-words">
-                      {formatCurrency(c.valor_parcela)} · {isEntrada ? "Pagamento único" : `${frequenciaLabels[c.frequencia]} · até ${format(parseISO(c.data_fim), "dd/MM/yyyy")}`}
+                      {formatCurrency(c.valor_parcela)} · {frequenciaLabels[c.frequencia]} · até {format(parseISO(c.data_fim), "dd/MM/yyyy")}
+                      {entrada && (
+                        <span className="ml-1 text-foreground/70 font-medium">
+                          (Entrada {formatCurrency(entrada.valor_parcela)} + {numParcelas}x{formatCurrency(c.valor_parcela)})
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Badge variant="outline" className="w-fit text-xs">
