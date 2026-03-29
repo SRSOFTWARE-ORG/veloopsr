@@ -480,15 +480,15 @@ const AgendaPage = () => {
   const startPadding = startOfMonth(currentMonth).getDay();
 
   const upcomingItems = useMemo(() => {
-    if (statusFilter === "todos") return cobrancas.slice(0, 10);
-    return cobrancas.filter((c) => {
+    if (statusFilter === "todos") return mergedCobrancas.slice(0, 10);
+    return mergedCobrancas.filter((c) => {
       const dates = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia);
       return dates.some((d) => {
         const key = format(d, "yyyy-MM-dd");
         return getPaymentStatus(key, c.id, pagamentosMap) === statusFilter;
       });
     }).slice(0, 10);
-  }, [cobrancas, statusFilter, pagamentosMap]);
+  }, [mergedCobrancas, statusFilter, pagamentosMap]);
 
   function getDotColor(key: string): string {
     const statuses = dayStatusMap.get(key);
