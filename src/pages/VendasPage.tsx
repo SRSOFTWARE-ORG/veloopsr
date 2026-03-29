@@ -644,6 +644,12 @@ const VendasPage = () => {
                         min={0}
                       />
                     </div>
+                    <Label className="text-sm mt-2">Data da entrada</Label>
+                    <Input
+                      type="date"
+                      value={dataEntrada}
+                      onChange={(e) => setDataEntrada(e.target.value)}
+                    />
                   </>
                 )}
               </div>
