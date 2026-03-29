@@ -100,20 +100,48 @@ const CobrancaResumo = () => {
       });
     }
 
-    // 2) Vendas concluídas — apenas entradas (valor_entrada)
-    // Parcelas de vendas já são rastreadas via cobranca_pagamentos na agenda,
-    // então NÃO projetamos parcelas aqui para evitar duplicação.
+    // 2) Vendas concluídas — entradas (valor_entrada)
+    // SÓ conta se NÃO existir registro em cobranca_pagamentos tipo='entrada'
+    // para o mesmo cliente/data, evitando DUPLICAÇÃO
     const { data: vendas } = await supabase
       .from("vendas")
-      .select("valor_entrada, created_at")
+      .select("id, cliente_nome, valor_entrada, created_at, data_entrada")
       .eq("status", "concluida");
+
+    // Build dedup set from paid entradas already counted above
+    const entradaTracked = new Set<string>();
+    if (pagosPeriodo && allCobrancaIds.length > 0) {
+      const { data: pagosEntrada } = await supabase
+        .from("cobranca_pagamentos")
+        .select("cobranca_id, data_vencimento, tipo_pagamento")
+        .eq("tipo_pagamento", "entrada")
+        .eq("status", "pago");
+
+      const { data: cobNomes } = await supabase
+        .from("cobrancas")
+        .select("id, cliente_nome")
+        .in("id", [...new Set((pagosEntrada || []).map((p) => p.cobranca_id))]);
+
+      const nomeMap: Record<string, string> = {};
+      cobNomes?.forEach((c) => { nomeMap[c.id] = c.cliente_nome.trim().toUpperCase(); });
+
+      pagosEntrada?.forEach((p) => {
+        const nome = nomeMap[p.cobranca_id];
+        if (nome) entradaTracked.add(`${nome}_${p.data_vencimento}`);
+      });
+    }
 
     if (vendas) {
       vendas.forEach((v) => {
-        const vendaDate = v.created_at?.split("T")[0] || "";
         const entrada = Number(v.valor_entrada) || 0;
-        if (entrada > 0 && vendaDate >= start && vendaDate <= end) {
-          totalRecebido += entrada;
+        if (entrada <= 0) return;
+        const dataEntrada = (v as any).data_entrada || v.created_at?.split("T")[0] || "";
+        if (dataEntrada >= start && dataEntrada <= end) {
+          const dedupKey = `${v.cliente_nome.trim().toUpperCase()}_${dataEntrada}`;
+          if (!entradaTracked.has(dedupKey)) {
+            totalRecebido += entrada;
+            entradaTracked.add(dedupKey);
+          }
         }
       });
     }
