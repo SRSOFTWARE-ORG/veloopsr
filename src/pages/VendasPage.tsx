@@ -231,6 +231,7 @@ const VendasPage = () => {
         cliente_cpf: selectedCliente.cpf || null,
         valor_total: total,
         valor_entrada: temEntrada ? entrada : 0,
+        data_entrada: temEntrada ? dataEntrada : null,
         num_parcelas: formaPagamento === "avista" ? 1 : numParcelas,
         valor_parcela: formaPagamento === "avista" ? total : valorParcela,
         desconto_percentual: desconto,
