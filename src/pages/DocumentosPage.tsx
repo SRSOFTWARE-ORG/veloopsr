@@ -87,7 +87,7 @@ const DocumentosPage = () => {
     const { data: pendingData } = await supabase
       .from("documentos")
       .select("*")
-      .in("tipo", ["carne", "boleto", "nota_fiscal"])
+      .in("tipo", ["carne", "boleto", "nota_fiscal", "pdv"])
       .eq("processado", false)
       .order("created_at", { ascending: true });
 
