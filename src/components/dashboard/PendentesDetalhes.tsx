@@ -246,7 +246,7 @@ const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhes
               </div>
               <div>
                 <Label>Valor</Label>
-                <CurrencyInput value={editValor} onChange={setEditValor} />
+                <CurrencyInput value={editValor} onValueChange={setEditValor} />
               </div>
               <div>
                 <Label>Data Vencimento</Label>
@@ -280,7 +280,7 @@ const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhes
               </div>
               <div>
                 <Label>Valor</Label>
-                <CurrencyInput value={addValor} onChange={setAddValor} />
+                <CurrencyInput value={addValor} onValueChange={setAddValor} />
               </div>
               <div>
                 <Label>Data Vencimento</Label>

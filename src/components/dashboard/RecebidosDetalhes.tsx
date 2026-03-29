@@ -269,7 +269,7 @@ const RecebidosDetalhes = ({ open, onOpenChange, start, end }: RecebidosDetalhes
               </div>
               <div>
                 <Label>Valor</Label>
-                <CurrencyInput value={editValor} onChange={setEditValor} />
+                <CurrencyInput value={editValor} onValueChange={setEditValor} />
               </div>
               <div>
                 <Label>Data</Label>
@@ -303,7 +303,7 @@ const RecebidosDetalhes = ({ open, onOpenChange, start, end }: RecebidosDetalhes
               </div>
               <div>
                 <Label>Valor</Label>
-                <CurrencyInput value={addValor} onChange={setAddValor} />
+                <CurrencyInput value={addValor} onValueChange={setAddValor} />
               </div>
               <div>
                 <Label>Data</Label>
