@@ -1,6 +1,9 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import veloopHeaderLogo from "@/assets/veloop-header-clean.png";
 import NotificationBell from "@/components/NotificationBell";
+import ConnectionStatusIndicator from "@/components/ConnectionStatusIndicator";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useSyncManager } from "@/hooks/useSyncManager";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -43,6 +46,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { status, pendingCount, isOnline, setIsSyncing, refreshPending } = useOnlineStatus();
+  useSyncManager({ isOnline, setIsSyncing, refreshPending });
 
   const allItems = isPrimaryAdmin ? [...navItems, ...adminItems] : navItems;
 
@@ -56,6 +61,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
           </div>
           <NotificationBell />
+          <ConnectionStatusIndicator status={status} pendingCount={pendingCount} />
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -115,6 +121,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           onClick={() => navigate("/")}
         />
         <div className="flex items-center gap-1">
+          <ConnectionStatusIndicator status={status} pendingCount={pendingCount} />
           <NotificationBell />
           <button onClick={() => setSidebarOpen((open) => !open)} className="p-2">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

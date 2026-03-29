@@ -1,5 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createIDBPersister } from "@/lib/query-persister";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,12 +30,19 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2, // 2 min cache
-      gcTime: 1000 * 60 * 5,
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 30, // 30 min for persistence
       refetchOnWindowFocus: false,
+      networkMode: "offlineFirst",
+      retry: (failureCount) => navigator.onLine && failureCount < 2,
+    },
+    mutations: {
+      networkMode: "offlineFirst",
     },
   },
 });
+
+const idbPersister = createIDBPersister();
 const INTRO_SEEN_KEY = "veloop_intro_seen";
 
 const ScreenLoader = () => (
@@ -110,7 +119,7 @@ const App = () => {
   }, [handleIntroFinish, showIntro]);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: idbPersister, maxAge: 1000 * 60 * 60 * 24 }}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -226,7 +235,7 @@ const App = () => {
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 };
 
