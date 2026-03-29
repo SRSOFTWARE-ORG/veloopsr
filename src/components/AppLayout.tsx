@@ -61,7 +61,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <p className="text-xs text-muted-foreground mt-0.5">SR Software</p>
           </div>
           <NotificationBell />
-          <ConnectionStatusIndicator status={status} pendingCount={pendingCount} />
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -121,7 +120,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           onClick={() => navigate("/")}
         />
         <div className="flex items-center gap-1">
-          <ConnectionStatusIndicator status={status} pendingCount={pendingCount} />
           <NotificationBell />
           <button onClick={() => setSidebarOpen((open) => !open)} className="p-2">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
