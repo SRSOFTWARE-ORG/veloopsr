@@ -80,6 +80,7 @@ interface Pagamento {
   status: string;
   pago_por: string | null;
   pago_em: string | null;
+  tipo_pagamento?: string;
 }
 
 interface Cliente {
