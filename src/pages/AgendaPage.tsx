@@ -697,21 +697,26 @@ const AgendaPage = () => {
             </Card>
           ) : (
             selectedCobrancas.map((c) => {
-               const status = getPaymentStatus(selectedDateKey!, c.id, pagamentosMap);
+              const clientKey = c.cliente_nome.trim().toUpperCase();
+              const entrada = entradaMap.get(clientKey);
+              const isEntradaDate = entrada && selectedDateKey === format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+
+              // For the entrada date, use the entrada's cobranca for status check
+              const statusCobrancaId = isEntradaDate && entrada ? entrada.id : c.id;
+              const status = getPaymentStatus(selectedDateKey!, statusCobrancaId, pagamentosMap);
               const config = statusConfig[status];
               const StatusIcon = config.icon;
               const isPaidOrExempt = status === "pago" || status === "isento";
-              const pagKey = `${c.id}_${selectedDateKey}`;
-              const pagamento = pagamentosMap.get(pagKey);
-              const isEntrada = (pagamento as any)?.tipo_pagamento === "entrada" || c.observacoes?.startsWith("Entrada");
+
+              const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
 
               return (
                 <Card key={c.id} className={cn("border", isPaidOrExempt && "opacity-75")}>
                   <CardContent className="space-y-2 py-4">
                     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isEntrada ? "bg-emerald-500/10" : "bg-primary/10")}>
-                          {isEntrada ? (
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isEntradaDate ? "bg-emerald-500/10" : "bg-primary/10")}>
+                          {isEntradaDate ? (
                             <DollarSign className="w-4 h-4 text-emerald-600" />
                           ) : (
                             <User className="w-4 h-4 text-primary" />
@@ -720,7 +725,7 @@ const AgendaPage = () => {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-semibold">{c.cliente_nome}</p>
-                            {isEntrada && (
+                            {isEntradaDate && (
                               <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0">
                                 Entrada
                               </Badge>
@@ -729,52 +734,28 @@ const AgendaPage = () => {
                           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <DollarSign className="w-3 h-3 shrink-0" />
-                              {formatCurrency(c.valor_parcela)}
+                              {isEntradaDate && entrada
+                                ? formatCurrency(entrada.valor_parcela)
+                                : formatCurrency(c.valor_parcela)}
                             </span>
-                            {!isEntrada && (
+                            {!isEntradaDate && (
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3 shrink-0" />
                                 {frequenciaLabels[c.frequencia]}
                               </span>
                             )}
-                            {/* Show entrada + parcelas summary */}
-                            {(() => {
-                              const clienteNome = c.cliente_nome.trim().toUpperCase();
-                              // Find entrada cobrança for same client
-                              const entradaCob = cobrancas.find(
-                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && ob.observacoes?.startsWith("Entrada")
-                              );
-                              // Find carnê cobrança for same client
-                              const carneCob = cobrancas.find(
-                                (ob) => ob.id !== c.id && ob.cliente_nome.trim().toUpperCase() === clienteNome && !ob.observacoes?.startsWith("Entrada")
-                              );
-
-                              if (isEntrada && carneCob) {
-                                const numParcelas = generatePaymentDates(carneCob.data_inicio, carneCob.data_fim, carneCob.frequencia).length;
-                                const valorTotal = c.valor_parcela + (numParcelas * carneCob.valor_parcela);
-                                return (
-                                  <span className="text-[10px] font-medium text-foreground/70">
-                                    Entrada {formatCurrency(c.valor_parcela)} + {numParcelas}x {formatCurrency(carneCob.valor_parcela)} = {formatCurrency(valorTotal)}
-                                  </span>
-                                );
-                              }
-                              if (!isEntrada && entradaCob) {
-                                const numParcelas = generatePaymentDates(c.data_inicio, c.data_fim, c.frequencia).length;
-                                const valorTotal = entradaCob.valor_parcela + (numParcelas * c.valor_parcela);
-                                return (
-                                  <span className="text-[10px] font-medium text-foreground/70">
-                                    Entrada {formatCurrency(entradaCob.valor_parcela)} + {numParcelas}x {formatCurrency(c.valor_parcela)} = {formatCurrency(valorTotal)}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
+                            {/* Show combined summary */}
+                            {entrada && (
+                              <span className="text-[10px] font-medium text-foreground/70">
+                                Entrada {formatCurrency(entrada.valor_parcela)} + {numParcelas}x {formatCurrency(c.valor_parcela)} = {formatCurrency(entrada.valor_parcela + (numParcelas * c.valor_parcela))}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                       <Badge variant="outline" className={cn("w-fit max-w-full text-xs border", config.color)}>
                         <StatusIcon className="w-3 h-3 mr-1 shrink-0" />
-                        {isEntrada ? (status === "pago" ? "Entrada Paga" : config.label) : config.label}
+                        {isEntradaDate ? (status === "pago" ? "Entrada Paga" : config.label) : config.label}
                       </Badge>
                     </div>
 
