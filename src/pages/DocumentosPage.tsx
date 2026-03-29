@@ -443,6 +443,137 @@ const DocumentosPage = () => {
     }
   };
 
+  const processPdvData = async (doc: Documento, extracted: any) => {
+    await removeOldLinkedRecords(doc.nome_arquivo);
+
+    const clienteNome = extracted.cliente_nome;
+    const valorTotal = extracted.valor_total || 0;
+    const valorEntrada = extracted.valor_entrada || 0;
+    const numParcelas = extracted.num_parcelas || 1;
+    const valorParcela = extracted.valor_parcela || 0;
+    const formaPag = extracted.forma_pagamento || "avista";
+    const dataVenda = extracted.data_venda || new Date().toISOString().split("T")[0];
+
+    const clienteId = await findOrCreateCliente(clienteNome, extracted);
+
+    // DEDUP: Check existing venda for this client from same PDV doc
+    let existingVendas: any[] | null = null;
+    if (extracted.cliente_cpf) {
+      const { data } = await supabase.from("vendas").select("id").eq("cliente_cpf", extracted.cliente_cpf).ilike("observacoes", `%${doc.nome_arquivo}%`).limit(1);
+      existingVendas = data;
+    }
+    if (!existingVendas || existingVendas.length === 0) {
+      const { data } = await supabase.from("vendas").select("id").ilike("cliente_nome", clienteNome).ilike("observacoes", `%${doc.nome_arquivo}%`).limit(1);
+      existingVendas = data;
+    }
+
+    if (!existingVendas || existingVendas.length === 0) {
+      const { data: vendaData } = await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        cliente_telefone: extracted.cliente_telefone || null,
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
+        num_parcelas: numParcelas,
+        valor_parcela: valorParcela,
+        vendedor_id: user!.id,
+        forma_pagamento: numParcelas > 1 ? "parcelado" : formaPag,
+        frequencia_parcela: "mes",
+        data_inicio_pagamento: dataVenda,
+        data_entrada: valorEntrada > 0 ? dataVenda : null,
+        status: "concluida",
+        observacoes: `PDV: ${doc.nome_arquivo}`,
+      }).select("id").single();
+
+      // Insert venda_itens for each product
+      if (vendaData && extracted.produtos && extracted.produtos.length > 0) {
+        for (const prod of extracted.produtos) {
+          let produtoId: string | null = null;
+          if (prod.codigo_barras) {
+            const { data: dbProd } = await supabase.from("produtos").select("id").eq("codigo_barras", prod.codigo_barras).limit(1);
+            if (dbProd?.[0]) produtoId = dbProd[0].id;
+          }
+          if (!produtoId) {
+            const { data: dbProd } = await supabase.from("produtos").select("id").ilike("nome", `%${prod.nome}%`).limit(1);
+            if (dbProd?.[0]) produtoId = dbProd[0].id;
+          }
+          if (!produtoId) {
+            const { data: newProd } = await supabase.from("produtos").insert({
+              nome: prod.nome,
+              preco_venda: prod.preco_unitario || 0,
+              codigo_barras: prod.codigo_barras || null,
+              estoque_atual: 0,
+            }).select("id").single();
+            produtoId = newProd?.id || null;
+          }
+          if (produtoId) {
+            await supabase.from("venda_itens").insert({
+              venda_id: vendaData.id,
+              produto_id: produtoId,
+              quantidade: prod.quantidade || 1,
+              preco_unitario: prod.preco_unitario || 0,
+              subtotal: prod.subtotal || ((prod.quantidade || 1) * (prod.preco_unitario || 0)),
+            });
+          }
+        }
+      }
+
+      // Create agenda entry if parcelado
+      if (clienteId && numParcelas > 1 && valorParcela > 0) {
+        const start = new Date(dataVenda + "T00:00:00");
+        const end = new Date(start);
+        for (let p = 1; p < numParcelas; p++) {
+          end.setMonth(end.getMonth() + 1);
+        }
+
+        const { data: existingCob } = await supabase.from("cobrancas").select("id")
+          .eq("cliente_id", clienteId).eq("valor_parcela", valorParcela).eq("data_inicio", dataVenda).limit(1);
+
+        if (!existingCob || existingCob.length === 0) {
+          const { data: newCob } = await supabase.from("cobrancas").insert({
+            cliente_id: clienteId,
+            cliente_nome: clienteNome,
+            valor_parcela: valorParcela,
+            data_inicio: dataVenda,
+            data_fim: end.toISOString().split("T")[0],
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `PDV: ${doc.nome_arquivo}`,
+          }).select("id").single();
+
+          if (newCob && valorEntrada > 0) {
+            const { data: existingEntrada } = await supabase.from("cobrancas").select("id")
+              .eq("cliente_id", clienteId).ilike("observacoes", "Entrada%PDV%").limit(1);
+
+            if (!existingEntrada || existingEntrada.length === 0) {
+              const { data: entradaCob } = await supabase.from("cobrancas").insert({
+                cliente_id: clienteId,
+                cliente_nome: clienteNome,
+                valor_parcela: valorEntrada,
+                data_inicio: dataVenda,
+                data_fim: dataVenda,
+                frequencia: "mes",
+                criado_por: user!.id,
+                observacoes: `Entrada PDV: ${doc.nome_arquivo}`,
+              }).select("id").single();
+
+              if (entradaCob) {
+                await supabase.from("cobranca_pagamentos").insert({
+                  cobranca_id: entradaCob.id,
+                  data_vencimento: dataVenda,
+                  status: "pago",
+                  pago_em: new Date().toISOString(),
+                  pago_por: user!.id,
+                  tipo_pagamento: "entrada",
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
