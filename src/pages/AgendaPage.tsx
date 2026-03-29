@@ -818,7 +818,7 @@ const AgendaPage = () => {
                             variant="outline"
                             size="sm"
                             className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "pago")}
+                            onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "pago")}
                           >
                             <CheckCircle2 className="w-3 h-3" />
                             Pago
@@ -827,7 +827,7 @@ const AgendaPage = () => {
                             variant="outline"
                             size="sm"
                             className="text-xs h-7 gap-1 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
-                            onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "isento")}
+                            onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "isento")}
                           >
                             <ShieldOff className="w-3 h-3" />
                             Isentar
@@ -839,7 +839,7 @@ const AgendaPage = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs h-7 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
-                          onClick={() => handleSetPaymentStatus(c.id, selectedDateKey!, "a_pagar")}
+                          onClick={() => handleSetPaymentStatus(statusCobrancaId, selectedDateKey!, "a_pagar")}
                         >
                           <Undo2 className="w-3 h-3" />
                           Desfazer
