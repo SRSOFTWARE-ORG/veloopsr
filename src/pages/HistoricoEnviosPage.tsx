@@ -167,7 +167,7 @@ const HistoricoEnviosPage = () => {
       {/* Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-0" style={{ WebkitOverflowScrolling: 'touch' }}>
             <Table>
               <TableHeader>
                 <TableRow>
