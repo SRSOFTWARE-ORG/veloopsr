@@ -17,7 +17,7 @@ import { CalendarIcon, Pencil, Plus, Clock, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import CurrencyInput from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 interface PendentesDetalhesProps {
   open: boolean;

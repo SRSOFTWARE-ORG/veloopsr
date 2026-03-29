@@ -13,11 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Pencil, Plus, Eye, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Pencil, Plus, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import CurrencyInput from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 interface RecebidosDetalhesProps {
   open: boolean;
