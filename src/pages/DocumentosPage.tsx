@@ -628,7 +628,7 @@ const DocumentosPage = () => {
 
       successCount++;
 
-      if (docData && ["carne", "boleto", "nota_fiscal"].includes(tipo)) {
+      if (docData && ["carne", "boleto", "nota_fiscal", "pdv"].includes(tipo)) {
         docsToScan.push(docData as Documento);
       }
     }
@@ -673,7 +673,7 @@ const DocumentosPage = () => {
   };
 
   const handleScanAll = async () => {
-    const pending = documentos.filter((d) => !d.processado && ["carne", "boleto", "nota_fiscal"].includes(d.tipo));
+    const pending = documentos.filter((d) => !d.processado && ["carne", "boleto", "nota_fiscal", "pdv"].includes(d.tipo));
     if (pending.length === 0) {
       toast.info("Todos os documentos já foram processados!");
       return;
