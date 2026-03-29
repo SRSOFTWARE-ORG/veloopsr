@@ -222,6 +222,20 @@ const CobrancaResumo = () => {
         )}
       </CardContent>
     </Card>
+
+    <RecebidosDetalhes
+      open={recebidosOpen}
+      onOpenChange={setRecebidosOpen}
+      start={getDateRange(periodo).start}
+      end={getDateRange(periodo).end}
+    />
+    <PendentesDetalhes
+      open={pendentesOpen}
+      onOpenChange={setPendentesOpen}
+      start={getDateRange(periodo).start}
+      end={getDateRange(periodo).end}
+    />
+    </>
   );
 };
 
