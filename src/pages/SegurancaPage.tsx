@@ -100,6 +100,9 @@ const SegurancaPage = () => {
       <div className="flex items-center justify-between mb-4 slide-up">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Segurança SR</h1>
+          {isPrimaryAdmin && (
+            <p className="text-xs font-semibold text-primary">Silvio Rodrigues — Gerente & CEO</p>
+          )}
           <p className="text-sm text-muted-foreground">{dispositivos.length} dispositivos</p>
         </div>
         {!isReadOnly && (
