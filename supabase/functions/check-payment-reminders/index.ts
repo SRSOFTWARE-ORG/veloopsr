@@ -92,16 +92,16 @@ async function generateFormalMessage(
   cpf: string,
   valor: string,
   dataVencimento: string,
-  tipo: "P" | "V"
+  tipo: "D-1" | "D0"
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-  const tomP = "preventivo e cordial, informando que a fatura vence AMANHÃ";
-  const tomV = "mais urgente e direto, informando que a fatura vence HOJE";
-  const tom = tipo === "P" ? tomP : tomV;
-  const diaRef = tipo === "P" ? "amanhã" : "hoje";
+  const tomD1 = "preventivo e cordial, informando que a fatura vence AMANHÃ";
+  const tomD0 = "mais urgente e direto, informando que a fatura vence HOJE";
+  const tom = tipo === "D-1" ? tomD1 : tomD0;
+  const diaRef = tipo === "D-1" ? "amanhã" : "hoje";
 
-  const fallback = `Prezado(a) Sr(a). *${clienteNome}*,\n\nInformamos que a fatura vinculada ao CPF *${cpf}*, no valor de *${valor}*, ${tipo === "P" ? `possui vencimento previsto para ${diaRef}, dia *${dataVencimento}*` : `vence na presente data (*${dataVencimento}*)`}.\n\n${tipo === "P" ? "Solicitamos, por gentileza, que o pagamento seja realizado até a data informada, a fim de evitar encargos adicionais." : "Reforçamos a importância da regularização do pagamento no dia de hoje para evitar encargos adicionais."}\n\nCaso o pagamento já tenha sido efetuado, pedimos que desconsidere esta mensagem.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
+  const fallback = `Prezado(a) Sr(a). *${clienteNome}*,\n\nInformamos que a fatura vinculada ao CPF *${cpf}*, no valor de *${valor}*, ${tipo === "D-1" ? `possui vencimento previsto para ${diaRef}, dia *${dataVencimento}*` : `vence na presente data (*${dataVencimento}*)`}.\n\n${tipo === "D-1" ? "Solicitamos, por gentileza, que o pagamento seja realizado até a data informada, a fim de evitar encargos adicionais." : "Reforçamos a importância da regularização do pagamento no dia de hoje para evitar encargos adicionais."}\n\nCaso o pagamento já tenha sido efetuado, pedimos que desconsidere esta mensagem.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
 
   if (!LOVABLE_API_KEY) return fallback;
 
@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
       valorParcela: number;
       criadoPor: string;
       date: string;
-      tipo: "P" | "V";
+      tipo: "D-1" | "D0";
     }
 
     const entriesToProcess: ProcessEntry[] = [];
@@ -269,9 +269,9 @@ Deno.serve(async (req) => {
         // REGRA CRÍTICA: nunca enviar para pago ou isento
         if (status === "pago" || status === "isento") continue;
 
-        let tipo: "P" | "V" | null = null;
-        if (date === tomorrowStr) tipo = "P";
-        else if (date === todayStr) tipo = "V";
+        let tipo: "D-1" | "D0" | null = null;
+        if (date === tomorrowStr) tipo = "D-1";
+        else if (date === todayStr) tipo = "D0";
 
         if (!tipo) continue;
 
@@ -340,8 +340,8 @@ Deno.serve(async (req) => {
       if (enviado) whatsappCount++;
 
       // ── Notificação interna para vendedor + admins ──
-      const tipoLabel = entry.tipo === "P" ? "Amanhã" : "Hoje";
-      const emoji = entry.tipo === "P" ? "🔔" : "📌";
+      const tipoLabel = entry.tipo === "D-1" ? "Amanhã" : "Hoje";
+      const emoji = entry.tipo === "D-1" ? "🔔" : "📌";
       const usersToNotify = new Set([entry.criadoPor, ...adminIds]);
 
       for (const userId of usersToNotify) {
@@ -350,9 +350,9 @@ Deno.serve(async (req) => {
           userId,
           `${emoji} Cobrança ${tipoLabel}`,
           `Cobrar ${entry.clienteNome} ${tipoLabel.toLowerCase()} — ${valorFormatado}`,
-          entry.tipo === "P" ? "lembrete_amanha" : "lembrete_hoje",
+          entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje",
           { cobranca_id: entry.cobrancaId, cliente_nome: entry.clienteNome, data: entry.date },
-          `${entry.tipo === "P" ? "amanha" : "hoje"}_${entry.cobrancaId}_${entry.date}`
+          `${entry.tipo === "D-1" ? "amanha" : "hoje"}_${entry.cobrancaId}_${entry.date}`
         );
         if (ok) notifCount++;
       }
