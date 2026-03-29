@@ -238,7 +238,10 @@ const ConfiguracoesPage = () => {
                   </div>
                   <div>
                     <span className="block">{u.nome}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{u.email}</span>
+                    {u.email === "srcj9975@gmail.com" && (
+                      <span className="text-[10px] font-semibold text-primary">Gerente & CEO</span>
+                    )}
+                    <span className="text-xs font-normal text-muted-foreground block">{u.email}</span>
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
