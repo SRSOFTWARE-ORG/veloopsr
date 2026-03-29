@@ -287,6 +287,7 @@ const DocumentosPage = () => {
         forma_pagamento: "parcelado",
         frequencia_parcela: freq,
         data_inicio_pagamento: startDate,
+        data_entrada: valorEntrada > 0 ? new Date().toISOString().split("T")[0] : null,
         status: "concluida",
         observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
       });
@@ -316,15 +317,31 @@ const DocumentosPage = () => {
           observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
         }).select("id").single();
 
-        // Registrar entrada como pagamento pago se houver
+        // Registrar entrada como pagamento pago na agenda
         if (newCob && valorEntrada > 0) {
           const today = new Date().toISOString().split("T")[0];
-          await supabase.from("cobranca_pagamentos").insert({
-            cobranca_id: newCob.id,
-            data_vencimento: today,
-            status: "pago",
-            pago_em: new Date().toISOString(),
-          });
+          // Create separate cobranca for entrada
+          const { data: entradaCob } = await supabase.from("cobrancas").insert({
+            cliente_id: clienteId,
+            cliente_nome: clienteNome,
+            valor_parcela: valorEntrada,
+            data_inicio: today,
+            data_fim: today,
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `Entrada do carnê: ${doc.nome_arquivo}`,
+          }).select("id").single();
+
+          if (entradaCob) {
+            await supabase.from("cobranca_pagamentos").insert({
+              cobranca_id: entradaCob.id,
+              data_vencimento: today,
+              status: "pago",
+              pago_em: new Date().toISOString(),
+              pago_por: user!.id,
+              tipo_pagamento: "entrada",
+            });
+          }
         }
       }
     }
