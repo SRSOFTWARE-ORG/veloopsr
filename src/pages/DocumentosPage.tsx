@@ -35,6 +35,7 @@ const tipoLabels: Record<string, string> = {
   nota_fiscal: "Nota Fiscal",
   carne: "Carnê",
   boleto: "Boleto",
+  pdv: "PDV",
   contrato: "Contrato",
   recibo_garantia: "Recibo Garantia",
   outro: "Outro",
@@ -60,6 +61,7 @@ const detectTipoFromFileName = (fileName: string): string => {
   if (upper.startsWith("NOTA") || upper.includes("NOTA FISCAL")) return "nota_fiscal";
   if (upper.startsWith("CARN") || upper.includes("CARNÊ") || upper.includes("CARNE")) return "carne";
   if (upper.startsWith("BOLETO") || upper.includes("BOLETO")) return "boleto";
+  if (upper.includes("PDV") || upper.includes("SMB") || upper.includes("CUPOM")) return "pdv";
   if (upper.startsWith("CONTRATO") || upper.includes("CONTRATO")) return "contrato";
   if (upper.startsWith("RECIBO") || upper.includes("GARANTIA")) return "recibo_garantia";
   return "outro";
