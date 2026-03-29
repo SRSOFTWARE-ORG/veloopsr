@@ -35,12 +35,14 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@supabase/supabase-js": "^2.99.3",
         "@tanstack/react-query": "^5.83.0",
+        "@tanstack/react-query-persist-client": "^5.95.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "date-fns": "^3.6.0",
         "embla-carousel-react": "^8.6.0",
         "framer-motion": "^11.0.0",
+        "idb-keyval": "^6.2.2",
         "input-otp": "^1.4.2",
         "lucide-react": "^0.462.0",
         "next-themes": "^0.3.0",
@@ -584,7 +586,11 @@
 
     "@tanstack/query-core": ["@tanstack/query-core@5.83.0", "", {}, "sha512-0M8dA+amXUkyz5cVUm/B+zSk3xkQAcuXuz5/Q/LveT4ots2rBpPTZOzd7yJa2Utsf8D2Upl5KyjhHRY+9lB/XA=="],
 
+    "@tanstack/query-persist-client-core": ["@tanstack/query-persist-client-core@5.95.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tanstack/query-persist-client-core/-/query-persist-client-core-5.95.2.tgz", { "dependencies": { "@tanstack/query-core": "5.95.2" } }, "sha512-Opfj34WZ594YXpEcZEs8WBiyPGrjrKlGILfk/Ss283uwWQ36C5nX3tRY/bBiXmM82KWauUuNvahwGwiyco/8cQ=="],
+
     "@tanstack/react-query": ["@tanstack/react-query@5.83.0", "", { "dependencies": { "@tanstack/query-core": "5.83.0" }, "peerDependencies": { "react": "^18 || ^19" } }, "sha512-/XGYhZ3foc5H0VM2jLSD/NyBRIOK4q9kfeml4+0x2DlL6xVuAcVEW+hTlTapAmejObg0i3eNqhkr2dT+eciwoQ=="],
+
+    "@tanstack/react-query-persist-client": ["@tanstack/react-query-persist-client@5.95.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tanstack/react-query-persist-client/-/react-query-persist-client-5.95.2.tgz", { "dependencies": { "@tanstack/query-persist-client-core": "5.95.2" }, "peerDependencies": { "@tanstack/react-query": "^5.95.2", "react": "^18 || ^19" } }, "sha512-i3fvzD8gaLgQyFvRc/+iSUr60aL31tMN+5QM11zdPRg0K9CirIQjHD7WgXFBnD29KJDvcjcv7OrIBaPwZ+H9xw=="],
 
     "@testing-library/dom": ["@testing-library/dom@10.4.1", "", { "dependencies": { "@babel/code-frame": "^7.10.4", "@babel/runtime": "^7.12.5", "@types/aria-query": "^5.0.1", "aria-query": "5.3.0", "dom-accessibility-api": "^0.5.9", "lz-string": "^1.5.0", "picocolors": "1.1.1", "pretty-format": "^27.0.2" } }, "sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg=="],
 
@@ -1075,6 +1081,8 @@
     "iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
 
     "idb": ["idb@7.1.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/idb/-/idb-7.1.1.tgz", {}, "sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ=="],
+
+    "idb-keyval": ["idb-keyval@6.2.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/idb-keyval/-/idb-keyval-6.2.2.tgz", {}, "sha512-yjD9nARJ/jb1g+CvD0tlhUHOrJ9Sy0P8T9MF3YaLlHnSRpwPfpTX0XIvpmw3gAJUmEu3FiICLBDPXVwyEvrleg=="],
 
     "ignore": ["ignore@5.3.2", "", {}, "sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g=="],
 
@@ -1833,6 +1841,8 @@
     "@rollup/pluginutils/rollup": ["rollup@2.80.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/rollup/-/rollup-2.80.0.tgz", { "optionalDependencies": { "fsevents": "~2.3.2" }, "bin": { "rollup": "dist/bin/rollup" } }, "sha512-cIFJOD1DESzpjOBl763Kp1AH7UE/0fcdHe6rZXUdQ9c50uvgigvW97u3IcSeBwOkgqL/PXPBktBCh0KEu5L8XQ=="],
 
     "@surma/rollup-plugin-off-main-thread/magic-string": ["magic-string@0.25.9", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/magic-string/-/magic-string-0.25.9.tgz", { "dependencies": { "sourcemap-codec": "^1.4.8" } }, "sha512-RmF0AsMzgt25qzqqLc1+MbHmhdx0ojF2Fvs4XnOqz2ZOBXzzkEwc/dJQZCYHAn7v1jbVOjAZfK8msRn4BxO4VQ=="],
+
+    "@tanstack/query-persist-client-core/@tanstack/query-core": ["@tanstack/query-core@5.95.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tanstack/query-core/-/query-core-5.95.2.tgz", {}, "sha512-o4T8vZHZET4Bib3jZ/tCW9/7080urD4c+0/AUaYVpIqOsr7y0reBc1oX3ttNaSW5mYyvZHctiQ/UOP2PfdmFEQ=="],
 
     "@testing-library/dom/dom-accessibility-api": ["dom-accessibility-api@0.5.16", "", {}, "sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg=="],
 
