@@ -35,6 +35,7 @@ const tipoLabels: Record<string, string> = {
   nota_fiscal: "Nota Fiscal",
   carne: "Carnê",
   boleto: "Boleto",
+  pdv: "PDV",
   contrato: "Contrato",
   recibo_garantia: "Recibo Garantia",
   outro: "Outro",
@@ -60,6 +61,7 @@ const detectTipoFromFileName = (fileName: string): string => {
   if (upper.startsWith("NOTA") || upper.includes("NOTA FISCAL")) return "nota_fiscal";
   if (upper.startsWith("CARN") || upper.includes("CARNÊ") || upper.includes("CARNE")) return "carne";
   if (upper.startsWith("BOLETO") || upper.includes("BOLETO")) return "boleto";
+  if (upper.includes("PDV") || upper.includes("SMB") || upper.includes("CUPOM")) return "pdv";
   if (upper.startsWith("CONTRATO") || upper.includes("CONTRATO")) return "contrato";
   if (upper.startsWith("RECIBO") || upper.includes("GARANTIA")) return "recibo_garantia";
   return "outro";
@@ -85,7 +87,7 @@ const DocumentosPage = () => {
     const { data: pendingData } = await supabase
       .from("documentos")
       .select("*")
-      .in("tipo", ["carne", "boleto", "nota_fiscal"])
+      .in("tipo", ["carne", "boleto", "nota_fiscal", "pdv"])
       .eq("processado", false)
       .order("created_at", { ascending: true });
 
@@ -118,8 +120,13 @@ const DocumentosPage = () => {
 
   const scanDocumentAndProcess = async (doc: Documento) => {
     try {
-      const { data: scanResult, error: scanError } = await supabase.functions.invoke("scan-document", {
-        body: { pdf_url: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
+      // Use scan-pdv for PDV documents, scan-document for others
+      const isPdv = doc.tipo === "pdv";
+      const functionName = isPdv ? "scan-pdv" : "scan-document";
+      const bodyKey = isPdv ? "file_url" : "pdf_url";
+
+      const { data: scanResult, error: scanError } = await supabase.functions.invoke(functionName, {
+        body: { [bodyKey]: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
       });
 
       if (scanError) throw scanError;
@@ -128,19 +135,23 @@ const DocumentosPage = () => {
       const extracted = scanResult?.data;
       if (!extracted?.cliente_nome) throw new Error("Dados insuficientes");
 
-      const tipoDetectado = extracted.tipo_documento || "boleto";
+      if (isPdv) {
+        await processPdvData(doc, extracted);
+      } else {
+        const tipoDetectado = extracted.tipo_documento || "boleto";
 
-      // Update document type if AI detected differently
-      if (tipoDetectado !== doc.tipo) {
-        await supabase.from("documentos").update({ tipo: tipoDetectado } as any).eq("id", doc.id);
-      }
+        // Update document type if AI detected differently
+        if (tipoDetectado !== doc.tipo) {
+          await supabase.from("documentos").update({ tipo: tipoDetectado } as any).eq("id", doc.id);
+        }
 
-      if (tipoDetectado === "carne") {
-        await processCarneData(doc, extracted);
-      } else if (tipoDetectado === "boleto") {
-        await processBoletoData(doc, extracted);
-      } else if (tipoDetectado === "nota_fiscal") {
-        await processNotaData(doc, extracted);
+        if (tipoDetectado === "carne") {
+          await processCarneData(doc, extracted);
+        } else if (tipoDetectado === "boleto") {
+          await processBoletoData(doc, extracted);
+        } else if (tipoDetectado === "nota_fiscal") {
+          await processNotaData(doc, extracted);
+        }
       }
 
       await supabase.from("documentos").update({ processado: true, cliente_nome: extracted.cliente_nome } as any).eq("id", doc.id);
@@ -432,6 +443,137 @@ const DocumentosPage = () => {
     }
   };
 
+  const processPdvData = async (doc: Documento, extracted: any) => {
+    await removeOldLinkedRecords(doc.nome_arquivo);
+
+    const clienteNome = extracted.cliente_nome;
+    const valorTotal = extracted.valor_total || 0;
+    const valorEntrada = extracted.valor_entrada || 0;
+    const numParcelas = extracted.num_parcelas || 1;
+    const valorParcela = extracted.valor_parcela || 0;
+    const formaPag = extracted.forma_pagamento || "avista";
+    const dataVenda = extracted.data_venda || new Date().toISOString().split("T")[0];
+
+    const clienteId = await findOrCreateCliente(clienteNome, extracted);
+
+    // DEDUP: Check existing venda for this client from same PDV doc
+    let existingVendas: any[] | null = null;
+    if (extracted.cliente_cpf) {
+      const { data } = await supabase.from("vendas").select("id").eq("cliente_cpf", extracted.cliente_cpf).ilike("observacoes", `%${doc.nome_arquivo}%`).limit(1);
+      existingVendas = data;
+    }
+    if (!existingVendas || existingVendas.length === 0) {
+      const { data } = await supabase.from("vendas").select("id").ilike("cliente_nome", clienteNome).ilike("observacoes", `%${doc.nome_arquivo}%`).limit(1);
+      existingVendas = data;
+    }
+
+    if (!existingVendas || existingVendas.length === 0) {
+      const { data: vendaData } = await supabase.from("vendas").insert({
+        cliente_nome: clienteNome,
+        cliente_cpf: extracted.cliente_cpf || null,
+        cliente_telefone: extracted.cliente_telefone || null,
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
+        num_parcelas: numParcelas,
+        valor_parcela: valorParcela,
+        vendedor_id: user!.id,
+        forma_pagamento: numParcelas > 1 ? "parcelado" : formaPag,
+        frequencia_parcela: "mes",
+        data_inicio_pagamento: dataVenda,
+        data_entrada: valorEntrada > 0 ? dataVenda : null,
+        status: "concluida",
+        observacoes: `PDV: ${doc.nome_arquivo}`,
+      }).select("id").single();
+
+      // Insert venda_itens for each product
+      if (vendaData && extracted.produtos && extracted.produtos.length > 0) {
+        for (const prod of extracted.produtos) {
+          let produtoId: string | null = null;
+          if (prod.codigo_barras) {
+            const { data: dbProd } = await supabase.from("produtos").select("id").eq("codigo_barras", prod.codigo_barras).limit(1);
+            if (dbProd?.[0]) produtoId = dbProd[0].id;
+          }
+          if (!produtoId) {
+            const { data: dbProd } = await supabase.from("produtos").select("id").ilike("nome", `%${prod.nome}%`).limit(1);
+            if (dbProd?.[0]) produtoId = dbProd[0].id;
+          }
+          if (!produtoId) {
+            const { data: newProd } = await supabase.from("produtos").insert({
+              nome: prod.nome,
+              preco_venda: prod.preco_unitario || 0,
+              codigo_barras: prod.codigo_barras || null,
+              estoque_atual: 0,
+            }).select("id").single();
+            produtoId = newProd?.id || null;
+          }
+          if (produtoId) {
+            await supabase.from("venda_itens").insert({
+              venda_id: vendaData.id,
+              produto_id: produtoId,
+              quantidade: prod.quantidade || 1,
+              preco_unitario: prod.preco_unitario || 0,
+              subtotal: prod.subtotal || ((prod.quantidade || 1) * (prod.preco_unitario || 0)),
+            });
+          }
+        }
+      }
+
+      // Create agenda entry if parcelado
+      if (clienteId && numParcelas > 1 && valorParcela > 0) {
+        const start = new Date(dataVenda + "T00:00:00");
+        const end = new Date(start);
+        for (let p = 1; p < numParcelas; p++) {
+          end.setMonth(end.getMonth() + 1);
+        }
+
+        const { data: existingCob } = await supabase.from("cobrancas").select("id")
+          .eq("cliente_id", clienteId).eq("valor_parcela", valorParcela).eq("data_inicio", dataVenda).limit(1);
+
+        if (!existingCob || existingCob.length === 0) {
+          const { data: newCob } = await supabase.from("cobrancas").insert({
+            cliente_id: clienteId,
+            cliente_nome: clienteNome,
+            valor_parcela: valorParcela,
+            data_inicio: dataVenda,
+            data_fim: end.toISOString().split("T")[0],
+            frequencia: "mes",
+            criado_por: user!.id,
+            observacoes: `PDV: ${doc.nome_arquivo}`,
+          }).select("id").single();
+
+          if (newCob && valorEntrada > 0) {
+            const { data: existingEntrada } = await supabase.from("cobrancas").select("id")
+              .eq("cliente_id", clienteId).ilike("observacoes", "Entrada%PDV%").limit(1);
+
+            if (!existingEntrada || existingEntrada.length === 0) {
+              const { data: entradaCob } = await supabase.from("cobrancas").insert({
+                cliente_id: clienteId,
+                cliente_nome: clienteNome,
+                valor_parcela: valorEntrada,
+                data_inicio: dataVenda,
+                data_fim: dataVenda,
+                frequencia: "mes",
+                criado_por: user!.id,
+                observacoes: `Entrada PDV: ${doc.nome_arquivo}`,
+              }).select("id").single();
+
+              if (entradaCob) {
+                await supabase.from("cobranca_pagamentos").insert({
+                  cobranca_id: entradaCob.id,
+                  data_vencimento: dataVenda,
+                  status: "pago",
+                  pago_em: new Date().toISOString(),
+                  pago_por: user!.id,
+                  tipo_pagamento: "entrada",
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -486,7 +628,7 @@ const DocumentosPage = () => {
 
       successCount++;
 
-      if (docData && ["carne", "boleto", "nota_fiscal"].includes(tipo)) {
+      if (docData && ["carne", "boleto", "nota_fiscal", "pdv"].includes(tipo)) {
         docsToScan.push(docData as Documento);
       }
     }
@@ -531,7 +673,7 @@ const DocumentosPage = () => {
   };
 
   const handleScanAll = async () => {
-    const pending = documentos.filter((d) => !d.processado && ["carne", "boleto", "nota_fiscal"].includes(d.tipo));
+    const pending = documentos.filter((d) => !d.processado && ["carne", "boleto", "nota_fiscal", "pdv"].includes(d.tipo));
     if (pending.length === 0) {
       toast.info("Todos os documentos já foram processados!");
       return;
