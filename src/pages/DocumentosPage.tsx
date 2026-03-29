@@ -317,30 +317,40 @@ const DocumentosPage = () => {
           observacoes: `Importado do carnê: ${doc.nome_arquivo}`,
         }).select("id").single();
 
-        // Registrar entrada como pagamento pago na agenda
+        // Registrar entrada como pagamento pago na agenda (com guard anti-duplicação)
         if (newCob && valorEntrada > 0) {
           const today = new Date().toISOString().split("T")[0];
-          // Create separate cobranca for entrada
-          const { data: entradaCob } = await supabase.from("cobrancas").insert({
-            cliente_id: clienteId,
-            cliente_nome: clienteNome,
-            valor_parcela: valorEntrada,
-            data_inicio: today,
-            data_fim: today,
-            frequencia: "mes",
-            criado_por: user!.id,
-            observacoes: `Entrada do carnê: ${doc.nome_arquivo}`,
-          }).select("id").single();
 
-          if (entradaCob) {
-            await supabase.from("cobranca_pagamentos").insert({
-              cobranca_id: entradaCob.id,
-              data_vencimento: today,
-              status: "pago",
-              pago_em: new Date().toISOString(),
-              pago_por: user!.id,
-              tipo_pagamento: "entrada",
-            });
+          // DEDUP: Check if entrada already exists for this client
+          const { data: existingEntrada } = await supabase
+            .from("cobrancas")
+            .select("id")
+            .eq("cliente_id", clienteId)
+            .ilike("observacoes", "Entrada%")
+            .limit(1);
+
+          if (!existingEntrada || existingEntrada.length === 0) {
+            const { data: entradaCob } = await supabase.from("cobrancas").insert({
+              cliente_id: clienteId,
+              cliente_nome: clienteNome,
+              valor_parcela: valorEntrada,
+              data_inicio: today,
+              data_fim: today,
+              frequencia: "mes",
+              criado_por: user!.id,
+              observacoes: `Entrada do carnê: ${doc.nome_arquivo}`,
+            }).select("id").single();
+
+            if (entradaCob) {
+              await supabase.from("cobranca_pagamentos").insert({
+                cobranca_id: entradaCob.id,
+                data_vencimento: today,
+                status: "pago",
+                pago_em: new Date().toISOString(),
+                pago_por: user!.id,
+                tipo_pagamento: "entrada",
+              });
+            }
           }
         }
       }
