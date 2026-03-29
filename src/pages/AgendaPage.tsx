@@ -857,7 +857,8 @@ const AgendaPage = () => {
                   </Badge>
                 </CardContent>
               </Card>
-            ))
+             );
+            })
           )}
         </div>
       )}
