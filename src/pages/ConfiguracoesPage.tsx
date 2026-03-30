@@ -53,7 +53,7 @@ interface UserWithPermissions {
 }
 
 const ConfiguracoesPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, loading } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -167,6 +167,14 @@ const ConfiguracoesPage = () => {
     toast.success("Permissão atualizada!");
     fetchUsers();
   };
+
+  if (loading) {
+    return (
+      <div className="page-container text-center py-20">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
