@@ -1,6 +1,8 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSyncQueue, removeSyncItem, type SyncAction } from "@/lib/offline-sync";
+import { getSyncQueue, removeSyncItem, incrementRetry, type SyncAction } from "@/lib/offline-sync";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 interface UseSyncManagerProps {
   isOnline: boolean;
@@ -9,25 +11,49 @@ interface UseSyncManagerProps {
 }
 
 export function useSyncManager({ isOnline, setIsSyncing, refreshPending }: UseSyncManagerProps) {
+  const queryClient = useQueryClient();
+  const processingRef = useRef(false);
+
   const processQueue = useCallback(async () => {
+    if (processingRef.current) return;
     const queue = await getSyncQueue();
     if (queue.length === 0) return;
 
+    processingRef.current = true;
     setIsSyncing(true);
+
+    let synced = 0;
+    let failed = 0;
 
     for (const action of queue) {
       try {
         await processAction(action);
         await removeSyncItem(action.id);
+        synced++;
       } catch (err) {
         console.error("[Sync] Falha ao sincronizar:", action, err);
-        break; // Stop on first error to maintain order
+        const canRetry = await incrementRetry(action);
+        if (!canRetry) {
+          failed++;
+          console.warn("[Sync] Ação removida após 3 tentativas:", action);
+        }
+        // Continue to next action instead of stopping
       }
     }
 
+    processingRef.current = false;
     setIsSyncing(false);
     await refreshPending();
-  }, [setIsSyncing, refreshPending]);
+
+    // Invalidate queries to refresh data
+    if (synced > 0) {
+      queryClient.invalidateQueries();
+      toast.success(`${synced} alteração(ões) sincronizada(s) com sucesso`);
+    }
+    if (failed > 0) {
+      toast.error(`${failed} ação(ões) falharam após 3 tentativas`);
+    }
+  }, [setIsSyncing, refreshPending, queryClient]);
 
   // Sync when coming back online
   useEffect(() => {
@@ -36,7 +62,7 @@ export function useSyncManager({ isOnline, setIsSyncing, refreshPending }: UseSy
     }
   }, [isOnline, processQueue]);
 
-  // Periodic sync attempt
+  // Periodic sync attempt every 30s
   useEffect(() => {
     if (!isOnline) return;
     const interval = setInterval(processQueue, 30000);
@@ -57,7 +83,28 @@ async function processAction(action: SyncAction) {
     }
     case "update": {
       const { id, ...rest } = payload;
-      const { error } = await supabase.from(table as any).update(rest as any).eq("id", id as string);
+      const recordId = id as string;
+
+      // Conflict resolution: "last write wins" via updated_at
+      const { data: serverData } = await supabase
+        .from(table as any)
+        .select("updated_at")
+        .eq("id", recordId)
+        .single();
+
+      if (serverData?.updated_at) {
+        const serverTime = new Date(serverData.updated_at).getTime();
+        if (serverTime > action.localUpdatedAt) {
+          // Server has newer data — skip this update
+          console.info("[Sync] Conflito: servidor mais recente, ignorando atualização local", recordId);
+          return;
+        }
+      }
+
+      const { error } = await supabase
+        .from(table as any)
+        .update({ ...rest, updated_at: new Date().toISOString() } as any)
+        .eq("id", recordId);
       if (error) throw error;
       break;
     }
