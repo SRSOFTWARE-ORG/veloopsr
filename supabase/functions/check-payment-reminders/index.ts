@@ -83,59 +83,7 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   }
 }
 
-// ── IA: gerar mensagem formal ──
-async function generateFormalMessage(
-  clienteNome: string,
-  cpf: string,
-  valor: string,
-  dataVencimento: string,
-  tipo: "D-1" | "D0"
-): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-  const tomD1 = "preventivo e cordial, informando que a fatura vence AMANHÃ";
-  const tomD0 = "mais urgente e direto, informando que a fatura vence HOJE";
-  const tom = tipo === "D-1" ? tomD1 : tomD0;
-  const diaRef = tipo === "D-1" ? "amanhã" : "hoje";
-
-  const fallback = `Prezado(a) Sr(a). *${clienteNome}*,\n\nInformamos que a fatura vinculada ao CPF *${cpf}*, no valor de *${valor}*, ${tipo === "D-1" ? `possui vencimento previsto para ${diaRef}, dia *${dataVencimento}*` : `vence na presente data (*${dataVencimento}*)`}.\n\n${tipo === "D-1" ? "Solicitamos, por gentileza, que o pagamento seja realizado até a data informada, a fim de evitar encargos adicionais." : "Reforçamos a importância da regularização do pagamento no dia de hoje para evitar encargos adicionais."}\n\nCaso o pagamento já tenha sido efetuado, pedimos que desconsidere esta mensagem.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
-
-  if (!LOVABLE_API_KEY) return fallback;
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 8 linhas). O tom deve ser ${tom}. Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`
-          },
-          {
-            role: "user",
-            content: `Gere uma mensagem formal de cobrança com os seguintes dados:\n- Nome completo: ${clienteNome}\n- CPF: ${cpf}\n- Valor: ${valor}\n- Data de vencimento: ${dataVencimento}\n- A fatura vence ${diaRef}.\n\nInclua uma frase pedindo para desconsiderar caso já tenha sido pago.`
-          }
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("AI gateway error:", res.status, await res.text());
-      return fallback;
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || fallback;
-  } catch (err) {
-    console.error("AI generation error:", err);
-    return fallback;
-  }
-}
+// ── IA: gerar mensagem removida — agora via webhook/n8n ──
 
 // ── Notificação interna (push + banco) ──
 async function createNotification(
