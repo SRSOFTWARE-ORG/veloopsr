@@ -8,6 +8,7 @@ interface Props {
   pendingCount: number;
   onForceSync?: () => Promise<void>;
   sidebarOpen?: boolean;
+  inline?: boolean;
 }
 
 const config: Record<ConnectionStatus, { icon: typeof Cloud; label: string }> = {
@@ -22,7 +23,7 @@ const colorMap: Record<ConnectionStatus, string> = {
   syncing: "text-blue-500",
 };
 
-const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarOpen }: Props) => {
+const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarOpen, inline }: Props) => {
   const { icon: Icon, label } = config[status];
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,13 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
     }
   };
 
+  // Inline mode: just the cloud icon, no positioning
+  if (inline) {
+    return (
+      <Icon className={`w-5 h-5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -99,7 +107,6 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-150 hover:shadow-md active:scale-95"
       >
         <Icon className={`w-3.5 h-3.5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
-        {/* Hide label when mobile sidebar is open */}
         {!sidebarOpen && (
           <span className={`text-[10px] font-medium uppercase tracking-wider ${status === "offline" ? "text-amber-600" : "text-gray-600"}`}>
             {label}
