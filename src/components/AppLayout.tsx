@@ -162,7 +162,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               decoding="sync"
               onClick={() => { navigate("/"); setSidebarOpen(false); }}
             />
-            <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-3">
+              <ConnectionStatusIndicator status={status} pendingCount={pendingCount} onForceSync={processQueue} sidebarOpen={sidebarOpen} inline />
+              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+            </div>
           </div>
           <nav className="p-3 space-y-0.5">
             {allItems.map((item) => (
