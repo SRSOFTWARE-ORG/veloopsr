@@ -788,8 +788,8 @@ const DocumentosPage = () => {
                   {d.processado && (
                     <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">✓ Processado</span>
                   )}
-                  {d.cliente_nome && <span className="text-xs text-muted-foreground">{d.cliente_nome}</span>}
-                  <span className="text-xs text-muted-foreground">
+                  {d.cliente_nome && <span className="text-xs text-muted-foreground hidden md:inline">{d.cliente_nome}</span>}
+                  <span className="text-xs text-muted-foreground hidden md:inline">
                     {new Date(d.created_at).toLocaleDateString("pt-BR")}
                   </span>
                 </div>
