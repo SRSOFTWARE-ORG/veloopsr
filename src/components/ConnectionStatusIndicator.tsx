@@ -145,9 +145,14 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
       {/* Main pill */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-150 hover:shadow-md active:scale-95"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95"
+        style={{
+          perspective: "600px",
+          filter: `drop-shadow(0 2px 4px ${status === "online" ? "rgba(16,185,129,0.35)" : status === "offline" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.35)"})`,
+          animation: status !== "syncing" ? "cloudFloat 3s ease-in-out infinite" : undefined,
+        }}
       >
-        <Icon className={`w-3.5 h-3.5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
+        <Icon className={`w-4 h-4 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
         {!sidebarOpen && (
           <span className={`text-[10px] font-medium uppercase tracking-wider ${status === "offline" ? "text-amber-600" : "text-gray-600"}`}>
             {label}
