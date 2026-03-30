@@ -206,7 +206,7 @@ html, body, #root {
 }
 
 @keyframes cloudFloat {
-  0%, 100% { transform: translateY(0) rotateY(0deg); }
-  25% { transform: translateY(-2px) rotateY(8deg); }
-  75% { transform: translateY(1px) rotateY(-5deg); }
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  25% { transform: translateY(-2px) translateZ(0); }
+  75% { transform: translateY(1px) translateZ(0); }
 }

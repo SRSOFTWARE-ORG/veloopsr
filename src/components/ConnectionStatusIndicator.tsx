@@ -92,22 +92,18 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
   // Inline mode: cloud icon with expandable actions
   if (inline) {
     return (
-      <div ref={containerRef} className="relative" style={{ perspective: "600px" }}>
+      <div ref={containerRef} className="relative">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="p-1.5 rounded-full active:scale-90 transition-all duration-200 hover:scale-110"
           style={{
             filter: `drop-shadow(0 2px 4px ${status === "online" ? "rgba(16,185,129,0.4)" : status === "offline" ? "rgba(245,158,11,0.4)" : "rgba(59,130,246,0.4)"})`,
             animation: status === "syncing" ? undefined : "cloudFloat 3s ease-in-out infinite",
+            willChange: "transform",
+            backfaceVisibility: "hidden",
           }}
         >
-          <Icon
-            className={`w-5 h-5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`}
-            style={{
-              transform: status !== "syncing" ? "rotateY(0deg)" : undefined,
-              transition: "transform 0.3s ease",
-            }}
-          />
+          <Icon className={`w-5 h-5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
         </button>
         {expanded && (
           <div className="absolute right-0 top-full mt-2 flex flex-col gap-1 bg-white/90 backdrop-blur-md border border-gray-100 rounded-xl shadow-lg p-2 min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-200 z-50">
@@ -147,9 +143,11 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
         onClick={() => setExpanded((v) => !v)}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95"
         style={{
-          perspective: "600px",
           filter: `drop-shadow(0 2px 4px ${status === "online" ? "rgba(16,185,129,0.35)" : status === "offline" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.35)"})`,
           animation: status !== "syncing" ? "cloudFloat 3s ease-in-out infinite" : undefined,
+          willChange: "transform",
+          backfaceVisibility: "hidden",
+          WebkitFontSmoothing: "antialiased",
         }}
       >
         <Icon className={`w-4 h-4 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
