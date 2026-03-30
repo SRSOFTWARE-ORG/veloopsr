@@ -41,30 +41,27 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
-// ── WhatsApp via Evolution API ──
-async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean> {
-  const apiUrl = Deno.env.get("EVOLUTION_API_URL");
-  const apiKey = Deno.env.get("EVOLUTION_API_KEY");
-  if (!apiUrl || !apiKey || !telefone) return false;
-
-  const digits = telefone.replace(/\D/g, "");
-  const formattedPhone = digits.startsWith("55") && digits.length >= 12
-    ? digits
-    : `55${digits.startsWith("0") ? digits.slice(1) : digits}`;
+// ── Webhook para n8n ──
+async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
+  const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
+  if (!webhookUrl) {
+    console.warn("[Webhook] N8N_WEBHOOK_URL não configurada");
+    return false;
+  }
 
   try {
-    const res = await fetch(`${apiUrl}/message/sendText/Veloop`, {
+    const res = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({ number: formattedPhone, text: mensagem }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, timestamp: new Date().toISOString(), source: "veloop" }),
     });
     if (!res.ok) {
-      console.error("WhatsApp send failed:", await res.text());
+      console.error("[Webhook] Falha:", res.status, await res.text());
       return false;
     }
     return true;
   } catch (err) {
-    console.error("WhatsApp network error:", err);
+    console.error("[Webhook] Network error:", err);
     return false;
   }
 }
@@ -86,59 +83,7 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   }
 }
 
-// ── IA: gerar mensagem formal ──
-async function generateFormalMessage(
-  clienteNome: string,
-  cpf: string,
-  valor: string,
-  dataVencimento: string,
-  tipo: "D-1" | "D0"
-): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-  const tomD1 = "preventivo e cordial, informando que a fatura vence AMANHÃ";
-  const tomD0 = "mais urgente e direto, informando que a fatura vence HOJE";
-  const tom = tipo === "D-1" ? tomD1 : tomD0;
-  const diaRef = tipo === "D-1" ? "amanhã" : "hoje";
-
-  const fallback = `Prezado(a) Sr(a). *${clienteNome}*,\n\nInformamos que a fatura vinculada ao CPF *${cpf}*, no valor de *${valor}*, ${tipo === "D-1" ? `possui vencimento previsto para ${diaRef}, dia *${dataVencimento}*` : `vence na presente data (*${dataVencimento}*)`}.\n\n${tipo === "D-1" ? "Solicitamos, por gentileza, que o pagamento seja realizado até a data informada, a fim de evitar encargos adicionais." : "Reforçamos a importância da regularização do pagamento no dia de hoje para evitar encargos adicionais."}\n\nCaso o pagamento já tenha sido efetuado, pedimos que desconsidere esta mensagem.\n\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`;
-
-  if (!LOVABLE_API_KEY) return fallback;
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `Você gera mensagens de cobrança formais, elegantes e objetivas em nome da empresa SR SOFTWARE para envio via WhatsApp. Use formatação WhatsApp (*negrito*). Não use saudações como 'Bom dia/Boa tarde'. Seja breve (máximo 8 linhas). O tom deve ser ${tom}. Sempre finalize com:\nAtenciosamente,\n*SR SOFTWARE*\n_Powered by Veloop_`
-          },
-          {
-            role: "user",
-            content: `Gere uma mensagem formal de cobrança com os seguintes dados:\n- Nome completo: ${clienteNome}\n- CPF: ${cpf}\n- Valor: ${valor}\n- Data de vencimento: ${dataVencimento}\n- A fatura vence ${diaRef}.\n\nInclua uma frase pedindo para desconsiderar caso já tenha sido pago.`
-          }
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("AI gateway error:", res.status, await res.text());
-      return fallback;
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || fallback;
-  } catch (err) {
-    console.error("AI generation error:", err);
-    return fallback;
-  }
-}
+// ── IA: gerar mensagem removida — agora via webhook/n8n ──
 
 // ── Notificação interna (push + banco) ──
 async function createNotification(
@@ -307,15 +252,22 @@ Deno.serve(async (req) => {
 
       if (!telefone || !cpf) continue;
 
-      const dataFormatada = entry.date.split("-").reverse().join("/");
       const valorFormatado = formatValor(entry.valorParcela);
       const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
 
-      // ── Gerar mensagem com IA ──
-      const mensagem = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada, entry.tipo);
-
-      // ── Enviar WhatsApp ──
-      const enviado = await sendWhatsApp(telefone, mensagem);
+      // ── Enviar via Webhook (n8n) ──
+      const enviado = await sendWebhook({
+        nome_cliente: nomeCompleto,
+        telefone,
+        valor_transacao: entry.valorParcela,
+        data_vencimento: entry.date,
+        tipo: "cobranca",
+        cobranca_id: entry.cobrancaId,
+        cliente_id: entry.clienteId,
+        cpf,
+        status_parcela: statusAtual,
+        tipo_envio: entry.tipo,
+      });
 
       // ── Registrar no banco (SEMPRE, sucesso ou falha) ──
       try {
@@ -327,13 +279,11 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem,
+          mensagem: `Webhook ${entry.tipo} — ${valorFormatado}`,
           enviado_com_sucesso: enviado,
         });
-        // Marcar CPF como enviado para evitar duplicação no mesmo loop
         cpfsJaEnviados.add(cpf);
       } catch (insertErr) {
-        // Unique constraint violation = duplicata, ignorar
         console.warn("Insert envio_cobranca falhou (possível duplicata):", insertErr);
       }
 
@@ -407,7 +357,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        whatsapp_sent: whatsappCount,
+        webhooks_sent: whatsappCount,
         notifications_created: notifCount,
         skipped_duplicates: skippedDuplicates,
         entries_processed: entriesToProcess.length,

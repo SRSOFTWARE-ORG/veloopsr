@@ -6,11 +6,12 @@ const MAX_RETRIES = 3;
 export interface SyncAction {
   id: string;
   table: string;
-  type: "insert" | "update" | "delete";
+  type: "insert" | "update" | "delete" | "webhook";
   payload: Record<string, unknown>;
   createdAt: number;
   retries: number;
   localUpdatedAt: number; // timestamp for conflict resolution
+  webhookEndpoint?: string; // for webhook type actions
 }
 
 export async function addToSyncQueue(

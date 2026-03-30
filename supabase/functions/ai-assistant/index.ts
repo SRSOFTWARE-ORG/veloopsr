@@ -171,22 +171,23 @@ const actionTools = [
   {
     type: "function",
     function: {
-      name: "send_whatsapp",
-      description: "Enviar mensagem WhatsApp para um cliente",
+      name: "send_webhook",
+      description: "Enviar dados de cobrança/venda via webhook para o n8n",
       parameters: {
         type: "object",
         properties: {
+          nome_cliente: { type: "string", description: "Nome do cliente" },
           telefone: { type: "string", description: "Telefone do cliente com DDD" },
-          mensagem: { type: "string", description: "Mensagem livre" },
+          valor_transacao: { type: "number", description: "Valor da transação" },
+          data_vencimento: { type: "string", description: "Data de vencimento" },
+          tipo: { type: "string", enum: ["entrada", "carne", "cobranca"], description: "Tipo da transação" },
+          id_venda: { type: "string", description: "ID da venda (opcional)" },
           cobranca_id: { type: "string" },
           cliente_id: { type: "string" },
-          cliente_nome: { type: "string" },
           cpf: { type: "string" },
-          valor: { type: "number" },
-          data_vencimento: { type: "string" },
           status_parcela: { type: "string" },
         },
-        required: ["telefone"],
+        required: ["nome_cliente", "telefone", "valor_transacao", "tipo"],
       },
     },
   },
@@ -380,29 +381,28 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       if (error) throw error;
       return `✅ Registro de pagamento excluído`;
     }
-    case "send_whatsapp": {
+    case "send_webhook": {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-      const body: any = { telefone: args.telefone, instancia: "Veloop" };
-      if (args.mensagem) body.mensagem = args.mensagem;
-      if (args.cobranca_id) {
-        body.cobranca_id = args.cobranca_id;
-        body.cliente_id = args.cliente_id;
-        body.cliente_nome = args.cliente_nome;
-        body.cpf = args.cpf;
-        body.valor = args.valor;
-        body.data_vencimento = args.data_vencimento;
-        body.status_parcela = args.status_parcela;
-      }
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-webhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          nome_cliente: args.nome_cliente,
+          telefone: args.telefone,
+          valor_transacao: args.valor_transacao,
+          data_vencimento: args.data_vencimento,
+          tipo: args.tipo,
+          id_venda: args.id_venda,
+          cobranca_id: args.cobranca_id,
+          cliente_id: args.cliente_id,
+          cpf: args.cpf,
+          status_parcela: args.status_parcela,
+        }),
       });
       const data = await res.json();
-      if (data.duplicado) return "⚠️ Mensagem já enviada hoje (bloqueio anti-duplicidade)";
       if (!data.success) return `❌ Falha: ${data.error || "Erro desconhecido"}`;
-      return `✅ WhatsApp enviado para ${args.telefone}`;
+      return `✅ Webhook enviado com sucesso`;
     }
     case "trigger_payment_reminders": {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -554,7 +554,7 @@ PODERES COMPLETOS:
 FERRAMENTAS DISPONÍVEIS:
 update_payment_status, update_client, delete_client, update_product, delete_product,
 update_sale, delete_sale, update_cobranca, delete_cobranca, create_payment_record,
-delete_payment_record, send_whatsapp, trigger_payment_reminders, send_notification,
+delete_payment_record, send_webhook, trigger_payment_reminders, send_notification,
 view_whatsapp_history, create_cobranca, delete_dispositivo, update_dispositivo
 
 DADOS DO SISTEMA:
@@ -673,8 +673,8 @@ function describeAction(action: string, args: any, _ctx: any): string {
       return `Vou criar parcela em **${args.data_vencimento}** (${args.status || "a_pagar"}). Confirmar?`;
     case "delete_payment_record":
       return `Vou **excluir** este registro de pagamento. Confirmar?`;
-    case "send_whatsapp":
-      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Confirmar?`;
+    case "send_webhook":
+      return `Vou enviar dados de **${args.nome_cliente}** via webhook. Confirmar?`;
     case "trigger_payment_reminders":
       return `Vou **disparar automação de lembretes** (WhatsApp + notificações). Confirmar?`;
     case "send_notification":
