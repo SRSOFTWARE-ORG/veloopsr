@@ -176,16 +176,6 @@ const ConfiguracoesPage = () => {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="page-container text-center py-20">
-        <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
-        <p className="font-semibold text-lg">Acesso Restrito</p>
-        <p className="text-sm text-muted-foreground">Apenas administradores podem acessar esta página.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="page-container">
       {/* AI Search Bar */}
