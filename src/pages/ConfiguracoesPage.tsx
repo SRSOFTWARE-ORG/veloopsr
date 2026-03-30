@@ -53,7 +53,7 @@ interface UserWithPermissions {
 }
 
 const ConfiguracoesPage = () => {
-  const { isAdmin, user, loading } = useAuth();
+  const { isAdmin, isPrimaryAdmin, user, loading } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -63,46 +63,64 @@ const ConfiguracoesPage = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    if (isAdmin) fetchUsers();
-  }, [isAdmin]);
+  const isPreviewEnvironment = typeof window !== "undefined" && window.location.hostname.includes("lovableproject.com");
 
   const fetchUsers = async () => {
-    const [profilesRes, rolesRes, permsRes, emailsRes] = await Promise.all([
-      supabase.from("profiles").select("*"),
-      supabase.from("user_roles").select("*"),
-      supabase.from("permissions").select("*"),
-      supabase.functions.invoke("list-user-emails"),
-    ]);
+    try {
+      const [profilesRes, rolesRes, permsRes] = await Promise.all([
+        supabase.from("profiles").select("*"),
+        supabase.from("user_roles").select("*"),
+        supabase.from("permissions").select("*"),
+      ]);
 
-    const profiles = profilesRes.data || [];
-    const roles = rolesRes.data || [];
-    const perms = permsRes.data || [];
-    const emailMap: Record<string, string> = emailsRes.data?.emails || {};
+      let emailMap: Record<string, string> = {};
 
-    const merged: UserWithPermissions[] = profiles.map((p) => {
-      const role = roles.find((r) => r.user_id === p.id);
-      const perm = perms.find((pe) => pe.user_id === p.id);
-      return {
-        id: p.id,
-        nome: p.nome,
-        email: emailMap[p.id] || "",
-        role: role?.role || "vendedor",
-        permissions: {
-          pode_editar_preco: perm?.pode_editar_preco ?? false,
-          pode_excluir_venda: perm?.pode_excluir_venda ?? false,
-          pode_dar_desconto: perm?.pode_dar_desconto ?? false,
-          limite_desconto: Number(perm?.limite_desconto) || 0,
-          pode_ver_faturamento: (perm as any)?.pode_ver_faturamento ?? false,
-          tipo_comissao: (perm as any)?.tipo_comissao || "percentual",
-          valor_comissao: Number((perm as any)?.valor_comissao) || 0,
-        },
-      };
-    });
+      if (isPrimaryAdmin && !isPreviewEnvironment) {
+        const { data, error } = await supabase.functions.invoke("list-user-emails");
 
-    setUsers(merged);
+        if (error) {
+          console.warn("Falha ao buscar e-mails dos usuários:", error);
+        } else {
+          emailMap = data?.emails || {};
+        }
+      }
+
+      const profiles = profilesRes.data || [];
+      const roles = rolesRes.data || [];
+      const perms = permsRes.data || [];
+
+      const merged: UserWithPermissions[] = profiles.map((p) => {
+        const role = roles.find((r) => r.user_id === p.id);
+        const perm = perms.find((pe) => pe.user_id === p.id);
+        return {
+          id: p.id,
+          nome: p.nome,
+          email: emailMap[p.id] || "",
+          role: role?.role || "vendedor",
+          permissions: {
+            pode_editar_preco: perm?.pode_editar_preco ?? false,
+            pode_excluir_venda: perm?.pode_excluir_venda ?? false,
+            pode_dar_desconto: perm?.pode_dar_desconto ?? false,
+            limite_desconto: Number(perm?.limite_desconto) || 0,
+            pode_ver_faturamento: (perm as any)?.pode_ver_faturamento ?? false,
+            tipo_comissao: (perm as any)?.tipo_comissao || "percentual",
+            valor_comissao: Number((perm as any)?.valor_comissao) || 0,
+          },
+        };
+      });
+
+      setUsers(merged);
+    } catch (error) {
+      console.error("Erro ao carregar configurações:", error);
+      setUsers([]);
+    }
   };
+
+  useEffect(() => {
+    if (isAdmin) {
+      void fetchUsers();
+    }
+  }, [isAdmin, isPrimaryAdmin]);
 
   const handleCreateVendor = async () => {
     if (!newVendor.nome || !newVendor.email || !newVendor.password) {
