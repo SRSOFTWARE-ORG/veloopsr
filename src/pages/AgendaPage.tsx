@@ -369,33 +369,29 @@ const AgendaPage = () => {
     setSendingWhatsApp(`${cobranca.id}_${dateKey}`);
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+      const { data, error } = await supabase.functions.invoke("send-webhook", {
         body: {
+          nome_cliente: cliente?.nome || cobranca.cliente_nome,
           telefone,
+          valor_transacao: cobranca.valor_parcela,
+          data_vencimento: dateKey,
+          tipo: "cobranca" as const,
           cobranca_id: cobranca.id,
           cliente_id: cobranca.cliente_id,
-          cliente_nome: cliente?.nome || cobranca.cliente_nome,
           cpf,
-          valor: cobranca.valor_parcela,
-          data_vencimento: dateKey,
           status_parcela: status,
         },
       });
 
       if (error) throw error;
       if (data && !data.success) {
-        if (data.duplicado) {
-          toast.warning("Mensagem já enviada para este cliente hoje. Não será reenviada.");
-        } else {
-          throw new Error(data.error || "Erro ao enviar");
-        }
-        return;
+        throw new Error(data.error || "Erro ao enviar");
       }
 
-      toast.success(`WhatsApp enviado para ${cobranca.cliente_nome}!`);
+      toast.success(`Webhook enviado para ${cobranca.cliente_nome}!`);
     } catch (err: any) {
-      console.error("WhatsApp error:", err);
-      toast.error(err.message || "Erro ao enviar WhatsApp. Verifique a conexão com o servidor.");
+      console.error("Webhook error:", err);
+      toast.error(err.message || "Erro ao enviar webhook. Verifique a conexão.");
     } finally {
       setSendingWhatsApp(null);
     }
