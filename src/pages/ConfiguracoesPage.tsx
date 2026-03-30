@@ -53,7 +53,7 @@ interface UserWithPermissions {
 }
 
 const ConfiguracoesPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, loading } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
