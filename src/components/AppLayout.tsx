@@ -247,7 +247,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Connection Status - Fixed floating pill */}
-      <ConnectionStatusIndicator status={status} pendingCount={pendingCount} onForceSync={processQueue} />
+      <ConnectionStatusIndicator status={status} pendingCount={pendingCount} onForceSync={processQueue} sidebarOpen={sidebarOpen} />
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 pt-14 md:pt-0 w-full min-w-0 overflow-x-hidden">
