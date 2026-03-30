@@ -90,12 +90,11 @@ async function processAction(action: SyncAction) {
         .from(table as any)
         .select("updated_at")
         .eq("id", recordId)
-        .single();
+        .single() as { data: { updated_at?: string } | null };
 
       if (serverData?.updated_at) {
         const serverTime = new Date(serverData.updated_at).getTime();
         if (serverTime > action.localUpdatedAt) {
-          // Server has newer data — skip this update
           console.info("[Sync] Conflito: servidor mais recente, ignorando atualização local", recordId);
           return;
         }
