@@ -41,30 +41,27 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
-// ── WhatsApp via Evolution API ──
-async function sendWhatsApp(telefone: string, mensagem: string): Promise<boolean> {
-  const apiUrl = Deno.env.get("EVOLUTION_API_URL");
-  const apiKey = Deno.env.get("EVOLUTION_API_KEY");
-  if (!apiUrl || !apiKey || !telefone) return false;
-
-  const digits = telefone.replace(/\D/g, "");
-  const formattedPhone = digits.startsWith("55") && digits.length >= 12
-    ? digits
-    : `55${digits.startsWith("0") ? digits.slice(1) : digits}`;
+// ── Webhook para n8n ──
+async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
+  const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
+  if (!webhookUrl) {
+    console.warn("[Webhook] N8N_WEBHOOK_URL não configurada");
+    return false;
+  }
 
   try {
-    const res = await fetch(`${apiUrl}/message/sendText/Veloop`, {
+    const res = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({ number: formattedPhone, text: mensagem }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, timestamp: new Date().toISOString(), source: "veloop" }),
     });
     if (!res.ok) {
-      console.error("WhatsApp send failed:", await res.text());
+      console.error("[Webhook] Falha:", res.status, await res.text());
       return false;
     }
     return true;
   } catch (err) {
-    console.error("WhatsApp network error:", err);
+    console.error("[Webhook] Network error:", err);
     return false;
   }
 }

@@ -554,7 +554,7 @@ PODERES COMPLETOS:
 FERRAMENTAS DISPONÍVEIS:
 update_payment_status, update_client, delete_client, update_product, delete_product,
 update_sale, delete_sale, update_cobranca, delete_cobranca, create_payment_record,
-delete_payment_record, send_whatsapp, trigger_payment_reminders, send_notification,
+delete_payment_record, send_webhook, trigger_payment_reminders, send_notification,
 view_whatsapp_history, create_cobranca, delete_dispositivo, update_dispositivo
 
 DADOS DO SISTEMA:
@@ -673,8 +673,8 @@ function describeAction(action: string, args: any, _ctx: any): string {
       return `Vou criar parcela em **${args.data_vencimento}** (${args.status || "a_pagar"}). Confirmar?`;
     case "delete_payment_record":
       return `Vou **excluir** este registro de pagamento. Confirmar?`;
-    case "send_whatsapp":
-      return `Vou enviar **WhatsApp** para **${args.telefone}**${args.cliente_nome ? ` (${args.cliente_nome})` : ""}. Confirmar?`;
+    case "send_webhook":
+      return `Vou enviar dados de **${args.nome_cliente}** via webhook. Confirmar?`;
     case "trigger_payment_reminders":
       return `Vou **disparar automação de lembretes** (WhatsApp + notificações). Confirmar?`;
     case "send_notification":
