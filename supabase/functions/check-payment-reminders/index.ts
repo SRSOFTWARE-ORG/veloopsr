@@ -252,15 +252,22 @@ Deno.serve(async (req) => {
 
       if (!telefone || !cpf) continue;
 
-      const dataFormatada = entry.date.split("-").reverse().join("/");
       const valorFormatado = formatValor(entry.valorParcela);
       const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
 
-      // ── Gerar mensagem com IA ──
-      const mensagem = await generateFormalMessage(nomeCompleto, cpf, valorFormatado, dataFormatada, entry.tipo);
-
-      // ── Enviar WhatsApp ──
-      const enviado = await sendWhatsApp(telefone, mensagem);
+      // ── Enviar via Webhook (n8n) ──
+      const enviado = await sendWebhook({
+        nome_cliente: nomeCompleto,
+        telefone,
+        valor_transacao: entry.valorParcela,
+        data_vencimento: entry.date,
+        tipo: "cobranca",
+        cobranca_id: entry.cobrancaId,
+        cliente_id: entry.clienteId,
+        cpf,
+        status_parcela: statusAtual,
+        tipo_envio: entry.tipo,
+      });
 
       // ── Registrar no banco (SEMPRE, sucesso ou falha) ──
       try {
@@ -272,13 +279,11 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem,
+          mensagem: `Webhook ${entry.tipo} — ${valorFormatado}`,
           enviado_com_sucesso: enviado,
         });
-        // Marcar CPF como enviado para evitar duplicação no mesmo loop
         cpfsJaEnviados.add(cpf);
       } catch (insertErr) {
-        // Unique constraint violation = duplicata, ignorar
         console.warn("Insert envio_cobranca falhou (possível duplicata):", insertErr);
       }
 
@@ -352,7 +357,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        whatsapp_sent: whatsappCount,
+        webhooks_sent: whatsappCount,
         notifications_created: notifCount,
         skipped_duplicates: skippedDuplicates,
         entries_processed: entriesToProcess.length,
