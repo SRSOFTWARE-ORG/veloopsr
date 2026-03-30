@@ -22,7 +22,7 @@ const ConnectionStatusIndicator = ({ status, pendingCount }: Props) => {
   const { icon: Icon, label } = config[status];
 
   return (
-    <div className="fixed top-[3px] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-4 md:top-4 z-50 flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-300">
+    <div className="fixed top-[18px] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-4 md:top-4 z-50 flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-300">
       <Icon className={`w-3.5 h-3.5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
       <span className={`text-[10px] font-medium uppercase tracking-wider ${status === "offline" ? "text-amber-600" : "text-gray-600"}`}>
         {label}
