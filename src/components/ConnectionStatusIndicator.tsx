@@ -89,10 +89,38 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarO
     }
   };
 
-  // Inline mode: just the cloud icon, no positioning
+  // Inline mode: cloud icon with expandable actions
   if (inline) {
     return (
-      <Icon className={`w-5 h-5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
+      <div ref={containerRef} className="relative">
+        <button onClick={() => setExpanded((v) => !v)} className="p-1 active:scale-90 transition-transform duration-100">
+          <Icon className={`w-5 h-5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
+        </button>
+        {expanded && (
+          <div className="absolute right-0 top-full mt-2 flex flex-col gap-1 bg-white/90 backdrop-blur-md border border-gray-100 rounded-xl shadow-lg p-2 min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+            <button
+              onClick={handleForceSync}
+              disabled={status === "syncing" || (!navigator.onLine && pendingCount === 0)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${status === "syncing" ? "animate-spin text-blue-500" : "text-gray-500"}`} />
+              Sincronizar Agora
+              {pendingCount > 0 && (
+                <span className="ml-auto text-[9px] font-bold text-blue-600 bg-blue-50 rounded-full px-1.5 py-0.5">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" />
+              Exportar Relatório CSV
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
