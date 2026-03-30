@@ -76,6 +76,15 @@ async function processAction(action: SyncAction) {
   const { table, type, payload } = action;
 
   switch (type) {
+    case "webhook": {
+      // Replay queued webhook via edge function
+      toast.info("Sincronizando com a Agenda...");
+      const { error } = await supabase.functions.invoke("send-webhook", {
+        body: payload,
+      });
+      if (error) throw error;
+      break;
+    }
     case "insert": {
       const { error } = await supabase.from(table as any).insert(payload as any);
       if (error) throw error;
