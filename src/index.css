@@ -205,6 +205,11 @@ html, body, #root {
   100% { transform: scale(1); opacity: 1; }
 }
 
+
+.agenda-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes cloudFloat {
   0%, 100% { transform: translateY(0) translateZ(0); }
   25% { transform: translateY(-2px) translateZ(0); }
