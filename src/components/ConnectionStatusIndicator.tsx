@@ -8,6 +8,7 @@ interface Props {
   pendingCount: number;
   onForceSync?: () => Promise<void>;
   sidebarOpen?: boolean;
+  inline?: boolean;
 }
 
 const config: Record<ConnectionStatus, { icon: typeof Cloud; label: string }> = {
@@ -22,7 +23,7 @@ const colorMap: Record<ConnectionStatus, string> = {
   syncing: "text-blue-500",
 };
 
-const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarOpen }: Props) => {
+const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarOpen, inline }: Props) => {
   const { icon: Icon, label } = config[status];
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
