@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Cloud, CloudOff, RefreshCw, Download } from "lucide-react";
 import type { ConnectionStatus } from "@/hooks/useOnlineStatus";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ interface Props {
   status: ConnectionStatus;
   pendingCount: number;
   onForceSync?: () => Promise<void>;
+  sidebarOpen?: boolean;
 }
 
 const config: Record<ConnectionStatus, { icon: typeof Cloud; label: string }> = {
@@ -21,9 +22,22 @@ const colorMap: Record<ConnectionStatus, string> = {
   syncing: "text-blue-500",
 };
 
-const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync }: Props) => {
+const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync, sidebarOpen }: Props) => {
   const { icon: Icon, label } = config[status];
   const [expanded, setExpanded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on any outside click
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [expanded]);
 
   const handleForceSync = async () => {
     if (!onForceSync || status === "syncing") return;
@@ -35,38 +49,29 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync }: Props)
   const handleExportCSV = async () => {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-
       const [{ data: cobrancas }, { data: pagamentos }] = await Promise.all([
         supabase.from("cobrancas").select("*"),
         supabase.from("cobranca_pagamentos").select("*"),
       ]);
-
       const pagMap = new Map<string, any[]>();
       (pagamentos || []).forEach((p) => {
         const arr = pagMap.get(p.cobranca_id) || [];
         arr.push(p);
         pagMap.set(p.cobranca_id, arr);
       });
-
       const rows: string[] = [
         "Cliente,Valor Parcela,Frequência,Data Início,Data Fim,Vencimento,Status Parcela,Pago Em",
       ];
-
       (cobrancas || []).forEach((c) => {
         const pags = pagMap.get(c.id) || [];
         if (pags.length === 0) {
-          rows.push(
-            `"${c.cliente_nome}",${c.valor_parcela},"${c.frequencia}","${c.data_inicio}","${c.data_fim}","","",""`
-          );
+          rows.push(`"${c.cliente_nome}",${c.valor_parcela},"${c.frequencia}","${c.data_inicio}","${c.data_fim}","","",""`);
         } else {
           pags.forEach((p) => {
-            rows.push(
-              `"${c.cliente_nome}",${c.valor_parcela},"${c.frequencia}","${c.data_inicio}","${c.data_fim}","${p.data_vencimento}","${p.status}","${p.pago_em || ""}"`
-            );
+            rows.push(`"${c.cliente_nome}",${c.valor_parcela},"${c.frequencia}","${c.data_inicio}","${c.data_fim}","${p.data_vencimento}","${p.status}","${p.pago_em || ""}"`);
           });
         }
       });
-
       const csv = rows.join("\n");
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -84,16 +89,22 @@ const ConnectionStatusIndicator = ({ status, pendingCount, onForceSync }: Props)
   };
 
   return (
-    <div className="fixed top-[18px] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-4 md:top-4 z-50 flex flex-col items-center md:items-end gap-1">
+    <div
+      ref={containerRef}
+      className="fixed top-[18px] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-4 md:top-4 z-50 flex flex-col items-center md:items-end gap-1"
+    >
       {/* Main pill */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-md active:scale-95"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-md border border-gray-100 shadow-sm transition-all duration-150 hover:shadow-md active:scale-95"
       >
         <Icon className={`w-3.5 h-3.5 ${colorMap[status]} ${status === "syncing" ? "animate-spin" : ""}`} />
-        <span className={`text-[10px] font-medium uppercase tracking-wider ${status === "offline" ? "text-amber-600" : "text-gray-600"}`}>
-          {label}
-        </span>
+        {/* Hide label when mobile sidebar is open */}
+        {!sidebarOpen && (
+          <span className={`text-[10px] font-medium uppercase tracking-wider ${status === "offline" ? "text-amber-600" : "text-gray-600"}`}>
+            {label}
+          </span>
+        )}
         {pendingCount > 0 && (
           <span className="text-[9px] font-bold text-blue-600 bg-blue-100 rounded-full px-1.5">
             {pendingCount}
