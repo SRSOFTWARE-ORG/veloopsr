@@ -283,10 +283,35 @@ Deno.serve(async (req) => {
 
       // ── Enviar WhatsApp via UAZAPI ──
       const dataFormatada = entry.date.split("-").reverse().join("/");
-      const tipoMsg = entry.tipo === "D-1" ? "vence amanhã" : "vence hoje";
-      const mensagemWpp = statusAtual === "pendente" || statusAtual === "a_pagar"
-        ? `Olá ${nomeCompleto}! Sua parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Por favor, efetue o pagamento. Obrigado!`
-        : `Olá ${nomeCompleto}! Lembrete: parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Obrigado!`;
+      const cpfMascarado = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
+      const statusLabel = statusAtual === "pendente" ? "⚠️ PENDENTE (em atraso)"
+        : statusAtual === "a_pagar" ? "📋 A PAGAR" : `📋 ${statusAtual.toUpperCase()}`;
+      const saudacao = entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
+
+      const mensagemWpp = [
+        `Olá, *${nomeCompleto}*! 👋`,
+        ``,
+        `Segue o lembrete da sua fatura que ${saudacao}:`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━`,
+        `📄 *DADOS DA FATURA*`,
+        `━━━━━━━━━━━━━━━━━━`,
+        `👤 *Cliente:* ${nomeCompleto}`,
+        `🆔 *CPF:* ${cpfMascarado}`,
+        `📅 *Vencimento:* ${dataFormatada}`,
+        `💰 *Valor:* ${valorFormatado}`,
+        `📊 *Status:* ${statusLabel}`,
+        `━━━━━━━━━━━━━━━━━━`,
+        ``,
+        statusAtual === "pendente"
+          ? `⚠️ Esta fatura encontra-se *em atraso*. Por favor, regularize o quanto antes para evitar transtornos.`
+          : `Por favor, efetue o pagamento até a data de vencimento.`,
+        ``,
+        `Em caso de dúvidas, responda esta mensagem.`,
+        ``,
+        `Atenciosamente,`,
+        `*SR Software — Veloop* 🟢`,
+      ].join("\n");
 
       const enviado = await sendWhatsApp(telefone, mensagemWpp);
 
