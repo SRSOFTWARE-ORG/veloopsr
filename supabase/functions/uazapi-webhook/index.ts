@@ -119,7 +119,8 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const event = body.event || body.type || "unknown";
+    const rawEvent = body.event || body.type || "unknown";
+    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
     const sender = body.data?.key?.remoteJid || body.sender || null;
     const messageContent =
       body.data?.message?.conversation ||
