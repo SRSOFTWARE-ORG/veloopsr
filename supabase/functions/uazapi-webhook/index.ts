@@ -85,6 +85,88 @@ async function sendWhatsApp(phone: string, message: string) {
   } catch (e) { console.error("sendWhatsApp error:", e); return false; }
 }
 
+// ─── Download media from UAZAPI ───
+
+async function downloadMediaBase64(messageBody: any): Promise<string | null> {
+  const url = Deno.env.get("UAZAPI_URL");
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!url || !token) return null;
+  try {
+    const payload = messageBody.data || messageBody.body || messageBody;
+    const res = await fetch(`${url.replace(/\/+$/, "")}/chat/getBase64FromMediaMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ message: payload }),
+    });
+    if (!res.ok) { console.error("[downloadMedia] status:", res.status); return null; }
+    const data = await res.json();
+    return data.base64 || data.data || null;
+  } catch (e) { console.error("downloadMedia error:", e); return null; }
+}
+
+// ─── Transcribe audio with Gemini ───
+
+async function transcribeAudio(audioBase64: string, mimeType: string = "audio/ogg"): Promise<string> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) return "";
+  try {
+    const cleanBase64 = audioBase64.includes(",") ? audioBase64.split(",")[1] : audioBase64;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inlineData: { mimeType, data: cleanBase64 } },
+              { text: "Transcreva este áudio em português brasileiro. Retorne APENAS o texto transcrito, sem explicações." }
+            ]
+          }]
+        }),
+      }
+    );
+    if (!res.ok) { console.error("[Gemini STT] error:", res.status, await res.text()); return ""; }
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  } catch (e) { console.error("transcribeAudio error:", e); return ""; }
+}
+
+// ─── Text to Speech (Google Translate TTS - free) ───
+
+async function textToSpeechBase64(text: string): Promise<string | null> {
+  try {
+    const clean = text.replace(/[*_~`✨\n]/g, " ").replace(/Assistente SR/g, "").replace(/\s+/g, " ").trim();
+    const shortText = clean.slice(0, 200);
+    if (!shortText) return null;
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(shortText)}&tl=pt-BR&client=tw-ob&ttsspeed=1`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } });
+    if (!res.ok) { console.error("[TTS] status:", res.status); return null; }
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  } catch (e) { console.error("textToSpeech error:", e); return null; }
+}
+
+// ─── Send audio via UAZAPI (PTT voice message) ───
+
+async function sendWhatsAppAudio(phone: string, audioBase64: string): Promise<boolean> {
+  const url = Deno.env.get("UAZAPI_URL");
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!url || !token) return false;
+  try {
+    const res = await fetch(`${url.replace(/\/+$/, "")}/send/audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ number: phone, audio: `data:audio/mp3;base64,${audioBase64}`, ptt: true }),
+    });
+    if (!res.ok) console.error("[sendAudio] status:", res.status, await res.text());
+    return res.ok;
+  } catch (e) { console.error("sendWhatsAppAudio error:", e); return false; }
+}
+
 // ─── Conversation DB helpers ───
 
 async function getOrCreateConversation(supabase: any, phone: string) {
