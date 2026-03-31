@@ -6,7 +6,7 @@ const MAX_RETRIES = 3;
 export interface SyncAction {
   id: string;
   table: string;
-  type: "insert" | "update" | "delete" | "webhook";
+  type: "insert" | "update" | "delete" | "webhook" | "whatsapp";
   payload: Record<string, unknown>;
   createdAt: number;
   retries: number;
