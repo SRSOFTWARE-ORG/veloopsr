@@ -369,10 +369,18 @@ const AgendaPage = () => {
     setSendingWhatsApp(`${cobranca.id}_${dateKey}`);
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-webhook", {
+      const nomeCliente = cliente?.nome || cobranca.cliente_nome;
+      const valorFormatado = formatCurrency(cobranca.valor_parcela);
+      const dataFormatada = format(parseISO(dateKey), "dd/MM/yyyy");
+      const mensagem = status === "pendente"
+        ? `Olá ${nomeCliente}! Sua parcela de ${valorFormatado} venceu em ${dataFormatada}. Por favor, regularize o pagamento. Obrigado!`
+        : `Olá ${nomeCliente}! Lembrete: sua parcela de ${valorFormatado} vence em ${dataFormatada}. Obrigado!`;
+
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-uazapi", {
         body: {
-          nome_cliente: cliente?.nome || cobranca.cliente_nome,
+          nome_cliente: nomeCliente,
           telefone,
+          mensagem,
           valor_transacao: cobranca.valor_parcela,
           data_vencimento: dateKey,
           tipo: "cobranca" as const,
@@ -388,7 +396,7 @@ const AgendaPage = () => {
         throw new Error(data.error || "Erro ao enviar");
       }
 
-      toast.success(`Webhook enviado para ${cobranca.cliente_nome}!`);
+      toast.success(`WhatsApp enviado para ${cobranca.cliente_nome}!`);
     } catch (err: any) {
       console.error("Webhook error:", err);
       toast.error(err.message || "Erro ao enviar webhook. Verifique a conexão.");
