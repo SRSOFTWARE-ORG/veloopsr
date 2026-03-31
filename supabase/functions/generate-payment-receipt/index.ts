@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
       totalParcelas,
       cobrancaObs: cob.observacoes,
       descricao: cob.observacoes || "Parcela de Servico",
-    });
+    }, logoBytes);
 
     const fileName = `comprovantes/${cobranca_id}_${data_vencimento}.pdf`;
     const { error: uploadErr } = await supabase.storage.from("documentos_vendas").upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
