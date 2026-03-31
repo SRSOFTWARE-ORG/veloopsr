@@ -61,6 +61,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
+        id: "/",
         name: "Veloop - SR Software",
         short_name: "Veloop",
         description: "Sistema de gestão e PDV móvel para SR Software",
@@ -69,6 +70,23 @@ export default defineConfig(({ mode }) => ({
         background_color: "#0f172a",
         theme_color: "#1a7a4c",
         orientation: "portrait",
+        lang: "pt-BR",
+        categories: ["business", "productivity"],
+        prefer_related_applications: false,
+        shortcuts: [
+          {
+            name: "Vendas",
+            short_name: "Vendas",
+            url: "/vendas",
+            icons: [{ src: "https://veloopsr.lovable.app/icons/icon-192x192.png", sizes: "192x192", type: "image/png" }],
+          },
+          {
+            name: "Clientes",
+            short_name: "Clientes",
+            url: "/clientes",
+            icons: [{ src: "https://veloopsr.lovable.app/icons/icon-192x192.png", sizes: "192x192", type: "image/png" }],
+          },
+        ],
         icons: [
           {
             src: "https://veloopsr.lovable.app/icons/icon-192x192.png",
@@ -81,6 +99,12 @@ export default defineConfig(({ mode }) => ({
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
+          },
+          {
+            src: "https://veloopsr.lovable.app/icons/icon-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
