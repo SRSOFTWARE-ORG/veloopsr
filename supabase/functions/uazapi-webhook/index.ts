@@ -9,13 +9,27 @@ const corsHeaders = {
 
 /**
  * WhatsApp AI Chatbot via UAZAPI webhook.
- * - Responds to all incoming messages using AI
+ * - Only responds when admin is OFFLINE (not actively chatting)
+ * - Tracks admin activity per contact via fromMe messages
  * - Handles invoice/payment queries by asking for CPF
- * - Looks up CPF in the database and returns pending payment info
+ * - General AI conversation powered by Lovable AI
  */
 
+// Track admin activity per contact: phone -> last admin message timestamp
+const adminActivity = new Map<string, number>();
+const ADMIN_ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+function isAdminOnline(phone: string): boolean {
+  const lastActive = adminActivity.get(phone);
+  if (!lastActive) return false;
+  return Date.now() - lastActive < ADMIN_ONLINE_WINDOW_MS;
+}
+
+function markAdminActive(phone: string) {
+  adminActivity.set(phone, Date.now());
+}
+
 // In-memory conversation state (per phone number)
-// In production, consider using a database table for persistence
 const conversationState = new Map<string, {
   stage: "idle" | "awaiting_cpf";
   history: Array<{ role: string; content: string }>;
@@ -25,7 +39,6 @@ const conversationState = new Map<string, {
 function getState(phone: string) {
   let state = conversationState.get(phone);
   if (!state || Date.now() - state.lastActivity > 30 * 60 * 1000) {
-    // Reset after 30 min inactivity
     state = { stage: "idle", history: [], lastActivity: Date.now() };
     conversationState.set(phone, state);
   }
