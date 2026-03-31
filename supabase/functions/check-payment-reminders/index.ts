@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
       const cpfMascarado = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
       const statusLabel = statusAtual === "pendente" ? "⚠️ PENDENTE (em atraso)"
         : statusAtual === "a_pagar" ? "📋 A PAGAR" : `📋 ${statusAtual.toUpperCase()}`;
-      const saudacao = entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
+      const saudacao = entry.tipo === "D-3" ? "vence em *3 dias*" : entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
 
       const mensagemWpp = [
         `Olá, *${nomeCompleto}*! 👋`,
