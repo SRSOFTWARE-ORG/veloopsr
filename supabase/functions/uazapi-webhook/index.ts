@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const BOT_PREFIX = "🤖 [Assistente Virtual Veloop]\n\n";
+const BOT_PREFIX = "✨ *Assistente SR* ✨\n\n";
 const ADMIN_ONLINE_WINDOW_MS = 10 * 60 * 1000;
 const adminActivity = new Map<string, number>();
 
