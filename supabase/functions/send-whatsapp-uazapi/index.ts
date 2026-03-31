@@ -62,15 +62,16 @@ Deno.serve(async (req) => {
 
     // Send text message via UAZAPI
     const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const response = await fetch(`${apiUrl}/message/send-text`, {
+    const response = await fetch(`${apiUrl}/send/text`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "token": UAZAPI_TOKEN,
       },
       body: JSON.stringify({
-        phone,
-        message: mensagem,
+        number: phone,
+        text: mensagem,
+        linkPreview: false,
       }),
     });
 

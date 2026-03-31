@@ -57,10 +57,10 @@ async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
 
   try {
     const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const res = await fetch(`${apiUrl}/message/send-text`, {
+    const res = await fetch(`${apiUrl}/send/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      body: JSON.stringify({ phone: cleanPhone, message }),
+      body: JSON.stringify({ number: cleanPhone, text: message, linkPreview: false }),
     });
     const result = await res.json();
     if (!res.ok || result.error) {
