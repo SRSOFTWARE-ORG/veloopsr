@@ -6,6 +6,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ADMIN_PHONE = "5527999177265";
+
+function formatCurrency(v: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+}
+
+function formatDate(d: string): string {
+  return d.split("-").reverse().join("/");
+}
+
+async function sendWhatsAppText(phone: string, message: string): Promise<boolean> {
+  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
+  let cleanPhone = phone.replace(/\D/g, "");
+  if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
+  if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
+  try {
+    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+    const res = await fetch(`${apiUrl}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({ number: cleanPhone, text: message, linkPreview: false }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[UAZAPI] Text send error:", err);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,7 +53,6 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log("[MP Webhook] Received:", JSON.stringify(body));
 
-    // Mercado Pago sends { action, type, data: { id } }
     if (body.type !== "payment" && body.action !== "payment.updated" && body.action !== "payment.created") {
       return new Response(JSON.stringify({ ok: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,7 +92,7 @@ Deno.serve(async (req) => {
       const [cobrancaId, dataVencimento] = mpData.external_reference.split("|");
 
       if (cobrancaId && dataVencimento) {
-        // Check if payment record exists
+        // Update or create payment record
         const { data: existingPag } = await supabase
           .from("cobranca_pagamentos")
           .select("id, status")
@@ -89,70 +119,120 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Send WhatsApp confirmation
-        const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-        const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+        // Get client and cobranca info
+        const { data: cob } = await supabase
+          .from("cobrancas")
+          .select("cliente_id, cliente_nome, valor_parcela")
+          .eq("id", cobrancaId)
+          .maybeSingle();
 
-        if (UAZAPI_URL && UAZAPI_TOKEN) {
-          // Get client info
-          const { data: cob } = await supabase
-            .from("cobrancas")
-            .select("cliente_id, cliente_nome, valor_parcela")
-            .eq("id", cobrancaId)
+        let clienteNome = cob?.cliente_nome || "Cliente";
+        let clienteTelefone = "";
+        let clienteCpf = "";
+
+        if (cob?.cliente_id) {
+          const { data: cliente } = await supabase
+            .from("clientes")
+            .select("telefone, nome, cpf")
+            .eq("id", cob.cliente_id)
             .maybeSingle();
 
-          if (cob?.cliente_id) {
-            const { data: cliente } = await supabase
-              .from("clientes")
-              .select("telefone, nome")
-              .eq("id", cob.cliente_id)
-              .maybeSingle();
-
-            if (cliente?.telefone) {
-              let phone = cliente.telefone.replace(/\D/g, "");
-              if (phone.startsWith("0")) phone = phone.slice(1);
-              if (!phone.startsWith("55")) phone = "55" + phone;
-
-              const valorFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(mpData.transaction_amount || cob.valor_parcela);
-              const dataFmt = dataVencimento.split("-").reverse().join("/");
-
-              const msg = [
-                `✅ *Pagamento Confirmado!*`,
-                ``,
-                `Olá, *${cliente.nome || cob.cliente_nome}*! 👋`,
-                ``,
-                `Recebemos seu pagamento via PIX:`,
-                ``,
-                `━━━━━━━━━━━━━━━━━━`,
-                `💰 *Valor:* ${valorFmt}`,
-                `📅 *Parcela:* ${dataFmt}`,
-                `🕐 *Recebido em:* ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-                `━━━━━━━━━━━━━━━━━━`,
-                ``,
-                `Obrigado pelo pagamento! 🎉`,
-                ``,
-                `*SR Software — Veloop* 🟢`,
-              ].join("\n");
-
-              const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-              await fetch(`${apiUrl}/send/text`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-                body: JSON.stringify({ number: phone, text: msg, linkPreview: false }),
-              });
-            }
+          if (cliente) {
+            clienteNome = cliente.nome || clienteNome;
+            clienteTelefone = cliente.telefone || "";
+            clienteCpf = cliente.cpf || "";
           }
         }
 
-        // Notify admins
+        const valorPago = mpData.transaction_amount || cob?.valor_parcela || 0;
+        const dataFmt = formatDate(dataVencimento);
+        const valorFmt = formatCurrency(valorPago);
+        const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+        // 1. Send WhatsApp confirmation to CLIENT
+        if (clienteTelefone) {
+          let clientPhone = clienteTelefone.replace(/\D/g, "");
+          if (clientPhone.startsWith("0")) clientPhone = clientPhone.slice(1);
+          if (!clientPhone.startsWith("55")) clientPhone = "55" + clientPhone;
+
+          const clientMsg = [
+            `✅ *Pagamento Confirmado!*`,
+            ``,
+            `Olá, *${clienteNome}*! 👋`,
+            ``,
+            `Recebemos seu pagamento via PIX:`,
+            ``,
+            `━━━━━━━━━━━━━━━━━━`,
+            `💰 *Valor:* ${valorFmt}`,
+            `📅 *Parcela:* ${dataFmt}`,
+            `🕐 *Recebido em:* ${agora}`,
+            `━━━━━━━━━━━━━━━━━━`,
+            ``,
+            `📄 Em instantes você receberá o *comprovante em PDF* da SR Software.`,
+            ``,
+            `Obrigado pelo pagamento! 🎉`,
+            ``,
+            `*SR Software — Veloop* 🟢`,
+          ].join("\n");
+          await sendWhatsAppText(clientPhone, clientMsg);
+        }
+
+        // 2. Generate and send PDF receipt to client
+        try {
+          const receiptRes = await fetch(`${supabaseUrl}/functions/v1/generate-payment-receipt`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ cobranca_id: cobrancaId, data_vencimento: dataVencimento }),
+          });
+          const receiptData = await receiptRes.json();
+          console.log("[MP Webhook] Receipt generated:", receiptData?.success, receiptData?.whatsapp_sent);
+        } catch (err) {
+          console.error("[MP Webhook] Failed to generate receipt:", err);
+        }
+
+        // 3. Notify ADMIN via WhatsApp with detailed info
+        const cpfDisplay = clienteCpf
+          ? clienteCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+          : "Não informado";
+
+        const adminMsg = [
+          `🔔 *PAGAMENTO PIX RECEBIDO*`,
+          ``,
+          `━━━━━━━━━━━━━━━━━━`,
+          `📋 *DADOS DO PAGAMENTO*`,
+          `━━━━━━━━━━━━━━━━━━`,
+          ``,
+          `👤 *Cliente:* ${clienteNome}`,
+          `🆔 *CPF:* ${cpfDisplay}`,
+          `📱 *Telefone:* ${clienteTelefone || "Não informado"}`,
+          ``,
+          `💰 *Valor Pago:* ${valorFmt}`,
+          `📅 *Parcela:* ${dataFmt}`,
+          `🕐 *Data/Hora:* ${agora}`,
+          `💳 *Forma:* PIX (Mercado Pago)`,
+          `🆔 *ID MP:* ${paymentId}`,
+          ``,
+          `━━━━━━━━━━━━━━━━━━`,
+          `✅ *Status:* Parcela marcada como PAGA automaticamente na agenda.`,
+          `📄 *Comprovante PDF:* Enviado ao cliente via WhatsApp.`,
+          `━━━━━━━━━━━━━━━━━━`,
+          ``,
+          `*SR Software — Veloop* 🟢`,
+        ].join("\n");
+        await sendWhatsAppText(ADMIN_PHONE, adminMsg);
+
+        // 4. Notify admins in-app
         const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
         for (const admin of adminRoles || []) {
           await supabase.from("notificacoes").insert({
             user_id: admin.user_id,
             titulo: "✅ PIX Recebido",
-            mensagem: `Pagamento de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(mpData.transaction_amount)} confirmado via Mercado Pago`,
+            mensagem: `${clienteNome} pagou ${valorFmt} — Parcela ${dataFmt} via Mercado Pago`,
             tipo: "pagamento_confirmado",
-            dados: { cobranca_id: cobrancaId, data_vencimento: dataVencimento, mp_payment_id: String(paymentId) },
+            dados: { cobranca_id: cobrancaId, data_vencimento: dataVencimento, mp_payment_id: String(paymentId), cliente_nome: clienteNome, valor: valorPago },
           });
         }
       }

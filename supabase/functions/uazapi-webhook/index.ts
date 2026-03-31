@@ -9,15 +9,14 @@ const corsHeaders = {
 
 const BOT_PREFIX = "✨ *Assistente SR* ✨\n\n";
 const ADMIN_ONLINE_WINDOW_MS = 10 * 60 * 1000;
+const ADMIN_PHONE = "5527999177265";
 const adminActivity = new Map<string, number>();
 
-// Deduplication: track processed message IDs to prevent duplicates
 const processedMessages = new Map<string, number>();
-const DEDUP_TTL_MS = 60 * 1000; // 60 seconds
+const DEDUP_TTL_MS = 60 * 1000;
 
 function isDuplicate(messageId: string): boolean {
   const now = Date.now();
-  // Clean old entries
   for (const [id, ts] of processedMessages) {
     if (now - ts > DEDUP_TTL_MS) processedMessages.delete(id);
   }
@@ -42,48 +41,31 @@ function formatDate(d: string) {
   return `${dd}/${m}/${y}`;
 }
 
-// ─── AI: Gemini only ───
+// ─── AI: Gemini ───
 
 async function callAI(messages: Array<{ role: string; content: string }>): Promise<string> {
   const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) {
-    console.error("[AI] GEMINI_API_KEY not set");
-    return "Desculpe, o assistente está temporariamente indisponível.";
-  }
+  if (!key) return "Desculpe, o assistente está temporariamente indisponível.";
   try {
     const contents: any[] = [];
     let systemInstruction: any = undefined;
-
     for (const m of messages) {
       if (m.role === "system") {
         systemInstruction = { parts: [{ text: m.content }] };
       } else {
-        contents.push({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        });
+        contents.push({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] });
       }
     }
-
     const body: any = { contents };
     if (systemInstruction) body.systemInstruction = systemInstruction;
-
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     );
-    if (!res.ok) {
-      console.error("[Gemini] error:", res.status, await res.text());
-      return "Desculpe, não consegui processar sua mensagem agora. Tente novamente.";
-    }
+    if (!res.ok) { console.error("[Gemini] error:", res.status, await res.text()); return "Desculpe, não consegui processar sua mensagem agora."; }
     const data = await res.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (reply) return reply;
-    return "Desculpe, não consegui gerar uma resposta.";
-  } catch (e) {
-    console.error("[Gemini] exception:", e);
-    return "Desculpe, ocorreu um erro. Tente novamente em instantes.";
-  }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, não consegui gerar uma resposta.";
+  } catch (e) { console.error("[Gemini] exception:", e); return "Desculpe, ocorreu um erro. Tente novamente."; }
 }
 
 // ─── UAZAPI send ───
@@ -91,7 +73,7 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
 async function sendWhatsApp(phone: string, message: string) {
   const url = Deno.env.get("UAZAPI_URL");
   const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) { console.error("UAZAPI not configured"); return false; }
+  if (!url || !token) return false;
   try {
     const res = await fetch(`${url.replace(/\/+$/, "")}/send/text`, {
       method: "POST",
@@ -127,7 +109,7 @@ async function getHistory(supabase: any, conversationId: string, limit = 10) {
   return (data || []).reverse();
 }
 
-// ─── Notify admins ───
+// ─── Notify admins (in-app) ───
 
 async function notifyAdmins(supabase: any, phone: string, message: string) {
   try {
@@ -148,49 +130,57 @@ async function notifyAdmins(supabase: any, phone: string, message: string) {
   } catch (e) { console.warn("notifyAdmins error:", e); }
 }
 
-// ─── CPF lookup helper (accepts with or without punctuation) ───
+// ─── CPF lookup (with or without punctuation) ───
 
 async function lookupClienteByCpf(supabase: any, rawCpf: string) {
   const digits = rawCpf.replace(/\D/g, "");
   if (digits.length !== 11 && digits.length !== 14) return null;
-
-  // Try exact match first
   const { data: c1 } = await supabase.from("clientes").select("id, nome, cpf").eq("cpf", rawCpf.trim()).maybeSingle();
   if (c1) return c1;
-
-  // Try formatted CPF: 123.456.789-00
   if (digits.length === 11) {
     const formatted = `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9)}`;
     const { data: c2 } = await supabase.from("clientes").select("id, nome, cpf").eq("cpf", formatted).maybeSingle();
     if (c2) return c2;
   }
-
-  // Try digits-only match
   const { data: c3 } = await supabase.from("clientes").select("id, nome, cpf").eq("cpf", digits).maybeSingle();
   if (c3) return c3;
-
-  // Fallback: ilike search
   const { data: c4 } = await supabase.from("clientes").select("id, nome, cpf").ilike("cpf", `%${digits}%`).limit(1).maybeSingle();
   return c4 || null;
 }
 
 // ─── Fetch pending invoices for a client ───
 
-async function fetchPendingInvoices(supabase: any, clienteId: string): Promise<string> {
+async function fetchPendingInvoices(supabase: any, clienteId: string) {
   const { data: cobrancas } = await supabase.from("cobrancas").select("id, valor_parcela, cliente_nome").eq("cliente_id", clienteId);
-  if (!cobrancas?.length) return "Não encontrei cobranças no seu cadastro.";
+  if (!cobrancas?.length) return { text: "Não encontrei cobranças no seu cadastro.", parcelas: [] };
 
   const { data: parcelas } = await supabase.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status")
-    .in("cobranca_id", cobrancas.map((c: any) => c.id)).in("status", ["a_pagar", "pendente"]).order("data_vencimento", { ascending: true }).limit(5);
+    .in("cobranca_id", cobrancas.map((c: any) => c.id)).in("status", ["a_pagar", "pendente"]).order("data_vencimento", { ascending: true }).limit(10);
 
-  if (!parcelas?.length) return "✅ Sem parcelas pendentes. Tudo em dia!";
+  if (!parcelas?.length) return { text: "✅ Sem parcelas pendentes. Tudo em dia!", parcelas: [] };
 
   const cobMap = new Map(cobrancas.map((c: any) => [c.id, c]));
-  const lines = parcelas.map((p: any) => {
+  const enriched = parcelas.map((p: any, i: number) => {
     const cob = cobMap.get(p.cobranca_id);
-    return `• ${p.status === "pendente" ? "⚠️ ATRASADA" : "📅 A pagar"} — Venc: ${formatDate(p.data_vencimento)} — ${cob ? formatCurrency(cob.valor_parcela) : "N/A"}`;
+    return {
+      index: i + 1,
+      cobranca_id: p.cobranca_id,
+      data_vencimento: p.data_vencimento,
+      valor: cob?.valor_parcela || 0,
+      status: p.status,
+      label: `*${i + 1}.* ${p.status === "pendente" ? "⚠️ ATRASADA" : "📅 A pagar"} — Venc: ${formatDate(p.data_vencimento)} — ${cob ? formatCurrency(cob.valor_parcela) : "N/A"}`,
+    };
   });
-  return `Suas próximas parcelas:\n\n${lines.join("\n")}`;
+
+  const lines = enriched.map((e: any) => e.label);
+  return { text: `Suas próximas parcelas:\n\n${lines.join("\n")}`, parcelas: enriched };
+}
+
+// ─── Generate PIX payment link ───
+
+function generatePixLink(cobrancaId: string, dataVencimento: string, valor: number, clienteNome: string): string {
+  const appUrl = "https://veloopsr.lovable.app";
+  return `${appUrl}/pagar/${cobrancaId}/${dataVencimento}?valor=${valor}&cliente=${encodeURIComponent(clienteNome)}`;
 }
 
 // ─── Main handler ───
@@ -206,7 +196,6 @@ Deno.serve(async (req) => {
 
     console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
 
-    // Normalize event
     const rawEvent = body.event || body.type || body.action || body.EventType || body.eventType || body.data?.event || "unknown";
     const rawEventString = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
     const normalizedEvent = rawEventString.toLowerCase();
@@ -215,16 +204,13 @@ Deno.serve(async (req) => {
       normalizedEvent === "messages.upsert" || normalizedEvent === "message.upsert"
     ) ? "messages.upsert" : rawEventString;
 
-    // Extract message ID for deduplication
     const messageId = body.data?.key?.id || body.body?.key?.id || body.key?.id || body.message?.id || body.id || null;
 
-    // Sender
     const sender = body.data?.key?.remoteJid || body.body?.key?.remoteJid || body.key?.remoteJid
       || body.message?.chatid || body.chat?.wa_chatid || body.sender || body.from || body.remoteJid
       || (body.chat?.phone ? `${String(body.chat.phone).replace(/\D/g, "")}@s.whatsapp.net` : null)
       || null;
 
-    // Message text
     const rawMessageContent = body.data?.message?.conversation
       || body.data?.message?.extendedTextMessage?.text
       || body.body?.message?.conversation || body.body?.message?.extendedTextMessage?.text
@@ -237,7 +223,6 @@ Deno.serve(async (req) => {
         ? String((rawMessageContent as any).text ?? (rawMessageContent as any).content ?? (rawMessageContent as any).body ?? "").trim()
         : null);
 
-    // fromMe / wasSentByApi
     const fromMeRaw = body.data?.key?.fromMe ?? body.body?.key?.fromMe ?? body.key?.fromMe ?? body.message?.fromMe ?? body.fromMe ?? false;
     const fromMe = fromMeRaw === true || fromMeRaw === "true" || fromMeRaw === 1 || fromMeRaw === "1";
 
@@ -247,37 +232,29 @@ Deno.serve(async (req) => {
 
     console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, MsgID: ${messageId}, Msg: ${messageContent?.slice(0, 80)}`);
 
-    // Track admin activity on sent messages
     if (event === "messages.upsert" && sender && fromMe) {
       const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
       adminActivity.set(phone, Date.now());
     }
 
-    // Only process incoming private messages
     if (event !== "messages.upsert" || !sender || !messageContent || fromMe) {
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Anti-loop: ignore API-sent
     if (wasSentByApi) {
-      console.log("[Bot] Ignoring API-sent message");
       return new Response(JSON.stringify({ success: true, skipped: "api_sent" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Ignore groups
     if (sender.endsWith("@g.us")) {
       return new Response(JSON.stringify({ success: true, skipped: "group" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Deduplicate
     if (messageId && isDuplicate(messageId)) {
-      console.log(`[Bot] Duplicate message ${messageId}, skipping`);
       return new Response(JSON.stringify({ success: true, skipped: "duplicate" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
 
-    // Admin online = silent mode
     if (isAdminOnline(phone)) {
       await notifyAdmins(supabase, phone, messageContent);
       return new Response(JSON.stringify({ success: true, bot_skipped: "admin_online" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -285,11 +262,9 @@ Deno.serve(async (req) => {
 
     const conv = await getOrCreateConversation(supabase, phone);
     if (!conv) {
-      console.error("[Bot] Failed to create conversation");
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Manual mode = bot silent
     if (conv.status === "manual") {
       await saveMessage(supabase, conv.id, "user", messageContent);
       await notifyAdmins(supabase, phone, messageContent);
@@ -309,27 +284,205 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, action: "handoff" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ─── AWAITING CPF (from AI asking for it) ───
-    if (conv.stage === "awaiting_cpf") {
+    // ─── STAGE: AWAITING CPF (for payment or invoice lookup) ───
+    if (conv.stage === "awaiting_cpf" || conv.stage === "awaiting_cpf_payment") {
       const cpfDigits = messageContent.replace(/\D/g, "");
       if (cpfDigits.length === 11 || cpfDigits.length === 14) {
         const cliente = await lookupClienteByCpf(supabase, messageContent);
         let reply: string;
         if (!cliente) {
           reply = BOT_PREFIX + "❌ Não encontrei nenhum cliente com esse CPF. Verifique e tente novamente.";
+          await updateConversation(supabase, phone, { stage: "idle" });
         } else {
-          const invoiceInfo = await fetchPendingInvoices(supabase, cliente.id);
-          reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n${invoiceInfo}\n\nQualquer dúvida, é só perguntar! 😊`;
+          const { text, parcelas } = await fetchPendingInvoices(supabase, cliente.id);
+          if (conv.stage === "awaiting_cpf_payment" && parcelas.length > 0) {
+            // Payment flow: show parcelas and ask which one to pay
+            reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n${text}\n\n💳 *Deseja pagar alguma dessas parcelas?*\nResponda com o *número* da parcela que deseja pagar (ex: *1*)\n\nOu digite *cancelar* para voltar.`;
+            // Store client and parcelas data in conversation for next step
+            await updateConversation(supabase, phone, {
+              stage: "awaiting_payment_choice",
+              // Store data as JSON string - we'll parse it back
+            });
+            // Save parcelas info in a message for context
+            await saveMessage(supabase, conv.id, "system", JSON.stringify({ cliente_id: cliente.id, cliente_nome: cliente.nome, parcelas }));
+          } else {
+            reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n${text}\n\n💡 _Se desejar pagar alguma parcela antecipadamente, basta digitar *pagar*._`;
+            await updateConversation(supabase, phone, { stage: "idle" });
+          }
         }
-        await updateConversation(supabase, phone, { stage: "idle" });
         await sendWhatsApp(phone, reply);
         await saveMessage(supabase, conv.id, "user", messageContent);
         await saveMessage(supabase, conv.id, "assistant", reply);
         await notifyAdmins(supabase, phone, messageContent);
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      // If not a valid CPF, fall through to AI conversation (it will naturally ask again)
       await updateConversation(supabase, phone, { stage: "idle" });
+    }
+
+    // ─── STAGE: AWAITING PAYMENT CHOICE (user picks parcela number) ───
+    if (conv.stage === "awaiting_payment_choice") {
+      await saveMessage(supabase, conv.id, "user", messageContent);
+
+      if (msgLower === "cancelar" || msgLower === "voltar" || msgLower === "não" || msgLower === "nao") {
+        const reply = BOT_PREFIX + "Tudo bem! Cancelei o pagamento. Se precisar de algo, é só chamar! 😊\n\n💡 _Você pode pagar antecipadamente a qualquer momento digitando *pagar*._";
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Get the last system message with parcelas data
+      const { data: sysMessages } = await supabase.from("messages").select("content")
+        .eq("conversation_id", conv.id).eq("role", "system").order("created_at", { ascending: false }).limit(1);
+
+      let parcelasData: any = null;
+      try { parcelasData = JSON.parse(sysMessages?.[0]?.content || "null"); } catch {}
+
+      if (!parcelasData?.parcelas?.length) {
+        const reply = BOT_PREFIX + "Ocorreu um erro ao recuperar suas parcelas. Por favor, digite *pagar* para reiniciar.";
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const choiceNum = parseInt(messageContent.trim());
+      const selected = parcelasData.parcelas.find((p: any) => p.index === choiceNum);
+
+      if (!selected) {
+        const reply = BOT_PREFIX + `❌ Número inválido. Escolha entre *1* e *${parcelasData.parcelas.length}*, ou digite *cancelar*.`;
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Show confirmation
+      const reply = BOT_PREFIX + [
+        `📋 *Confirmação de Pagamento*`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━`,
+        `👤 *Cliente:* ${parcelasData.cliente_nome}`,
+        `📅 *Vencimento:* ${formatDate(selected.data_vencimento)}`,
+        `💰 *Valor:* ${formatCurrency(selected.valor)}`,
+        `━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `Deseja confirmar o pagamento via *PIX*?`,
+        ``,
+        `Responda *sim* para gerar o PIX ou *não* para cancelar.`,
+      ].join("\n");
+
+      // Store selected parcela for confirmation
+      await saveMessage(supabase, conv.id, "system", JSON.stringify({
+        action: "confirm_payment",
+        cliente_id: parcelasData.cliente_id,
+        cliente_nome: parcelasData.cliente_nome,
+        cobranca_id: selected.cobranca_id,
+        data_vencimento: selected.data_vencimento,
+        valor: selected.valor,
+      }));
+      await updateConversation(supabase, phone, { stage: "awaiting_payment_confirm" });
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── STAGE: AWAITING PAYMENT CONFIRMATION (sim/não) ───
+    if (conv.stage === "awaiting_payment_confirm") {
+      await saveMessage(supabase, conv.id, "user", messageContent);
+
+      if (msgLower === "não" || msgLower === "nao" || msgLower === "cancelar" || msgLower === "n") {
+        const reply = BOT_PREFIX + "Tudo bem! Pagamento cancelado. Se mudar de ideia, é só digitar *pagar*. 😊";
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (msgLower === "sim" || msgLower === "s" || msgLower === "confirmar" || msgLower === "confirmo") {
+        // Get confirmation data
+        const { data: sysMessages } = await supabase.from("messages").select("content")
+          .eq("conversation_id", conv.id).eq("role", "system").order("created_at", { ascending: false }).limit(1);
+
+        let confirmData: any = null;
+        try { confirmData = JSON.parse(sysMessages?.[0]?.content || "null"); } catch {}
+
+        if (!confirmData?.action || confirmData.action !== "confirm_payment") {
+          const reply = BOT_PREFIX + "Ocorreu um erro. Por favor, digite *pagar* para reiniciar.";
+          await updateConversation(supabase, phone, { stage: "idle" });
+          await sendWhatsApp(phone, reply);
+          await saveMessage(supabase, conv.id, "assistant", reply);
+          return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Generate PIX link
+        const pixLink = generatePixLink(
+          confirmData.cobranca_id,
+          confirmData.data_vencimento,
+          confirmData.valor,
+          confirmData.cliente_nome
+        );
+
+        const reply = BOT_PREFIX + [
+          `✅ *PIX Gerado com Sucesso!*`,
+          ``,
+          `💰 *Valor:* ${formatCurrency(confirmData.valor)}`,
+          `📅 *Parcela:* ${formatDate(confirmData.data_vencimento)}`,
+          ``,
+          `━━━━━━━━━━━━━━━━━━`,
+          `💳 *Clique no link abaixo para pagar:*`,
+          ``,
+          pixLink,
+          ``,
+          `━━━━━━━━━━━━━━━━━━`,
+          ``,
+          `📱 No link você encontra o *QR Code* e o *PIX Copia e Cola*.`,
+          ``,
+          `Após o pagamento, você receberá automaticamente:`,
+          `✅ Confirmação do banco`,
+          `📄 Comprovante SR Software em PDF`,
+          ``,
+          `_O pagamento será confirmado automaticamente!_ 🎉`,
+        ].join("\n");
+
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+
+        // Notify admin about payment initiation
+        const adminMsg = [
+          `💳 *Pagamento Antecipado Iniciado*`,
+          ``,
+          `👤 *Cliente:* ${confirmData.cliente_nome}`,
+          `📅 *Parcela:* ${formatDate(confirmData.data_vencimento)}`,
+          `💰 *Valor:* ${formatCurrency(confirmData.valor)}`,
+          `📱 *Telefone:* ${phone}`,
+          `🕐 *Hora:* ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+          ``,
+          `O cliente abriu o link de pagamento PIX via bot.`,
+        ].join("\n");
+        await sendWhatsApp(ADMIN_PHONE, adminMsg);
+        await notifyAdmins(supabase, phone, messageContent);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Invalid response
+      const reply = BOT_PREFIX + "Por favor, responda *sim* para confirmar ou *não* para cancelar.";
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── DETECT "pagar" keyword to start payment flow ───
+    const payKeywords = ["pagar", "pagamento", "pagar antecipado", "quero pagar", "pagar parcela"];
+    if (payKeywords.some((kw) => msgLower.includes(kw)) && conv.stage === "idle") {
+      const reply = BOT_PREFIX + "Claro! 💳 Para prosseguir com o pagamento, por favor me informe seu *CPF*:";
+      await updateConversation(supabase, phone, { stage: "awaiting_cpf_payment" });
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "user", messageContent);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ─── NATURAL AI CONVERSATION ───
@@ -347,11 +500,15 @@ Deno.serve(async (req) => {
         "NUNCA inclua prefixos como '🤖', '[Assistente]' ou similares — isso é adicionado automaticamente. " +
         "Se o cliente perguntar sobre faturas, parcelas, pagamentos ou boletos, peça o CPF dele de forma natural. " +
         "O CPF pode ser enviado com ou sem pontos e traço, ambos são aceitos. " +
+        "IMPORTANTE: Em TODA resposta, inclua de forma sutil no final uma menção de que o cliente pode pagar parcelas antecipadamente " +
+        "digitando a palavra *pagar*. Use variações naturais como: " +
+        "'💡 _Sabia que você pode pagar parcelas antecipadas? Basta digitar *pagar*!_' ou " +
+        "'💡 _Precisa pagar alguma parcela? Digite *pagar* e eu te ajudo!_'. " +
+        "NÃO force o cliente a pagar, apenas mostre que é uma opção disponível. " +
         "Se não souber algo específico, sugira que entre em contato diretamente com a SR SOFTWARE. " +
         "Responda sempre em português brasileiro.",
     };
 
-    // Check if AI is asking for CPF (to set the stage)
     const aiReply = await callAI([systemPrompt, ...history]);
 
     // If the AI asks for CPF, set conversation stage
