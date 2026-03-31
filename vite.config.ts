@@ -61,15 +61,14 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        id: "/",
         name: "Veloop - SR Software",
         short_name: "Veloop",
         description: "Sistema de gestão e PDV móvel para SR Software",
-        theme_color: "#1a7a4c",
-        background_color: "#0f172a",
-        display: "standalone",
-        scope: "/",
         start_url: "/",
+        display: "standalone",
+        background_color: "#0f172a",
+        theme_color: "#1a7a4c",
+        orientation: "portrait",
         icons: [
           {
             src: "https://veloopsr.lovable.app/icons/icon-192x192.png",
