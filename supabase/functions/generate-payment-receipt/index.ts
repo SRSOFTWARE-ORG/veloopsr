@@ -87,6 +87,11 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   const lightGray = rgb(0.85, 0.85, 0.85);
   const white = rgb(1, 1, 1);
 
+  // Safe drawText wrapper — strips accents to avoid WinAnsi encoding errors
+  const safeText = (text: string, opts: any) => {
+    page.drawText(stripAccents(text), opts);
+  };
+
   // ── Logo watermark (center, 90% transparent) ──
   const logoBytes = await fetchLogoBytes();
   if (logoBytes) {
