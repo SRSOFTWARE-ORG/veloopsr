@@ -22,19 +22,24 @@ Deno.serve(async (req) => {
   }
   const fileBlob = await fileRes.blob();
 
-  // Send via multipart form to /send/media
-  const formData = new FormData();
-  formData.append("chatId", `${phone}@s.whatsapp.net`);
-  formData.append("number", phone);
-  formData.append("phone", phone);
-  formData.append("caption", caption || "");
-  formData.append("fileName", fileName || "document.pdf");
-  formData.append("file", new File([fileBlob], fileName || "document.pdf", { type: "application/pdf" }));
+  // Convert to base64
+  const arrayBuf = await fileBlob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const base64 = btoa(binary);
 
+  // Try JSON body with base64
   const res = await fetch(`${apiUrl}/send/media`, {
     method: "POST",
-    headers: { token: UAZAPI_TOKEN },
-    body: formData,
+    headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+    body: JSON.stringify({
+      number: phone,
+      media: `data:application/pdf;base64,${base64}`,
+      fileName: fileName || "document.pdf",
+      caption: caption || "",
+      type: "document",
+    }),
   });
   const data = await res.text();
 
