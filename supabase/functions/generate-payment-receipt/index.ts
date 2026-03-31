@@ -312,7 +312,8 @@ Deno.serve(async (req) => {
     let whatsappSent = false;
     if (clienteTelefone) {
       const caption = `📄 *Nota de Pagamento — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(cob.valor_parcela)}\n\n_Veloop — SR Software_ 🟢`;
-      whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption);
+      const docName = `Comprovante_${clienteNome.replace(/\s+/g, "_")}_${data_vencimento}.pdf`;
+      whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption, docName);
     }
 
     return new Response(JSON.stringify({ success: true, pdf_url: pdfUrl, whatsapp_sent: whatsappSent }), {
