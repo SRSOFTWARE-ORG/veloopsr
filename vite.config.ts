@@ -68,26 +68,8 @@ export default defineConfig(({ mode }) => ({
         theme_color: "#1a7a4c",
         background_color: "#0f172a",
         display: "standalone",
-        orientation: "portrait",
         scope: "/",
         start_url: "/",
-        lang: "pt-BR",
-        categories: ["business", "productivity"],
-        prefer_related_applications: false,
-        shortcuts: [
-          {
-            name: "Vendas",
-            short_name: "Vendas",
-            url: "/vendas",
-            icons: [{ src: "https://veloopsr.lovable.app/icons/icon-192x192.png", sizes: "192x192", type: "image/png" }],
-          },
-          {
-            name: "Clientes",
-            short_name: "Clientes",
-            url: "/clientes",
-            icons: [{ src: "https://veloopsr.lovable.app/icons/icon-192x192.png", sizes: "192x192", type: "image/png" }],
-          },
-        ],
         icons: [
           {
             src: "https://veloopsr.lovable.app/icons/icon-192x192.png",
@@ -100,12 +82,6 @@ export default defineConfig(({ mode }) => ({
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
-          },
-          {
-            src: "https://veloopsr.lovable.app/icons/icon-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
           },
         ],
       },
