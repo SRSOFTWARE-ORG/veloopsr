@@ -300,10 +300,16 @@ Deno.serve(async (req) => {
       || body.message?.content || (typeof body.message === "string" ? body.message : null)
       || body.text || body.content || null;
 
-    const messageContent = typeof rawMessageContent === "string" ? rawMessageContent.trim()
+    let messageContent = typeof rawMessageContent === "string" ? rawMessageContent.trim()
       : (rawMessageContent && typeof rawMessageContent === "object"
         ? String((rawMessageContent as any).text ?? (rawMessageContent as any).content ?? (rawMessageContent as any).body ?? "").trim()
         : null);
+
+    // ─── AUDIO MESSAGE DETECTION ───
+    const audioMessage = body.data?.message?.audioMessage
+      || body.body?.message?.audioMessage
+      || body.message?.audioMessage || null;
+    let isAudioMessage = false;
 
     const fromMeRaw = body.data?.key?.fromMe ?? body.body?.key?.fromMe ?? body.key?.fromMe ?? body.message?.fromMe ?? body.fromMe ?? false;
     const fromMe = fromMeRaw === true || fromMeRaw === "true" || fromMeRaw === 1 || fromMeRaw === "1";
@@ -312,7 +318,22 @@ Deno.serve(async (req) => {
       ?? body.message?.wasSentByApi ?? body.message?.fromApi ?? body.wasSentByApi ?? false;
     const wasSentByApi = wasSentByApiRaw === true || wasSentByApiRaw === "true" || wasSentByApiRaw === 1 || wasSentByApiRaw === "1";
 
-    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, MsgID: ${messageId}, Msg: ${messageContent?.slice(0, 80)}`);
+    // If audio message without text, try to transcribe
+    if (!messageContent && audioMessage && !fromMe) {
+      console.log("[Webhook] Audio message detected, attempting transcription...");
+      const mimeType = audioMessage.mimetype || "audio/ogg";
+      const audioBase64 = await downloadMediaBase64(body);
+      if (audioBase64) {
+        const transcription = await transcribeAudio(audioBase64, mimeType.split(";")[0]);
+        if (transcription) {
+          messageContent = transcription;
+          isAudioMessage = true;
+          console.log(`[Webhook] Audio transcribed: "${transcription.slice(0, 100)}"`);
+        }
+      }
+    }
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, MsgID: ${messageId}, Audio: ${isAudioMessage}, Msg: ${messageContent?.slice(0, 80)}`);
 
     if (event === "messages.upsert" && sender && fromMe) {
       const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
