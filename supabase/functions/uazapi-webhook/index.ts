@@ -166,8 +166,16 @@ Deno.serve(async (req) => {
       console.log(`[Bot] Admin active on chat with ${phoneClean.slice(-4)}, bot paused for this contact`);
     }
 
-    // Only process incoming messages (not from us, and only messages.upsert)
+    // Only process incoming PRIVATE messages (not from us, not groups)
     if (event === "messages.upsert" && sender && messageContent && !fromMe) {
+      // ─── IGNORE GROUP MESSAGES ───
+      if (sender.endsWith("@g.us")) {
+        console.log(`[Bot] Ignoring group message from ${sender}`);
+        return new Response(JSON.stringify({ success: true, skipped: "group_message" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const phoneClean = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
 
       // ─── Check if admin is online/active with this contact ───
