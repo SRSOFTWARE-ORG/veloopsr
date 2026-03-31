@@ -240,8 +240,13 @@ Deno.serve(async (req) => {
         // REGRA CRÍTICA: nunca enviar para pago ou isento
         if (status === "pago" || status === "isento") continue;
 
-        let tipo: "D-1" | "D0" | null = null;
-        if (date === tomorrowStr) tipo = "D-1";
+        // D-3: 3 days before due date
+        const threeDaysAhead = new Date(now.getTime() + 3 * DAY_MS);
+        const threeDaysStr = formatDateOnly(threeDaysAhead);
+
+        let tipo: "D-3" | "D-1" | "D0" | null = null;
+        if (date === threeDaysStr) tipo = "D-3";
+        else if (date === tomorrowStr) tipo = "D-1";
         else if (date === todayStr) tipo = "D0";
 
         if (!tipo) continue;
