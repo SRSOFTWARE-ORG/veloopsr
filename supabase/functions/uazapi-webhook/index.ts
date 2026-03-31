@@ -623,7 +623,17 @@ Deno.serve(async (req) => {
     const fullReply = BOT_PREFIX + aiReply;
     await sendWhatsApp(phone, fullReply);
     await saveMessage(supabase, conv.id, "assistant", fullReply);
-    await notifyAdmins(supabase, phone, messageContent);
+
+    // If incoming was audio, also respond with audio
+    if (isAudioMessage) {
+      const audioResponse = await textToSpeechBase64(aiReply);
+      if (audioResponse) {
+        await sendWhatsAppAudio(phone, audioResponse);
+        console.log("[Webhook] Audio response sent to", phone);
+      }
+    }
+
+    await notifyAdmins(supabase, phone, isAudioMessage ? `🎤 [Áudio]: ${messageContent}` : messageContent);
 
     // Forward to n8n
     const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
