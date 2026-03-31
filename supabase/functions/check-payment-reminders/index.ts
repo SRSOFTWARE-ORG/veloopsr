@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem: `Webhook ${entry.tipo} — ${valorFormatado}`,
+          mensagem: `WhatsApp ${entry.tipo} — ${valorFormatado}`,
           enviado_com_sucesso: enviado,
         });
         cpfsJaEnviados.add(cpf);
