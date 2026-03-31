@@ -12,41 +12,38 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL")!.replace(/\/+$/, "");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN")!;
+    const UAZAPI_URL = Deno.env.get("UAZAPI_URL") || "";
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN") || "";
 
     const phone = "5527999177265";
     const msg = "⚠️ *SR SOFTWARE - Teste D-0*\n\nOlá! Sua parcela vence *hoje*.\nRegularize o pagamento.\n\n_Assistente SR SOFTWARE_";
-    const endpoint = "/send/text";
 
-    // Try different auth methods
-    const authMethods: Record<string, HeadersInit> = {
-      "header_token": { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      "bearer": { "Content-Type": "application/json", "Authorization": `Bearer ${UAZAPI_TOKEN}` },
-      "header_apikey": { "Content-Type": "application/json", "apikey": UAZAPI_TOKEN },
-      "header_x_token": { "Content-Type": "application/json", "x-token": UAZAPI_TOKEN },
+    // Debug: show what we have (masked token)
+    const debug = {
+      url: UAZAPI_URL,
+      token_length: UAZAPI_TOKEN.length,
+      token_first5: UAZAPI_TOKEN.slice(0, 5),
+      token_last5: UAZAPI_TOKEN.slice(-5),
     };
 
-    const results: Record<string, any> = {};
+    // Try sending with token header to /send/text
+    const fullUrl = `${UAZAPI_URL.replace(/\/+$/, "")}/send/text`;
+    const res = await fetch(fullUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "token": UAZAPI_TOKEN,
+      },
+      body: JSON.stringify({ phone, message: msg }),
+    });
+    const body = await res.text();
 
-    for (const [method, headers] of Object.entries(authMethods)) {
-      try {
-        const res = await fetch(`${UAZAPI_URL}${endpoint}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ phone, message: msg }),
-        });
-        const body = await res.text();
-        results[method] = { status: res.status, body: body.slice(0, 300) };
-        console.log(`${method} -> ${res.status}: ${body.slice(0, 100)}`);
-        // If success, stop trying
-        if (res.ok) break;
-      } catch (e) {
-        results[method] = { error: String(e) };
-      }
-    }
-
-    return new Response(JSON.stringify(results, null, 2), {
+    return new Response(JSON.stringify({
+      debug,
+      full_url: fullUrl,
+      status: res.status,
+      response: body.slice(0, 500),
+    }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
