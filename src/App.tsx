@@ -26,6 +26,7 @@ const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
 const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
 const HistoricoEnviosPage = lazy(() => import("@/pages/HistoricoEnviosPage"));
+const PixPaymentPage = lazy(() => import("@/pages/PixPaymentPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -224,6 +225,14 @@ const App = () => {
                   <ProtectedRoute>
                     <CaixaPage />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pagar/:cobrancaId/:dataVencimento"
+                element={
+                  <Suspense fallback={<ScreenLoader />}>
+                    <PixPaymentPage />
+                  </Suspense>
                 }
               />
               <Route
