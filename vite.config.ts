@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        id: "/?source=pwa",
+        id: "/",
         name: "Veloop - SR Software",
         short_name: "Veloop",
         description: "Sistema de gestão e PDV móvel para SR Software",
@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => ({
         display: "standalone",
         orientation: "portrait",
         scope: "/",
-        start_url: "/?source=pwa",
+        start_url: "/",
         lang: "pt-BR",
         categories: ["business", "productivity"],
         prefer_related_applications: false,
