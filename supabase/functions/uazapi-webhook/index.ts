@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
       || null;
 
     // Message text can also come in multiple paths
-    const messageContent = body.data?.message?.conversation
+    const rawMessageContent = body.data?.message?.conversation
       || body.data?.message?.extendedTextMessage?.text
       || body.body?.message?.conversation
       || body.body?.message?.extendedTextMessage?.text
@@ -224,15 +224,29 @@ Deno.serve(async (req) => {
       || body.chat?.wa_lastMessageTextVote
       || null;
 
-    const fromMe = body.data?.key?.fromMe
+    const extractedObjectText = rawMessageContent && typeof rawMessageContent === "object"
+      ? (
+        (rawMessageContent as Record<string, unknown>).text
+        ?? (rawMessageContent as Record<string, unknown>).content
+        ?? (rawMessageContent as Record<string, unknown>).body
+        ?? (rawMessageContent as Record<string, unknown>).caption
+      )
+      : null;
+
+    const messageContent = typeof rawMessageContent === "string"
+      ? rawMessageContent.trim()
+      : (typeof extractedObjectText === "string" ? extractedObjectText.trim() : null);
+
+    const fromMeRaw = body.data?.key?.fromMe
       ?? body.body?.key?.fromMe
       ?? body.key?.fromMe
       ?? body.message?.fromMe
       ?? body.message?.from_me
       ?? body.fromMe
       ?? false;
+    const fromMe = fromMeRaw === true || fromMeRaw === "true" || fromMeRaw === 1 || fromMeRaw === "1";
 
-    const wasSentByApi = body.data?.key?.wasSentByApi
+    const wasSentByApiRaw = body.data?.key?.wasSentByApi
       ?? body.data?.wasSentByApi
       ?? body.body?.key?.wasSentByApi
       ?? body.message?.wasSentByApi
@@ -240,8 +254,15 @@ Deno.serve(async (req) => {
       ?? body.message?.from_api
       ?? body.wasSentByApi
       ?? false;
+    const wasSentByApi = wasSentByApiRaw === true || wasSentByApiRaw === "true" || wasSentByApiRaw === 1 || wasSentByApiRaw === "1";
 
-    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, Msg: ${messageContent?.slice(0, 80)}`);
+    const messagePreview = messageContent
+      ? messageContent.slice(0, 80)
+      : rawMessageContent
+        ? JSON.stringify(rawMessageContent).slice(0, 80)
+        : "undefined";
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, Msg: ${messagePreview}`);
 
     // Audit log
     await supabase.from("audit_log").insert({
