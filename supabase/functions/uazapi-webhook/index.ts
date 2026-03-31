@@ -182,52 +182,66 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // Log raw body to diagnose UAZAPI payload structure
-    console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
+    console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 4000));
 
-    // UAZAPI v2 (Go) sends different structures — handle all known formats
-    // Format 1: { event: "messages.upsert", data: { key: { remoteJid, fromMe }, message: { conversation } } }
-    // Format 2: { type: "messages.upsert", sender: "...", message: "..." }
-    // Format 3: { event: "messages.upsert", body: { key: {...}, message: {...} } }
-    // Format 4: Direct root-level fields from UAZAPI Go v2
-    const rawEvent = body.event || body.type || body.action || "unknown";
-    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
-    
-    // Try multiple paths for sender
-    const sender = body.data?.key?.remoteJid 
-      || body.body?.key?.remoteJid 
-      || body.key?.remoteJid 
-      || body.sender 
-      || body.from 
-      || body.remoteJid 
+    // UAZAPI can send different structures (Evolution-style, Go v2, custom wrappers)
+    const rawEvent = body.event || body.type || body.action || body.EventType || body.eventType || body.data?.event || "unknown";
+    const rawEventString = typeof rawEvent === "string"
+      ? rawEvent
+      : String(rawEvent?.event || rawEvent?.type || rawEvent?.EventType || "unknown");
+
+    const normalizedEvent = rawEventString.toLowerCase();
+    const event = (
+      normalizedEvent === "messages" ||
+      normalizedEvent === "message" ||
+      normalizedEvent === "messages.upsert" ||
+      normalizedEvent === "message.upsert"
+    ) ? "messages.upsert" : rawEventString;
+
+    // Sender (JID) can come from different places
+    const sender = body.data?.key?.remoteJid
+      || body.body?.key?.remoteJid
+      || body.key?.remoteJid
+      || body.message?.chatid
+      || body.chat?.wa_chatid
+      || body.sender
+      || body.from
+      || body.remoteJid
+      || (body.chat?.phone ? `${String(body.chat.phone).replace(/\D/g, "")}@s.whatsapp.net` : null)
       || null;
-    
-    // Try multiple paths for message content
-    const messageContent = body.data?.message?.conversation 
-      || body.data?.message?.extendedTextMessage?.text 
-      || body.body?.message?.conversation 
-      || body.body?.message?.extendedTextMessage?.text 
-      || body.message?.conversation 
-      || body.message?.extendedTextMessage?.text 
+
+    // Message text can also come in multiple paths
+    const messageContent = body.data?.message?.conversation
+      || body.data?.message?.extendedTextMessage?.text
+      || body.body?.message?.conversation
+      || body.body?.message?.extendedTextMessage?.text
+      || body.message?.conversation
+      || body.message?.extendedTextMessage?.text
+      || body.message?.content
       || (typeof body.message === "string" ? body.message : null)
-      || body.text 
-      || body.content 
+      || body.text
+      || body.content
+      || body.chat?.wa_lastMessageTextVote
       || null;
-    
-    // Try multiple paths for fromMe
-    const fromMe = body.data?.key?.fromMe 
-      || body.body?.key?.fromMe 
-      || body.key?.fromMe 
-      || body.fromMe 
-      || false;
-    
-    // Try multiple paths for API-sent detection
-    const wasSentByApi = body.data?.key?.wasSentByApi 
-      || body.data?.wasSentByApi 
-      || body.body?.key?.wasSentByApi 
-      || body.wasSentByApi 
-      || false;
 
-    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, Msg: ${messageContent?.slice(0, 50)}`);
+    const fromMe = body.data?.key?.fromMe
+      ?? body.body?.key?.fromMe
+      ?? body.key?.fromMe
+      ?? body.message?.fromMe
+      ?? body.message?.from_me
+      ?? body.fromMe
+      ?? false;
+
+    const wasSentByApi = body.data?.key?.wasSentByApi
+      ?? body.data?.wasSentByApi
+      ?? body.body?.key?.wasSentByApi
+      ?? body.message?.wasSentByApi
+      ?? body.message?.fromApi
+      ?? body.message?.from_api
+      ?? body.wasSentByApi
+      ?? false;
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, Msg: ${messageContent?.slice(0, 80)}`);
 
     // Audit log
     await supabase.from("audit_log").insert({
