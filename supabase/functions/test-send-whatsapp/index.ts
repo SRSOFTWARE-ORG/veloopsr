@@ -12,44 +12,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { telefone, mensagem } = await req.json();
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+    const UAZAPI_URL = Deno.env.get("UAZAPI_URL")!.replace(/\/+$/, "");
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN")!;
 
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
-      return new Response(JSON.stringify({ error: "UAZAPI not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const phone = "5527999177265";
+    const msg = "Teste SR SOFTWARE";
+
+    // Try multiple possible endpoints
+    const endpoints = [
+      "/send/text",
+      "/message/send-text",
+      "/message/text",
+      "/send-text",
+      "/api/send-text",
+      "/chat/send/text",
+    ];
+
+    const results: Record<string, any> = {};
+
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(`${UAZAPI_URL}${ep}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
+          body: JSON.stringify({ phone, message: msg }),
+        });
+        const body = await res.text();
+        results[ep] = { status: res.status, body: body.slice(0, 200) };
+        console.log(`${ep} -> ${res.status}: ${body.slice(0, 100)}`);
+      } catch (e) {
+        results[ep] = { error: String(e) };
+      }
     }
 
-    let phone = (telefone || "27999177265").replace(/\D/g, "");
-    if (!phone.startsWith("55")) phone = "55" + phone;
-
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    console.log(`Sending to ${phone} via ${apiUrl}`);
-
-    const response = await fetch(`${apiUrl}/message/send-text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      body: JSON.stringify({
-        phone,
-        message: mensagem || "⚠️ *SR SOFTWARE - Lembrete de Cobrança D-0*\n\nOlá! Sua parcela vence *hoje*.\nRegularize o pagamento para evitar pendências.\n\nEm caso de dúvidas, responda esta mensagem.\n\n_Assistente SR SOFTWARE_",
-      }),
-    });
-
-    const result = await response.json();
-    console.log("UAZAPI response:", JSON.stringify(result));
-
-    return new Response(JSON.stringify({
-      success: response.ok && !result.error,
-      status: response.status,
-      result,
-    }), {
+    return new Response(JSON.stringify(results, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro" }), {
+    return new Response(JSON.stringify({ error: String(error) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
