@@ -38,6 +38,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { to: "/transacoes", icon: Receipt, label: "Transações" },
   { to: "/historico-envios", icon: MessageSquare, label: "Envios WhatsApp" },
   { to: "/configuracoes", icon: Settings, label: "Configurações" },
 ];
