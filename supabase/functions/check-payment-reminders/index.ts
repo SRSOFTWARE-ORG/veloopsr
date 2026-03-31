@@ -281,8 +281,17 @@ Deno.serve(async (req) => {
       const valorFormatado = formatValor(entry.valorParcela);
       const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
 
-      // ── Enviar via Webhook (n8n) ──
-      const enviado = await sendWebhook({
+      // ── Enviar WhatsApp via UAZAPI ──
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const tipoMsg = entry.tipo === "D-1" ? "vence amanhã" : "vence hoje";
+      const mensagemWpp = statusAtual === "pendente" || statusAtual === "a_pagar"
+        ? `Olá ${nomeCompleto}! Sua parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Por favor, efetue o pagamento. Obrigado!`
+        : `Olá ${nomeCompleto}! Lembrete: parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Obrigado!`;
+
+      const enviado = await sendWhatsApp(telefone, mensagemWpp);
+
+      // Also send to n8n webhook
+      sendWebhook({
         nome_cliente: nomeCompleto,
         telefone,
         valor_transacao: entry.valorParcela,
@@ -293,6 +302,7 @@ Deno.serve(async (req) => {
         cpf,
         status_parcela: statusAtual,
         tipo_envio: entry.tipo,
+        whatsapp_enviado: enviado,
       });
 
       // ── Registrar no banco (SEMPRE, sucesso ou falha) ──
