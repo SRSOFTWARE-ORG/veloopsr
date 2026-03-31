@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
       valorParcela: number;
       criadoPor: string;
       date: string;
-      tipo: "D-1" | "D0";
+      tipo: "D-3" | "D-1" | "D0";
     }
 
     const entriesToProcess: ProcessEntry[] = [];
@@ -240,8 +240,13 @@ Deno.serve(async (req) => {
         // REGRA CRÍTICA: nunca enviar para pago ou isento
         if (status === "pago" || status === "isento") continue;
 
-        let tipo: "D-1" | "D0" | null = null;
-        if (date === tomorrowStr) tipo = "D-1";
+        // D-3: 3 days before due date
+        const threeDaysAhead = new Date(now.getTime() + 3 * DAY_MS);
+        const threeDaysStr = formatDateOnly(threeDaysAhead);
+
+        let tipo: "D-3" | "D-1" | "D0" | null = null;
+        if (date === threeDaysStr) tipo = "D-3";
+        else if (date === tomorrowStr) tipo = "D-1";
         else if (date === todayStr) tipo = "D0";
 
         if (!tipo) continue;
@@ -286,7 +291,7 @@ Deno.serve(async (req) => {
       const cpfMascarado = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
       const statusLabel = statusAtual === "pendente" ? "⚠️ PENDENTE (em atraso)"
         : statusAtual === "a_pagar" ? "📋 A PAGAR" : `📋 ${statusAtual.toUpperCase()}`;
-      const saudacao = entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
+      const saudacao = entry.tipo === "D-3" ? "vence em *3 dias*" : entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
 
       const mensagemWpp = [
         `Olá, *${nomeCompleto}*! 👋`,
@@ -351,19 +356,21 @@ Deno.serve(async (req) => {
       if (enviado) whatsappCount++;
 
       // ── Notificação interna para vendedor + admins ──
-      const tipoLabel = entry.tipo === "D-1" ? "Amanhã" : "Hoje";
-      const emoji = entry.tipo === "D-1" ? "🔔" : "📌";
+      const tipoLabel = entry.tipo === "D-3" ? "Em 3 dias" : entry.tipo === "D-1" ? "Amanhã" : "Hoje";
+      const emoji = entry.tipo === "D-3" ? "📆" : entry.tipo === "D-1" ? "🔔" : "📌";
       const usersToNotify = new Set([entry.criadoPor, ...adminIds]);
 
       for (const userId of usersToNotify) {
+        const tipoNotif = entry.tipo === "D-3" ? "lembrete_3dias" : entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje";
+        const dedupPrefix = entry.tipo === "D-3" ? "3dias" : entry.tipo === "D-1" ? "amanha" : "hoje";
         const ok = await createNotification(
           supabase,
           userId,
           `${emoji} Cobrança ${tipoLabel}`,
           `Cobrar ${entry.clienteNome} ${tipoLabel.toLowerCase()} — ${valorFormatado}`,
-          entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje",
+          tipoNotif,
           { cobranca_id: entry.cobrancaId, cliente_nome: entry.clienteNome, data: entry.date },
-          `${entry.tipo === "D-1" ? "amanha" : "hoje"}_${entry.cobrancaId}_${entry.date}`
+          `${dedupPrefix}_${entry.cobrancaId}_${entry.date}`
         );
         if (ok) notifCount++;
       }
