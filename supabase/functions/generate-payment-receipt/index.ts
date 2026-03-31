@@ -76,7 +76,7 @@ interface ReceiptData {
   descricao: string;
 }
 
-async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
+async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null = null): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]);
   const { width, height } = page.getSize();
@@ -96,7 +96,7 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   };
 
   // ── Logo watermark (center, 90% transparent) ──
-  const logoBytes = await fetchLogoBytes();
+  const logoBytes = preloadedLogo ?? await fetchLogoBytes();
   if (logoBytes) {
     try {
       const logoImg = await doc.embedJpg(logoBytes);
@@ -237,7 +237,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: cob, error: cobErr } = await supabase.from("cobrancas").select("*").eq("id", cobranca_id).single();
+    // Run DB queries and logo fetch in parallel for speed
+    const [cobResult, logoBytes] = await Promise.all([
+      supabase.from("cobrancas").select("*").eq("id", cobranca_id).single(),
+      fetchLogoBytes(),
+    ]);
+    const { data: cob, error: cobErr } = cobResult;
     if (cobErr || !cob) throw new Error("Cobranca nao encontrada");
 
     const { data: cliente } = await supabase.from("clientes").select("nome, cpf, telefone, endereco, cidade, uf").eq("id", cob.cliente_id).single();
@@ -280,7 +285,7 @@ Deno.serve(async (req) => {
       totalParcelas,
       cobrancaObs: cob.observacoes,
       descricao: cob.observacoes || "Parcela de Servico",
-    });
+    }, logoBytes);
 
     const fileName = `comprovantes/${cobranca_id}_${data_vencimento}.pdf`;
     const { error: uploadErr } = await supabase.storage.from("documentos_vendas").upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
