@@ -26,7 +26,7 @@ function placeholder(val: string | null | undefined, fallback = "* * *"): string
   return val && val.trim() ? val.trim() : fallback;
 }
 
-async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string): Promise<boolean> {
+async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string, docName: string): Promise<boolean> {
   const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
   const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
   if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
@@ -35,14 +35,29 @@ async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string): 
   if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
   try {
     const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    // UAZAPI V2 Go doesn't support /send/document — send as text with link
+    // UAZAPI V2: POST /send/media with type "document"
+    const res = await fetch(`${apiUrl}/send/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({
+        number: cleanPhone,
+        type: "document",
+        file: pdfUrl,
+        docName: docName,
+        text: caption,
+        mimetype: "application/pdf",
+      }),
+    });
+    if (res.ok) return true;
+    // Fallback: send as text with link
+    console.warn("[UAZAPI] /send/media failed, fallback to text:", res.status);
     const textMsg = `${caption}\n\n🔗 Baixe o comprovante PDF:\n${pdfUrl}`;
-    const res = await fetch(`${apiUrl}/send/text`, {
+    const r2 = await fetch(`${apiUrl}/send/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
       body: JSON.stringify({ number: cleanPhone, text: textMsg, linkPreview: true }),
     });
-    return res.ok;
+    return r2.ok;
   } catch (err) {
     console.error("[UAZAPI] PDF send error:", err);
     return false;
@@ -297,7 +312,8 @@ Deno.serve(async (req) => {
     let whatsappSent = false;
     if (clienteTelefone) {
       const caption = `📄 *Nota de Pagamento — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(cob.valor_parcela)}\n\n_Veloop — SR Software_ 🟢`;
-      whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption);
+      const docName = `Comprovante_${clienteNome.replace(/\s+/g, "_")}_${data_vencimento}.pdf`;
+      whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption, docName);
     }
 
     return new Response(JSON.stringify({ success: true, pdf_url: pdfUrl, whatsapp_sent: whatsappSent }), {
