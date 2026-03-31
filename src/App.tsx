@@ -228,6 +228,14 @@ const App = () => {
                 }
               />
               <Route
+                path="/pagar/:cobrancaId/:dataVencimento"
+                element={
+                  <Suspense fallback={<ScreenLoader />}>
+                    <PixPaymentPage />
+                  </Suspense>
+                }
+              />
+              <Route
                 path="*"
                 element={
                   <Suspense fallback={<ScreenLoader />}>
