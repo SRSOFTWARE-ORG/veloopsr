@@ -55,13 +55,13 @@ async function sendWhatsApp(phone: string, message: string) {
   }
   const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
   try {
-    const res = await fetch(`${apiUrl}/message/send-text`, {
+    const res = await fetch(`${apiUrl}/send/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      body: JSON.stringify({ phone, message }),
+      body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
     });
-    const result = await res.json();
-    return res.ok && !result.error;
+    const result = await res.text();
+    return res.ok;
   } catch (e) {
     console.error("sendWhatsApp error:", e);
     return false;
