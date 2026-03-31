@@ -171,6 +171,23 @@ const actionTools = [
   {
     type: "function",
     function: {
+      name: "send_whatsapp",
+      description: "Enviar mensagem WhatsApp para um cliente via UAZAPI. Busca automaticamente o telefone do cliente se não informado.",
+      parameters: {
+        type: "object",
+        properties: {
+          cliente_id: { type: "string", description: "ID do cliente (busca telefone automaticamente)" },
+          telefone: { type: "string", description: "Telefone do destinatário com DDD (se não informar cliente_id)" },
+          mensagem: { type: "string", description: "Texto da mensagem a enviar" },
+          nome_cliente: { type: "string", description: "Nome do cliente (para registro)" },
+        },
+        required: ["mensagem"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "send_webhook",
       description: "Enviar dados de cobrança/venda via webhook para o n8n",
       parameters: {
@@ -380,6 +397,37 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const { error } = await sb.from("cobranca_pagamentos").delete().eq("id", args.payment_id);
       if (error) throw error;
       return `✅ Registro de pagamento excluído`;
+    }
+    case "send_whatsapp": {
+      let telefone = args.telefone;
+      let nomeCliente = args.nome_cliente || "";
+
+      // If cliente_id provided, fetch phone from DB
+      if (args.cliente_id && !telefone) {
+        const { data: cliente } = await sb.from("clientes").select("nome, telefone").eq("id", args.cliente_id).maybeSingle();
+        if (!cliente) return "❌ Cliente não encontrado";
+        if (!cliente.telefone) return "❌ Cliente não possui telefone cadastrado";
+        telefone = cliente.telefone;
+        if (!nomeCliente) nomeCliente = cliente.nome;
+      }
+
+      if (!telefone) return "❌ Telefone não informado e nenhum cliente_id fornecido";
+
+      // Send via UAZAPI edge function
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-uazapi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          telefone,
+          mensagem: args.mensagem,
+          nome_cliente: nomeCliente,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) return `❌ Falha ao enviar WhatsApp: ${data.error || "Erro desconhecido"}`;
+      return `✅ WhatsApp enviado para ${nomeCliente || telefone}!`;
     }
     case "send_webhook": {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
