@@ -758,6 +758,66 @@ export type Database = {
         }
         Relationships: []
       }
+      pix_payments: {
+        Row: {
+          cliente_id: string | null
+          cobranca_id: string | null
+          created_at: string
+          data_vencimento: string
+          id: string
+          mp_copia_cola: string | null
+          mp_payment_id: string | null
+          mp_qr_code: string | null
+          mp_qr_code_base64: string | null
+          status: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          data_vencimento: string
+          id?: string
+          mp_copia_cola?: string | null
+          mp_payment_id?: string | null
+          mp_qr_code?: string | null
+          mp_qr_code_base64?: string | null
+          status?: string
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          cliente_id?: string | null
+          cobranca_id?: string | null
+          created_at?: string
+          data_vencimento?: string
+          id?: string
+          mp_copia_cola?: string | null
+          mp_payment_id?: string | null
+          mp_qr_code?: string | null
+          mp_qr_code_base64?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_payments_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_payments_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           atualizado_por: string | null
