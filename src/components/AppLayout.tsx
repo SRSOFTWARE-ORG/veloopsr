@@ -20,6 +20,7 @@ import {
   Wrench,
   Wallet,
   MessageSquare,
+  Receipt,
 } from "lucide-react";
 import { useState } from "react";
 import SobreDialog from "@/components/SobreDialog";

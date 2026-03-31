@@ -241,6 +241,7 @@ const App = () => {
                           <TransacoesPage />
                         </ProtectedRoute>
                       }
+                    />
                     <Route
                       path="/caixa"
                       element={
