@@ -95,6 +95,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App = () => {
+  useFirebaseInit();
+
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === "undefined") {
       return false;
