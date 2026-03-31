@@ -85,6 +85,88 @@ async function sendWhatsApp(phone: string, message: string) {
   } catch (e) { console.error("sendWhatsApp error:", e); return false; }
 }
 
+// ─── Download media from UAZAPI ───
+
+async function downloadMediaBase64(messageBody: any): Promise<string | null> {
+  const url = Deno.env.get("UAZAPI_URL");
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!url || !token) return null;
+  try {
+    const payload = messageBody.data || messageBody.body || messageBody;
+    const res = await fetch(`${url.replace(/\/+$/, "")}/chat/getBase64FromMediaMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ message: payload }),
+    });
+    if (!res.ok) { console.error("[downloadMedia] status:", res.status); return null; }
+    const data = await res.json();
+    return data.base64 || data.data || null;
+  } catch (e) { console.error("downloadMedia error:", e); return null; }
+}
+
+// ─── Transcribe audio with Gemini ───
+
+async function transcribeAudio(audioBase64: string, mimeType: string = "audio/ogg"): Promise<string> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) return "";
+  try {
+    const cleanBase64 = audioBase64.includes(",") ? audioBase64.split(",")[1] : audioBase64;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inlineData: { mimeType, data: cleanBase64 } },
+              { text: "Transcreva este áudio em português brasileiro. Retorne APENAS o texto transcrito, sem explicações." }
+            ]
+          }]
+        }),
+      }
+    );
+    if (!res.ok) { console.error("[Gemini STT] error:", res.status, await res.text()); return ""; }
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  } catch (e) { console.error("transcribeAudio error:", e); return ""; }
+}
+
+// ─── Text to Speech (Google Translate TTS - free) ───
+
+async function textToSpeechBase64(text: string): Promise<string | null> {
+  try {
+    const clean = text.replace(/[*_~`✨\n]/g, " ").replace(/Assistente SR/g, "").replace(/\s+/g, " ").trim();
+    const shortText = clean.slice(0, 200);
+    if (!shortText) return null;
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(shortText)}&tl=pt-BR&client=tw-ob&ttsspeed=1`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } });
+    if (!res.ok) { console.error("[TTS] status:", res.status); return null; }
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  } catch (e) { console.error("textToSpeech error:", e); return null; }
+}
+
+// ─── Send audio via UAZAPI (PTT voice message) ───
+
+async function sendWhatsAppAudio(phone: string, audioBase64: string): Promise<boolean> {
+  const url = Deno.env.get("UAZAPI_URL");
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!url || !token) return false;
+  try {
+    const res = await fetch(`${url.replace(/\/+$/, "")}/send/audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ number: phone, audio: `data:audio/mp3;base64,${audioBase64}`, ptt: true }),
+    });
+    if (!res.ok) console.error("[sendAudio] status:", res.status, await res.text());
+    return res.ok;
+  } catch (e) { console.error("sendWhatsAppAudio error:", e); return false; }
+}
+
 // ─── Conversation DB helpers ───
 
 async function getOrCreateConversation(supabase: any, phone: string) {
@@ -218,10 +300,16 @@ Deno.serve(async (req) => {
       || body.message?.content || (typeof body.message === "string" ? body.message : null)
       || body.text || body.content || null;
 
-    const messageContent = typeof rawMessageContent === "string" ? rawMessageContent.trim()
+    let messageContent = typeof rawMessageContent === "string" ? rawMessageContent.trim()
       : (rawMessageContent && typeof rawMessageContent === "object"
         ? String((rawMessageContent as any).text ?? (rawMessageContent as any).content ?? (rawMessageContent as any).body ?? "").trim()
         : null);
+
+    // ─── AUDIO MESSAGE DETECTION ───
+    const audioMessage = body.data?.message?.audioMessage
+      || body.body?.message?.audioMessage
+      || body.message?.audioMessage || null;
+    let isAudioMessage = false;
 
     const fromMeRaw = body.data?.key?.fromMe ?? body.body?.key?.fromMe ?? body.key?.fromMe ?? body.message?.fromMe ?? body.fromMe ?? false;
     const fromMe = fromMeRaw === true || fromMeRaw === "true" || fromMeRaw === 1 || fromMeRaw === "1";
@@ -230,7 +318,22 @@ Deno.serve(async (req) => {
       ?? body.message?.wasSentByApi ?? body.message?.fromApi ?? body.wasSentByApi ?? false;
     const wasSentByApi = wasSentByApiRaw === true || wasSentByApiRaw === "true" || wasSentByApiRaw === 1 || wasSentByApiRaw === "1";
 
-    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, MsgID: ${messageId}, Msg: ${messageContent?.slice(0, 80)}`);
+    // If audio message without text, try to transcribe
+    if (!messageContent && audioMessage && !fromMe) {
+      console.log("[Webhook] Audio message detected, attempting transcription...");
+      const mimeType = audioMessage.mimetype || "audio/ogg";
+      const audioBase64 = await downloadMediaBase64(body);
+      if (audioBase64) {
+        const transcription = await transcribeAudio(audioBase64, mimeType.split(";")[0]);
+        if (transcription) {
+          messageContent = transcription;
+          isAudioMessage = true;
+          console.log(`[Webhook] Audio transcribed: "${transcription.slice(0, 100)}"`);
+        }
+      }
+    }
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, MsgID: ${messageId}, Audio: ${isAudioMessage}, Msg: ${messageContent?.slice(0, 80)}`);
 
     if (event === "messages.upsert" && sender && fromMe) {
       const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
@@ -520,7 +623,17 @@ Deno.serve(async (req) => {
     const fullReply = BOT_PREFIX + aiReply;
     await sendWhatsApp(phone, fullReply);
     await saveMessage(supabase, conv.id, "assistant", fullReply);
-    await notifyAdmins(supabase, phone, messageContent);
+
+    // If incoming was audio, also respond with audio
+    if (isAudioMessage) {
+      const audioResponse = await textToSpeechBase64(aiReply);
+      if (audioResponse) {
+        await sendWhatsAppAudio(phone, audioResponse);
+        console.log("[Webhook] Audio response sent to", phone);
+      }
+    }
+
+    await notifyAdmins(supabase, phone, isAudioMessage ? `🎤 [Áudio]: ${messageContent}` : messageContent);
 
     // Forward to n8n
     const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
