@@ -18,6 +18,10 @@ function maskCpf(cpf: string): string {
   if (digits.length === 11) return `${digits.slice(0,3)}.***.***-${digits.slice(9)}`;
   return cpf;
 }
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/✓/g, "OK").replace(/—/g, "-").replace(/[^\x00-\x7F]/g, "");
+}
 function placeholder(val: string | null | undefined, fallback = "* * *"): string {
   return val && val.trim() ? val.trim() : fallback;
 }
@@ -84,6 +88,11 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   const lightGray = rgb(0.85, 0.85, 0.85);
   const white = rgb(1, 1, 1);
 
+  // Safe drawText wrapper — strips accents to avoid WinAnsi encoding errors
+  const safeText = (text: string, opts: any) => {
+    page.drawText(stripAccents(text), opts);
+  };
+
   // ── Logo watermark (center, 90% transparent) ──
   const logoBytes = await fetchLogoBytes();
   if (logoBytes) {
@@ -104,23 +113,23 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
 
   // ── Header ──
   page.drawRectangle({ x: 0, y: height - 110, width, height: 110, color: green });
-  page.drawText("SR SOFTWARE", { x: 40, y: height - 42, size: 26, font: bold, color: white });
-  page.drawText("CNPJ: * * . * * * . * * * / * * * * - * *", { x: 40, y: height - 62, size: 9, font: regular, color: rgb(0.8, 0.95, 0.88) });
-  page.drawText("Veloop — Sistema de Gestao Inteligente", { x: 40, y: height - 78, size: 10, font: regular, color: rgb(0.8, 0.95, 0.88) });
-  page.drawText("veloopsr.lovable.app", { x: 40, y: height - 94, size: 9, font: regular, color: rgb(0.7, 0.9, 0.8) });
+  safeText("SR SOFTWARE", { x: 40, y: height - 42, size: 26, font: bold, color: white });
+  safeText("CNPJ: * * . * * * . * * * / * * * * - * *", { x: 40, y: height - 62, size: 9, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("Veloop — Sistema de Gestao Inteligente", { x: 40, y: height - 78, size: 10, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("veloopsr.lovable.app", { x: 40, y: height - 94, size: 9, font: regular, color: rgb(0.7, 0.9, 0.8) });
 
   // Nota number on right
   const notaNum = `#${String(Date.now()).slice(-8)}`;
   const notaW = bold.widthOfTextAtSize(notaNum, 14);
-  page.drawText("NOTA DE PAGAMENTO", { x: width - 40 - bold.widthOfTextAtSize("NOTA DE PAGAMENTO", 12), y: height - 42, size: 12, font: bold, color: white });
-  page.drawText(notaNum, { x: width - 40 - notaW, y: height - 60, size: 14, font: bold, color: rgb(0.9, 1, 0.95) });
-  page.drawText(fmtDate(new Date().toISOString().slice(0, 10)), { x: width - 40 - regular.widthOfTextAtSize(fmtDate(new Date().toISOString().slice(0, 10)), 10), y: height - 78, size: 10, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("NOTA DE PAGAMENTO", { x: width - 40 - bold.widthOfTextAtSize("NOTA DE PAGAMENTO", 12), y: height - 42, size: 12, font: bold, color: white });
+  safeText(notaNum, { x: width - 40 - notaW, y: height - 60, size: 14, font: bold, color: rgb(0.9, 1, 0.95) });
+  safeText(fmtDate(new Date().toISOString().slice(0, 10)), { x: width - 40 - regular.widthOfTextAtSize(fmtDate(new Date().toISOString().slice(0, 10)), 10), y: height - 78, size: 10, font: regular, color: rgb(0.8, 0.95, 0.88) });
 
   let y = height - 140;
 
   // ── Section: DADOS DO CLIENTE ──
   page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
-  page.drawText("DADOS DO CLIENTE", { x: 40, y: y, size: 11, font: bold, color: white });
+  safeText("DADOS DO CLIENTE", { x: 40, y: y, size: 11, font: bold, color: white });
   y -= 30;
 
   const lineH = 20;
@@ -130,11 +139,11 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   const col4 = 410;
 
   const drawRow = (l1: string, v1: string, l2?: string, v2?: string) => {
-    page.drawText(l1, { x: col1, y, size: 9, font: bold, color: gray });
-    page.drawText(v1, { x: col2, y, size: 9, font: regular, color: black });
+    safeText(l1, { x: col1, y, size: 9, font: bold, color: gray });
+    safeText(v1, { x: col2, y, size: 9, font: regular, color: black });
     if (l2 && v2) {
-      page.drawText(l2, { x: col3, y, size: 9, font: bold, color: gray });
-      page.drawText(v2, { x: col4, y, size: 9, font: regular, color: black });
+      safeText(l2, { x: col3, y, size: 9, font: bold, color: gray });
+      safeText(v2, { x: col4, y, size: 9, font: regular, color: black });
     }
     y -= lineH;
   };
@@ -147,23 +156,23 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
 
   // ── Section: DETALHES DO PAGAMENTO ──
   page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
-  page.drawText("DETALHES DO PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
+  safeText("DETALHES DO PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
   y -= 30;
 
   // Table header
   page.drawRectangle({ x: 30, y: y - 3, width: width - 60, height: 18, color: lightGray });
-  page.drawText("Descricao", { x: 40, y, size: 9, font: bold, color: black });
-  page.drawText("Parcela", { x: 280, y, size: 9, font: bold, color: black });
-  page.drawText("Vencimento", { x: 370, y, size: 9, font: bold, color: black });
-  page.drawText("Valor", { x: 480, y, size: 9, font: bold, color: black });
+  safeText("Descricao", { x: 40, y, size: 9, font: bold, color: black });
+  safeText("Parcela", { x: 280, y, size: 9, font: bold, color: black });
+  safeText("Vencimento", { x: 370, y, size: 9, font: bold, color: black });
+  safeText("Valor", { x: 480, y, size: 9, font: bold, color: black });
   y -= 22;
 
   // Table row
   const descTxt = data.descricao || data.cobrancaObs || "Parcela de Servico";
-  page.drawText(descTxt.slice(0, 35), { x: 40, y, size: 9, font: regular, color: black });
-  page.drawText(`${data.parcelaNum}/${data.totalParcelas}`, { x: 290, y, size: 9, font: regular, color: black });
-  page.drawText(fmtDate(data.dataVencimento), { x: 370, y, size: 9, font: regular, color: black });
-  page.drawText(fmt(data.valorParcela), { x: 470, y, size: 9, font: regular, color: black });
+  safeText(descTxt.slice(0, 35), { x: 40, y, size: 9, font: regular, color: black });
+  safeText(`${data.parcelaNum}/${data.totalParcelas}`, { x: 290, y, size: 9, font: regular, color: black });
+  safeText(fmtDate(data.dataVencimento), { x: 370, y, size: 9, font: regular, color: black });
+  safeText(fmt(data.valorParcela), { x: 470, y, size: 9, font: regular, color: black });
   y -= 5;
 
   // Table bottom line
@@ -172,14 +181,14 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
 
   // Total box
   page.drawRectangle({ x: 370, y: y - 5, width: width - 400, height: 28, color: green });
-  page.drawText("TOTAL PAGO:", { x: 380, y, size: 11, font: bold, color: white });
+  safeText("TOTAL PAGO:", { x: 380, y, size: 11, font: bold, color: white });
   const totalTxt = fmt(data.valorParcela);
-  page.drawText(totalTxt, { x: width - 40 - bold.widthOfTextAtSize(totalTxt, 13), y: y - 1, size: 13, font: bold, color: white });
+  safeText(totalTxt, { x: width - 40 - bold.widthOfTextAtSize(totalTxt, 13), y: y - 1, size: 13, font: bold, color: white });
   y -= 45;
 
   // ── Section: INFORMACOES DE PAGAMENTO ──
   page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
-  page.drawText("INFORMACOES DE PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
+  safeText("INFORMACOES DE PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
   y -= 30;
 
   drawRow("Status:", "PAGO ✓", "Forma:", "PIX");
@@ -196,17 +205,17 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   y -= 25;
 
   // Legal text
-  page.drawText("Este documento comprova o recebimento do pagamento referente ao servico/produto descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
+  safeText("Este documento comprova o recebimento do pagamento referente ao servico/produto descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
-  page.drawText("Nota gerada automaticamente pelo sistema Veloop — SR Software. Documento valido sem assinatura.", { x: 40, y, size: 8, font: regular, color: gray });
+  safeText("Nota gerada automaticamente pelo sistema Veloop — SR Software. Documento valido sem assinatura.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
-  page.drawText("Em caso de duvidas, entre em contato pelo WhatsApp: (27) 99917-7265", { x: 40, y, size: 8, font: regular, color: gray });
+  safeText("Em caso de duvidas, entre em contato pelo WhatsApp: (27) 99917-7265", { x: 40, y, size: 8, font: regular, color: gray });
 
   // ── Footer ──
   page.drawRectangle({ x: 0, y: 0, width, height: 45, color: green });
-  page.drawText("SR Software — Veloop", { x: 40, y: 22, size: 10, font: bold, color: white });
-  page.drawText("veloopsr.lovable.app  |  WhatsApp: (27) 99917-7265", { x: 40, y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
-  page.drawText("Documento eletronico", { x: width - 40 - regular.widthOfTextAtSize("Documento eletronico", 8), y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("SR Software — Veloop", { x: 40, y: 22, size: 10, font: bold, color: white });
+  safeText("veloopsr.lovable.app  |  WhatsApp: (27) 99917-7265", { x: 40, y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("Documento eletronico", { x: width - 40 - regular.widthOfTextAtSize("Documento eletronico", 8), y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
 
   return await doc.save();
 }
