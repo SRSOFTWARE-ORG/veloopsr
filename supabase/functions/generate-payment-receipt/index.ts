@@ -18,6 +18,9 @@ function maskCpf(cpf: string): string {
   if (digits.length === 11) return `${digits.slice(0,3)}.***.***-${digits.slice(9)}`;
   return cpf;
 }
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 function placeholder(val: string | null | undefined, fallback = "* * *"): string {
   return val && val.trim() ? val.trim() : fallback;
 }
