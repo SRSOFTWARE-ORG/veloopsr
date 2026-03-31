@@ -24,9 +24,10 @@ Deno.serve(async (req) => {
 
   // Send via multipart form to /send/media
   const formData = new FormData();
+  formData.append("chatId", `${phone}@s.whatsapp.net`);
   formData.append("number", phone);
+  formData.append("phone", phone);
   formData.append("caption", caption || "");
-  formData.append("type", "document");
   formData.append("fileName", fileName || "document.pdf");
   formData.append("file", new File([fileBlob], fileName || "document.pdf", { type: "application/pdf" }));
 
