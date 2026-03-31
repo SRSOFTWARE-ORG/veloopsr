@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
       devOptions: {
         enabled: false,
       },
-      includeAssets: ["favicon.ico", "robots.txt", "icons/*.png"],
+      includeAssets: ["favicon.ico", "robots.txt", "icons/*.png", "notification-sound.mp3"],
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}"],
