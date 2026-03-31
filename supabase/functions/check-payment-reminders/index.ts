@@ -41,13 +41,43 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
-// ── Webhook para n8n ──
-async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
-  const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
-  if (!webhookUrl) {
-    console.warn("[Webhook] N8N_WEBHOOK_URL não configurada");
+// ── Enviar WhatsApp via UAZAPI ──
+async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
+  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) {
+    console.warn("[UAZAPI] Credenciais não configuradas");
     return false;
   }
+
+  let cleanPhone = phone.replace(/\D/g, "");
+  if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
+  if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
+
+  try {
+    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+    const res = await fetch(`${apiUrl}/message/send-text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
+      body: JSON.stringify({ phone: cleanPhone, message }),
+    });
+    const result = await res.json();
+    if (!res.ok || result.error) {
+      console.error("[UAZAPI] Falha:", res.status, result.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[UAZAPI] Network error:", err);
+    return false;
+  }
+}
+
+// ── Webhook para n8n (complementar) ──
+async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
+  const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
+  if (!webhookUrl) return false;
 
   try {
     const res = await fetch(webhookUrl, {
@@ -55,11 +85,7 @@ async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...payload, timestamp: new Date().toISOString(), source: "veloop" }),
     });
-    if (!res.ok) {
-      console.error("[Webhook] Falha:", res.status, await res.text());
-      return false;
-    }
-    return true;
+    return res.ok;
   } catch (err) {
     console.error("[Webhook] Network error:", err);
     return false;
@@ -255,8 +281,17 @@ Deno.serve(async (req) => {
       const valorFormatado = formatValor(entry.valorParcela);
       const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
 
-      // ── Enviar via Webhook (n8n) ──
-      const enviado = await sendWebhook({
+      // ── Enviar WhatsApp via UAZAPI ──
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const tipoMsg = entry.tipo === "D-1" ? "vence amanhã" : "vence hoje";
+      const mensagemWpp = statusAtual === "pendente" || statusAtual === "a_pagar"
+        ? `Olá ${nomeCompleto}! Sua parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Por favor, efetue o pagamento. Obrigado!`
+        : `Olá ${nomeCompleto}! Lembrete: parcela de ${valorFormatado} ${tipoMsg} (${dataFormatada}). Obrigado!`;
+
+      const enviado = await sendWhatsApp(telefone, mensagemWpp);
+
+      // Also send to n8n webhook
+      sendWebhook({
         nome_cliente: nomeCompleto,
         telefone,
         valor_transacao: entry.valorParcela,
@@ -267,6 +302,7 @@ Deno.serve(async (req) => {
         cpf,
         status_parcela: statusAtual,
         tipo_envio: entry.tipo,
+        whatsapp_enviado: enviado,
       });
 
       // ── Registrar no banco (SEMPRE, sucesso ou falha) ──
@@ -279,7 +315,7 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem: `Webhook ${entry.tipo} — ${valorFormatado}`,
+          mensagem: `WhatsApp ${entry.tipo} — ${valorFormatado}`,
           enviado_com_sucesso: enviado,
         });
         cpfsJaEnviados.add(cpf);

@@ -77,9 +77,16 @@ async function processAction(action: SyncAction) {
 
   switch (type) {
     case "webhook": {
-      // Replay queued webhook via edge function
-      toast.info("Sincronizando com a Agenda...");
+      toast.info("Sincronizando webhook...");
       const { error } = await supabase.functions.invoke("send-webhook", {
+        body: payload,
+      });
+      if (error) throw error;
+      break;
+    }
+    case "whatsapp": {
+      toast.info("Enviando WhatsApp pendente...");
+      const { error } = await supabase.functions.invoke("send-whatsapp-uazapi", {
         body: payload,
       });
       if (error) throw error;
