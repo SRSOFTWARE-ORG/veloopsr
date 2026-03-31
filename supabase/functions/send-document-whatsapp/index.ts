@@ -22,28 +22,59 @@ Deno.serve(async (req) => {
   }
   const fileBlob = await fileRes.blob();
 
-  // Convert to base64
   const arrayBuf = await fileBlob.arrayBuffer();
-  const bytes = new Uint8Array(arrayBuf);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  const base64 = btoa(binary);
 
-  // Try JSON body with base64
-  const res = await fetch(`${apiUrl}/send/media`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-    body: JSON.stringify({
-      number: phone,
-      media: `data:application/pdf;base64,${base64}`,
-      fileName: fileName || "document.pdf",
-      caption: caption || "",
-      type: "document",
-    }),
-  });
-  const data = await res.text();
+  // Try multiple approaches
+  const results = [];
 
-  return new Response(JSON.stringify({ status: res.status, data: data.slice(0, 500) }), {
+  // Approach 1: multipart with "file" field only + query param
+  try {
+    const fd1 = new FormData();
+    fd1.append("file", new File([arrayBuf], fileName || "document.pdf", { type: "application/pdf" }));
+    const r1 = await fetch(`${apiUrl}/send/media?number=${phone}&caption=${encodeURIComponent(caption)}&fileName=${encodeURIComponent(fileName)}`, {
+      method: "POST",
+      headers: { token: UAZAPI_TOKEN },
+      body: fd1,
+    });
+    const d1 = await r1.text();
+    results.push({ approach: "multipart+query", status: r1.status, data: d1.slice(0, 300) });
+    if (r1.ok) {
+      return new Response(JSON.stringify({ success: true, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } catch (e) { results.push({ approach: "multipart+query", error: String(e) }); }
+
+  // Approach 2: send as image/sticker style with URL in JSON to /send/link
+  try {
+    const r2 = await fetch(`${apiUrl}/send/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({ number: phone, url, caption, title: fileName }),
+    });
+    const d2 = await r2.text();
+    results.push({ approach: "send/link", status: r2.status, data: d2.slice(0, 300) });
+    if (r2.ok) {
+      return new Response(JSON.stringify({ success: true, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } catch (e) { results.push({ approach: "send/link", error: String(e) }); }
+
+  // Approach 3: Just send the URL as a text message with link preview
+  try {
+    const textMsg = `📄 ${caption}\n\n🔗 Baixe o PDF:\n${url}`;
+    const r3 = await fetch(`${apiUrl}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({ number: phone, text: textMsg, linkPreview: true }),
+    });
+    const d3 = await r3.text();
+    results.push({ approach: "text+link", status: r3.status, data: d3.slice(0, 300) });
+  } catch (e) { results.push({ approach: "text+link", error: String(e) }); }
+
+  return new Response(JSON.stringify({ results }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+});
 });
