@@ -181,14 +181,53 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const rawEvent = body.event || body.type || "unknown";
-    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
-    const sender = body.data?.key?.remoteJid || body.sender || null;
-    const messageContent = body.data?.message?.conversation || body.data?.message?.extendedTextMessage?.text || null;
-    const fromMe = body.data?.key?.fromMe || false;
-    const wasSentByApi = body.data?.key?.wasSentByApi || body.data?.wasSentByApi || false;
+    // Log raw body to diagnose UAZAPI payload structure
+    console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
 
-    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}`);
+    // UAZAPI v2 (Go) sends different structures — handle all known formats
+    // Format 1: { event: "messages.upsert", data: { key: { remoteJid, fromMe }, message: { conversation } } }
+    // Format 2: { type: "messages.upsert", sender: "...", message: "..." }
+    // Format 3: { event: "messages.upsert", body: { key: {...}, message: {...} } }
+    // Format 4: Direct root-level fields from UAZAPI Go v2
+    const rawEvent = body.event || body.type || body.action || "unknown";
+    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
+    
+    // Try multiple paths for sender
+    const sender = body.data?.key?.remoteJid 
+      || body.body?.key?.remoteJid 
+      || body.key?.remoteJid 
+      || body.sender 
+      || body.from 
+      || body.remoteJid 
+      || null;
+    
+    // Try multiple paths for message content
+    const messageContent = body.data?.message?.conversation 
+      || body.data?.message?.extendedTextMessage?.text 
+      || body.body?.message?.conversation 
+      || body.body?.message?.extendedTextMessage?.text 
+      || body.message?.conversation 
+      || body.message?.extendedTextMessage?.text 
+      || (typeof body.message === "string" ? body.message : null)
+      || body.text 
+      || body.content 
+      || null;
+    
+    // Try multiple paths for fromMe
+    const fromMe = body.data?.key?.fromMe 
+      || body.body?.key?.fromMe 
+      || body.key?.fromMe 
+      || body.fromMe 
+      || false;
+    
+    // Try multiple paths for API-sent detection
+    const wasSentByApi = body.data?.key?.wasSentByApi 
+      || body.data?.wasSentByApi 
+      || body.body?.key?.wasSentByApi 
+      || body.wasSentByApi 
+      || false;
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}, Msg: ${messageContent?.slice(0, 50)}`);
 
     // Audit log
     await supabase.from("audit_log").insert({
