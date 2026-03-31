@@ -171,6 +171,23 @@ const actionTools = [
   {
     type: "function",
     function: {
+      name: "send_whatsapp",
+      description: "Enviar mensagem WhatsApp para um cliente via UAZAPI. Busca automaticamente o telefone do cliente se não informado.",
+      parameters: {
+        type: "object",
+        properties: {
+          cliente_id: { type: "string", description: "ID do cliente (busca telefone automaticamente)" },
+          telefone: { type: "string", description: "Telefone do destinatário com DDD (se não informar cliente_id)" },
+          mensagem: { type: "string", description: "Texto da mensagem a enviar" },
+          nome_cliente: { type: "string", description: "Nome do cliente (para registro)" },
+        },
+        required: ["mensagem"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "send_webhook",
       description: "Enviar dados de cobrança/venda via webhook para o n8n",
       parameters: {
