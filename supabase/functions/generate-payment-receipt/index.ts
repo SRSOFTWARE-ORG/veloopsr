@@ -237,7 +237,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: cob, error: cobErr } = await supabase.from("cobrancas").select("*").eq("id", cobranca_id).single();
+    // Run DB queries and logo fetch in parallel for speed
+    const [cobResult, logoBytes] = await Promise.all([
+      supabase.from("cobrancas").select("*").eq("id", cobranca_id).single(),
+      fetchLogoBytes(),
+    ]);
+    const { data: cob, error: cobErr } = cobResult;
     if (cobErr || !cob) throw new Error("Cobranca nao encontrada");
 
     const { data: cliente } = await supabase.from("clientes").select("nome, cpf, telefone, endereco, cidade, uf").eq("id", cob.cliente_id).single();
