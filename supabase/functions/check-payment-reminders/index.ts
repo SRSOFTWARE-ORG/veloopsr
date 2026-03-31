@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
       valorParcela: number;
       criadoPor: string;
       date: string;
-      tipo: "D-1" | "D0";
+      tipo: "D-3" | "D-1" | "D0";
     }
 
     const entriesToProcess: ProcessEntry[] = [];
