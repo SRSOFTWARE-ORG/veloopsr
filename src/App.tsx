@@ -235,6 +235,13 @@ const App = () => {
                       }
                     />
                     <Route
+                      path="/transacoes"
+                      element={
+                        <ProtectedRoute>
+                          <TransacoesPage />
+                        </ProtectedRoute>
+                      }
+                    <Route
                       path="/caixa"
                       element={
                         <ProtectedRoute>
