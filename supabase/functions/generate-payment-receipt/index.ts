@@ -76,7 +76,7 @@ interface ReceiptData {
   descricao: string;
 }
 
-async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
+async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null = null): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]);
   const { width, height } = page.getSize();
