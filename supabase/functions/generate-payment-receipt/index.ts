@@ -96,7 +96,7 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   };
 
   // ── Logo watermark (center, 90% transparent) ──
-  const logoBytes = await fetchLogoBytes();
+  const logoBytes = preloadedLogo ?? await fetchLogoBytes();
   if (logoBytes) {
     try {
       const logoImg = await doc.embedJpg(logoBytes);
