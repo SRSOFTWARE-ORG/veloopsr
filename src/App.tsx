@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import IntroScreen from "@/components/IntroScreen";
+import { useFirebaseInit } from "@/hooks/useFirebase";
 
 // Eager imports for critical pages — no lazy loading delay
 import Dashboard from "@/pages/Dashboard";
@@ -94,6 +95,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App = () => {
+  useFirebaseInit();
+
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === "undefined") {
       return false;

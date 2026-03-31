@@ -1,19 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFCMToken, onFCMMessage } from "@/lib/firebase";
 
-const VAPID_PUBLIC_KEY = "BPy_U9RKwaP6QOrq9knqdImvlJntnxCL9kgyHXNFEQtV-zX06JDox6AcT5hqSPEvWbQweTAdnb1IDoBq77zsFFk";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+const VAPID_KEY = "BPy_U9RKwaP6QOrq9knqdImvlJntnxCL9kgyHXNFEQtV-zX06JDox6AcT5hqSPEvWbQweTAdnb1IDoBq77zsFFk";
 
 export function usePushNotifications() {
   const { user } = useAuth();
@@ -29,16 +19,34 @@ export function usePushNotifications() {
     }
   }, []);
 
+  // Check existing FCM token in database
   useEffect(() => {
     if (!isSupported || !user) return;
 
-    // Check existing subscription
-    navigator.serviceWorker.ready.then((registration) => {
-      registration.pushManager.getSubscription().then((sub) => {
-        setIsSubscribed(!!sub);
+    supabase
+      .from("push_subscriptions")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .then(({ data }) => {
+        setIsSubscribed(!!(data && data.length > 0));
       });
-    });
   }, [isSupported, user]);
+
+  // Listen for foreground FCM messages
+  useEffect(() => {
+    if (!isSupported) return;
+
+    let unsubscribe: (() => void) | undefined;
+    onFCMMessage((payload) => {
+      console.log("[FCM] Foreground message:", payload);
+      // Foreground notifications are handled by NotificationBell via realtime
+    }).then((unsub) => {
+      if (typeof unsub === "function") unsubscribe = unsub;
+    });
+
+    return () => unsubscribe?.();
+  }, [isSupported]);
 
   const subscribe = useCallback(async () => {
     if (!isSupported || !user) return false;
@@ -48,24 +56,24 @@ export function usePushNotifications() {
       setPermission(perm);
       if (perm !== "granted") return false;
 
-      // Register sw-push.js
-      const registration = await navigator.serviceWorker.register("/sw-push.js");
+      // Register FCM service worker
+      await navigator.serviceWorker.register("/firebase-messaging-sw.js");
       await navigator.serviceWorker.ready;
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+      // Get FCM token
+      const fcmToken = await getFCMToken(VAPID_KEY);
+      if (!fcmToken) {
+        console.error("Failed to get FCM token");
+        return false;
+      }
 
-      const subJson = subscription.toJSON();
-
-      // Save to database
+      // Save FCM token to database
       await supabase.from("push_subscriptions").upsert(
         {
           user_id: user.id,
-          endpoint: subJson.endpoint!,
-          p256dh: subJson.keys!.p256dh!,
-          auth: subJson.keys!.auth!,
+          endpoint: fcmToken, // FCM token stored as endpoint
+          p256dh: "fcm", // marker to identify FCM tokens
+          auth: "fcm",
         },
         { onConflict: "user_id,endpoint" }
       );
@@ -73,7 +81,7 @@ export function usePushNotifications() {
       setIsSubscribed(true);
       return true;
     } catch (err) {
-      console.error("Push subscription failed:", err);
+      console.error("FCM subscription failed:", err);
       return false;
     }
   }, [isSupported, user]);
@@ -82,19 +90,15 @@ export function usePushNotifications() {
     if (!isSupported || !user) return;
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await subscription.unsubscribe();
-        await supabase
-          .from("push_subscriptions")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("endpoint", subscription.endpoint);
-      }
+      // Remove all push subscriptions for this user
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", user.id);
+
       setIsSubscribed(false);
     } catch (err) {
-      console.error("Push unsubscribe failed:", err);
+      console.error("FCM unsubscribe failed:", err);
     }
   }, [isSupported, user]);
 
