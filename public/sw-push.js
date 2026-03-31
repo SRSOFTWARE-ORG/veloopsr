@@ -1,5 +1,5 @@
 // Web Push notification handler for service worker
-// This file is loaded by the PWA service worker
+// Works in PWA, TWA (APK), and browser contexts
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
@@ -10,15 +10,21 @@ self.addEventListener("push", (event) => {
       body: data.mensagem || data.body || "",
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-192x192.png",
-      sound: "/notification-sound.mp3",
-      vibrate: [200, 100, 200],
+      vibrate: [200, 100, 200, 100, 200],
       tag: data.tag || "veloop-notification",
-      data: data.dados || {},
+      renotify: true,
+      requireInteraction: true,
+      data: { ...(data.dados || {}), soundUrl: "/notification-sound.mp3" },
       actions: [
         { action: "open", title: "Abrir" },
         { action: "dismiss", title: "Dispensar" },
       ],
     };
+
+    // Android TWA/PWA supports the sound property natively
+    if (self.navigator && self.navigator.userAgent && /android/i.test(self.navigator.userAgent)) {
+      options.sound = "/notification-sound.mp3";
+    }
 
     event.waitUntil(
       self.registration.showNotification(data.titulo || "Veloop", options)
@@ -33,12 +39,14 @@ self.addEventListener("notificationclick", (event) => {
   if (event.action === "dismiss") return;
 
   event.waitUntil(
-    clients.matchAll({ type: "window" }).then((clientList) => {
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Try to focus an existing window
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
           return client.focus();
         }
       }
+      // Open new window — go to agenda for payment reminders
       return clients.openWindow("/agenda");
     })
   );
