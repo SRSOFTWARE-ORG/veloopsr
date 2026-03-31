@@ -215,7 +215,7 @@ async function generatePdf(data: ReceiptData): Promise<Uint8Array> {
   page.drawRectangle({ x: 0, y: 0, width, height: 45, color: green });
   safeText("SR Software — Veloop", { x: 40, y: 22, size: 10, font: bold, color: white });
   safeText("veloopsr.lovable.app  |  WhatsApp: (27) 99917-7265", { x: 40, y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
-  page.drawText("Documento eletronico", { x: width - 40 - regular.widthOfTextAtSize("Documento eletronico", 8), y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
+  safeText("Documento eletronico", { x: width - 40 - regular.widthOfTextAtSize("Documento eletronico", 8), y: 8, size: 8, font: regular, color: rgb(0.8, 0.95, 0.88) });
 
   return await doc.save();
 }
