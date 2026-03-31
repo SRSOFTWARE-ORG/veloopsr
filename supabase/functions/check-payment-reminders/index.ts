@@ -293,6 +293,10 @@ Deno.serve(async (req) => {
         : statusAtual === "a_pagar" ? "📋 A PAGAR" : `📋 ${statusAtual.toUpperCase()}`;
       const saudacao = entry.tipo === "D-3" ? "vence em *3 dias*" : entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
 
+      // Link de pagamento PIX (apenas no D0)
+      const appUrl = "https://veloopsr.lovable.app";
+      const pixLink = `${appUrl}/pagar/${entry.cobrancaId}/${entry.date}?valor=${entry.valorParcela}&cliente=${encodeURIComponent(nomeCompleto)}&parcela=${encodeURIComponent(dataFormatada)}`;
+
       const mensagemWpp = [
         `Olá, *${nomeCompleto}*! 👋`,
         ``,
@@ -308,6 +312,13 @@ Deno.serve(async (req) => {
         `📊 *Status:* ${statusLabel}`,
         `━━━━━━━━━━━━━━━━━━`,
         ``,
+        ...(entry.tipo === "D0" ? [
+          `💳 *Pague agora via PIX:*`,
+          pixLink,
+          ``,
+          `Escaneie o QR Code ou copie o código PIX no link acima.`,
+          ``,
+        ] : []),
         statusAtual === "pendente"
           ? `⚠️ Esta fatura encontra-se *em atraso*. Por favor, regularize o quanto antes para evitar transtornos.`
           : `Por favor, efetue o pagamento até a data de vencimento.`,
