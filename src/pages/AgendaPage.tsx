@@ -302,29 +302,22 @@ const AgendaPage = () => {
     toast.success(labels[newStatus] || "Status atualizado!");
     fetchAll();
 
-    // Auto-generate receipt PDF and send via WhatsApp when marked as paid
+    // Fire-and-forget: generate receipt PDF + WhatsApp in background (no await)
     if (newStatus === "pago") {
-      try {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/generate-payment-receipt`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cobranca_id: cobrancaId, data_vencimento: dateKey }),
-          }
-        );
-        const result = await res.json();
-        if (result.success) {
-          toast.success(
-            result.whatsapp_sent
-              ? "Comprovante enviado via WhatsApp!"
-              : "Comprovante gerado com sucesso!"
-          );
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      fetch(
+        `https://${projectId}.supabase.co/functions/v1/generate-payment-receipt`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cobranca_id: cobrancaId, data_vencimento: dateKey }),
         }
-      } catch (err) {
-        console.error("Receipt generation error:", err);
-      }
+      ).then(r => r.json()).then(result => {
+        if (result.success) {
+          toast.success(result.whatsapp_sent ? "Comprovante enviado via WhatsApp!" : "Comprovante gerado!");
+        }
+      }).catch(err => console.error("Receipt error:", err));
+      toast.info("Gerando comprovante...");
     }
   };
 
