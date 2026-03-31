@@ -159,9 +159,27 @@ Deno.serve(async (req) => {
       }).catch((e) => console.warn("[n8n forward] error:", e));
     }
 
+    // Track admin (fromMe) messages to know when admin is actively chatting
+    if (event === "messages.upsert" && sender && fromMe) {
+      const phoneClean = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+      markAdminActive(phoneClean);
+      console.log(`[Bot] Admin active on chat with ${phoneClean.slice(-4)}, bot paused for this contact`);
+    }
+
     // Only process incoming messages (not from us, and only messages.upsert)
     if (event === "messages.upsert" && sender && messageContent && !fromMe) {
       const phoneClean = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+
+      // ─── Check if admin is online/active with this contact ───
+      if (isAdminOnline(phoneClean)) {
+        console.log(`[Bot] Admin online for ${phoneClean.slice(-4)}, bot staying silent`);
+        // Still notify admins but don't auto-respond
+        await notifyAdmins(supabase, phoneClean, messageContent);
+        return new Response(JSON.stringify({ success: true, bot_skipped: "admin_online" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const state = getState(phoneClean);
       const msgLower = messageContent.trim().toLowerCase();
 
