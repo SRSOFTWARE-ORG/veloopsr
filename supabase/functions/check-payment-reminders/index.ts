@@ -356,19 +356,21 @@ Deno.serve(async (req) => {
       if (enviado) whatsappCount++;
 
       // ── Notificação interna para vendedor + admins ──
-      const tipoLabel = entry.tipo === "D-1" ? "Amanhã" : "Hoje";
-      const emoji = entry.tipo === "D-1" ? "🔔" : "📌";
+      const tipoLabel = entry.tipo === "D-3" ? "Em 3 dias" : entry.tipo === "D-1" ? "Amanhã" : "Hoje";
+      const emoji = entry.tipo === "D-3" ? "📆" : entry.tipo === "D-1" ? "🔔" : "📌";
       const usersToNotify = new Set([entry.criadoPor, ...adminIds]);
 
       for (const userId of usersToNotify) {
+        const tipoNotif = entry.tipo === "D-3" ? "lembrete_3dias" : entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje";
+        const dedupPrefix = entry.tipo === "D-3" ? "3dias" : entry.tipo === "D-1" ? "amanha" : "hoje";
         const ok = await createNotification(
           supabase,
           userId,
           `${emoji} Cobrança ${tipoLabel}`,
           `Cobrar ${entry.clienteNome} ${tipoLabel.toLowerCase()} — ${valorFormatado}`,
-          entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje",
+          tipoNotif,
           { cobranca_id: entry.cobrancaId, cliente_nome: entry.clienteNome, data: entry.date },
-          `${entry.tipo === "D-1" ? "amanha" : "hoje"}_${entry.cobrancaId}_${entry.date}`
+          `${dedupPrefix}_${entry.cobrancaId}_${entry.date}`
         );
         if (ok) notifCount++;
       }
