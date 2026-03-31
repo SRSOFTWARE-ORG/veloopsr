@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
         "token": UAZAPI_TOKEN,
       },
-      body: JSON.stringify({ phone, message: msg }),
+      body: JSON.stringify({ number: phone, text: msg, linkPreview: false }),
     });
     const body = await res.text();
 
