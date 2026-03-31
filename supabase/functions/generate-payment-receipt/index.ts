@@ -35,10 +35,12 @@ async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string): 
   if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
   try {
     const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const res = await fetch(`${apiUrl}/send/document`, {
+    // UAZAPI V2 Go doesn't support /send/document — send as text with link
+    const textMsg = `${caption}\n\n🔗 Baixe o comprovante PDF:\n${pdfUrl}`;
+    const res = await fetch(`${apiUrl}/send/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-      body: JSON.stringify({ number: cleanPhone, url: pdfUrl, fileName: "Nota_SR_Software.pdf", caption }),
+      body: JSON.stringify({ number: cleanPhone, text: textMsg, linkPreview: true }),
     });
     return res.ok;
   } catch (err) {
