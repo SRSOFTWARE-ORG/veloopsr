@@ -19,7 +19,8 @@ function maskCpf(cpf: string): string {
   return cpf;
 }
 function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/✓/g, "OK").replace(/—/g, "-").replace(/[^\x00-\x7F]/g, "");
 }
 function placeholder(val: string | null | undefined, fallback = "* * *"): string {
   return val && val.trim() ? val.trim() : fallback;
