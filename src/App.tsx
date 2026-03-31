@@ -129,122 +129,131 @@ const App = () => {
         <Sonner />
         {showIntro && <IntroScreen onFinish={handleIntroFinish} />}
         <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <LoginPage />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/vendas"
-                element={
-                  <ProtectedRoute>
-                    <VendasPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/produtos"
-                element={
-                  <ProtectedRoute>
-                    <ProdutosPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/documentos"
-                element={
-                  <ProtectedRoute>
-                    <DocumentosPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/clientes"
-                element={
-                  <ProtectedRoute>
-                    <ClientesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agenda"
-                element={
-                  <ProtectedRoute>
-                    <AgendaPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/assistencia"
-                element={
-                  <ProtectedRoute>
-                    <AssistenciaPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/seguranca"
-                element={
-                  <ProtectedRoute>
-                    <SegurancaPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/configuracoes"
-                element={
-                  <ProtectedRoute>
-                    <ConfiguracoesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/historico-envios"
-                element={
-                  <ProtectedRoute>
-                    <HistoricoEnviosPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/caixa"
-                element={
-                  <ProtectedRoute>
-                    <CaixaPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/pagar/:cobrancaId/:dataVencimento"
-                element={
-                  <Suspense fallback={<ScreenLoader />}>
-                    <PixPaymentPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="*"
-                element={
-                  <Suspense fallback={<ScreenLoader />}>
-                    <NotFound />
-                  </Suspense>
-                }
-              />
-            </Routes>
-          </AuthProvider>
+          <Routes>
+            {/* Public PIX payment page — no auth required */}
+            <Route
+              path="/pagar/:cobrancaId/:dataVencimento"
+              element={
+                <Suspense fallback={<ScreenLoader />}>
+                  <PixPaymentPage />
+                </Suspense>
+              }
+            />
+            {/* All other routes require AuthProvider */}
+            <Route
+              path="/*"
+              element={
+                <AuthProvider>
+                  <Routes>
+                    <Route
+                      path="/login"
+                      element={
+                        <PublicRoute>
+                          <LoginPage />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/vendas"
+                      element={
+                        <ProtectedRoute>
+                          <VendasPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/produtos"
+                      element={
+                        <ProtectedRoute>
+                          <ProdutosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/documentos"
+                      element={
+                        <ProtectedRoute>
+                          <DocumentosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/clientes"
+                      element={
+                        <ProtectedRoute>
+                          <ClientesPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/agenda"
+                      element={
+                        <ProtectedRoute>
+                          <AgendaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/assistencia"
+                      element={
+                        <ProtectedRoute>
+                          <AssistenciaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/seguranca"
+                      element={
+                        <ProtectedRoute>
+                          <SegurancaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/configuracoes"
+                      element={
+                        <ProtectedRoute>
+                          <ConfiguracoesPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/historico-envios"
+                      element={
+                        <ProtectedRoute>
+                          <HistoricoEnviosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/caixa"
+                      element={
+                        <ProtectedRoute>
+                          <CaixaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="*"
+                      element={
+                        <Suspense fallback={<ScreenLoader />}>
+                          <NotFound />
+                        </Suspense>
+                      }
+                    />
+                  </Routes>
+                </AuthProvider>
+              }
+            />
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </PersistQueryClientProvider>
