@@ -7,394 +7,344 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/**
- * WhatsApp AI Chatbot via UAZAPI webhook.
- * - Only responds when admin is OFFLINE (not actively chatting)
- * - Tracks admin activity per contact via fromMe messages
- * - Handles invoice/payment queries by asking for CPF
- * - General AI conversation powered by Lovable AI
- */
-
-// Track admin activity per contact: phone -> last admin message timestamp
+const BOT_PREFIX = "🤖 [Assistente Virtual Veloop]\n\n";
+const ADMIN_ONLINE_WINDOW_MS = 10 * 60 * 1000;
 const adminActivity = new Map<string, number>();
-const ADMIN_ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+const HUMAN_KEYWORDS = ["atendente", "humano", "pessoa", "suporte"];
+const INVOICE_KEYWORDS = [
+  "fatura", "parcela", "boleto", "pagamento", "pagar", "vencimento",
+  "quanto devo", "minha conta", "pendente", "cobrança", "cobranças",
+  "próxima parcela", "próximo pagamento", "dívida", "débito",
+];
+
+// ─── Helpers ───
 
 function isAdminOnline(phone: string): boolean {
-  const lastActive = adminActivity.get(phone);
-  if (!lastActive) return false;
-  return Date.now() - lastActive < ADMIN_ONLINE_WINDOW_MS;
+  const last = adminActivity.get(phone);
+  return !!last && Date.now() - last < ADMIN_ONLINE_WINDOW_MS;
 }
 
-function markAdminActive(phone: string) {
-  adminActivity.set(phone, Date.now());
+function formatCurrency(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// In-memory conversation state (per phone number)
-const conversationState = new Map<string, {
-  stage: "idle" | "awaiting_cpf";
-  history: Array<{ role: string; content: string }>;
-  lastActivity: number;
-}>();
-
-function getState(phone: string) {
-  let state = conversationState.get(phone);
-  if (!state || Date.now() - state.lastActivity > 30 * 60 * 1000) {
-    state = { stage: "idle", history: [], lastActivity: Date.now() };
-    conversationState.set(phone, state);
-  }
-  state.lastActivity = Date.now();
-  return state;
+function formatDate(d: string) {
+  const [y, m, dd] = d.split("-");
+  return `${dd}/${m}/${y}`;
 }
 
-async function sendWhatsApp(phone: string, message: string) {
-  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-  if (!UAZAPI_URL || !UAZAPI_TOKEN) {
-    console.error("UAZAPI not configured");
-    return false;
-  }
-  const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+// ─── AI: Gemini (primary) + Groq (fallback) ───
+
+async function callGemini(messages: Array<{ role: string; content: string }>): Promise<string | null> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) return null;
   try {
-    const res = await fetch(`${apiUrl}/send/text`, {
+    const contents = messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+    // Gemini expects system instruction separately
+    const systemIdx = messages.findIndex((m) => m.role === "system");
+    let systemInstruction: any = undefined;
+    if (systemIdx >= 0) {
+      systemInstruction = { parts: [{ text: messages[systemIdx].content }] };
+      contents.splice(systemIdx, 1);
+    }
+    const body: any = { contents };
+    if (systemInstruction) body.systemInstruction = systemInstruction;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    );
+    if (res.status === 429) { console.warn("[Gemini] rate limited"); return null; }
+    if (!res.ok) { console.error("[Gemini] error:", res.status); return null; }
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (e) { console.error("[Gemini] exception:", e); return null; }
+}
+
+async function callGroq(messages: Array<{ role: string; content: string }>): Promise<string | null> {
+  const key = Deno.env.get("GROQ_API_KEY");
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "llama3-8b-8192", messages }),
     });
-    const result = await res.text();
-    return res.ok;
-  } catch (e) {
-    console.error("sendWhatsApp error:", e);
-    return false;
-  }
+    if (!res.ok) { console.error("[Groq] error:", res.status); return null; }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (e) { console.error("[Groq] exception:", e); return null; }
 }
 
 async function callAI(messages: Array<{ role: string; content: string }>): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return "Desculpe, o assistente está temporariamente indisponível.";
+  // Try Gemini first, fallback to Groq, then Lovable AI
+  let reply = await callGemini(messages);
+  if (reply) { console.log("[AI] Gemini responded"); return reply; }
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages,
-      }),
-    });
+  reply = await callGroq(messages);
+  if (reply) { console.log("[AI] Groq fallback responded"); return reply; }
 
-    if (!res.ok) {
-      console.error("AI gateway error:", res.status);
-      return "Desculpe, não consegui processar sua mensagem no momento. Tente novamente.";
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || "Desculpe, não entendi. Pode repetir?";
-  } catch (e) {
-    console.error("AI call error:", e);
-    return "Desculpe, ocorreu um erro. Tente novamente em alguns instantes.";
-  }
-}
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const body = await req.json();
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    const rawEvent = body.event || body.type || "unknown";
-    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
-    const sender = body.data?.key?.remoteJid || body.sender || null;
-    const messageContent =
-      body.data?.message?.conversation ||
-      body.data?.message?.extendedTextMessage?.text ||
-      null;
-    const fromMe = body.data?.key?.fromMe || false;
-
-    console.log(`[UAZAPI Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}`);
-
-    // Audit log
-    await supabase.from("audit_log").insert({
-      tabela: "whatsapp_uazapi",
-      acao: "webhook_recebido",
-      detalhes: {
-        event,
-        sender: sender ? sender.replace(/\d(?=\d{4})/g, "*") : null,
-        has_message: !!messageContent,
-        from_me: fromMe,
-        timestamp: new Date().toISOString(),
-      },
-    });
-
-    // Forward to n8n if configured
-    const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
-    if (webhookUrl) {
-      fetch(webhookUrl, {
+  // Ultimate fallback: Lovable AI
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    try {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "uazapi_incoming",
-          event,
-          sender,
-          message: messageContent,
-          raw: body,
-          timestamp: new Date().toISOString(),
-        }),
-      }).catch((e) => console.warn("[n8n forward] error:", e));
-    }
-
-    // Track admin (fromMe) messages to know when admin is actively chatting
-    if (event === "messages.upsert" && sender && fromMe) {
-      const phoneClean = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
-      markAdminActive(phoneClean);
-      console.log(`[Bot] Admin active on chat with ${phoneClean.slice(-4)}, bot paused for this contact`);
-    }
-
-    // Only process incoming PRIVATE messages (not from us, not groups)
-    if (event === "messages.upsert" && sender && messageContent && !fromMe) {
-      // ─── IGNORE GROUP MESSAGES ───
-      if (sender.endsWith("@g.us")) {
-        console.log(`[Bot] Ignoring group message from ${sender}`);
-        return new Response(JSON.stringify({ success: true, skipped: "group_message" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.choices?.[0]?.message?.content;
+        if (reply) { console.log("[AI] Lovable fallback responded"); return reply; }
       }
-
-      const phoneClean = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
-
-      // ─── Check if admin is online/active with this contact ───
-      if (isAdminOnline(phoneClean)) {
-        console.log(`[Bot] Admin online for ${phoneClean.slice(-4)}, bot staying silent`);
-        // Still notify admins but don't auto-respond
-        await notifyAdmins(supabase, phoneClean, messageContent);
-        return new Response(JSON.stringify({ success: true, bot_skipped: "admin_online" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const state = getState(phoneClean);
-      const msgLower = messageContent.trim().toLowerCase();
-
-      // ─── Stage: Awaiting CPF ───
-      if (state.stage === "awaiting_cpf") {
-        const cpfDigits = messageContent.replace(/\D/g, "");
-
-        if (cpfDigits.length === 11 || cpfDigits.length === 14) {
-          // Look up client by CPF
-          const { data: cliente } = await supabase
-            .from("clientes")
-            .select("id, nome, cpf, telefone")
-            .eq("cpf", messageContent.trim())
-            .maybeSingle();
-
-          // Also try with just digits
-          let clienteMatch = cliente;
-          if (!clienteMatch) {
-            const { data: c2 } = await supabase
-              .from("clientes")
-              .select("id, nome, cpf, telefone")
-              .ilike("cpf", `%${cpfDigits}%`)
-              .limit(1)
-              .maybeSingle();
-            clienteMatch = c2;
-          }
-
-          if (!clienteMatch) {
-            await sendWhatsApp(phoneClean,
-              "❌ Não encontrei nenhum cliente com esse CPF no nosso sistema.\n\n" +
-              "Verifique se digitou corretamente ou entre em contato com a loja para mais informações."
-            );
-            state.stage = "idle";
-            state.history.push(
-              { role: "user", content: messageContent },
-              { role: "assistant", content: "CPF não encontrado no sistema." }
-            );
-          } else {
-            // Found client — look up pending payments
-            const { data: cobrancas } = await supabase
-              .from("cobrancas")
-              .select("id, valor_parcela, cliente_nome")
-              .eq("cliente_id", clienteMatch.id);
-
-            let pendingInfo = "";
-            if (cobrancas && cobrancas.length > 0) {
-              const cobrancaIds = cobrancas.map((c) => c.id);
-              const { data: parcelas } = await supabase
-                .from("cobranca_pagamentos")
-                .select("id, cobranca_id, data_vencimento, status")
-                .in("cobranca_id", cobrancaIds)
-                .in("status", ["a_pagar", "pendente"])
-                .order("data_vencimento", { ascending: true })
-                .limit(5);
-
-              if (parcelas && parcelas.length > 0) {
-                const cobrancaMap = new Map(cobrancas.map((c) => [c.id, c]));
-                const lines = parcelas.map((p) => {
-                  const cob = cobrancaMap.get(p.cobranca_id);
-                  const valor = cob ? formatCurrency(cob.valor_parcela) : "N/A";
-                  const venc = formatDate(p.data_vencimento);
-                  const statusLabel = p.status === "pendente" ? "⚠️ ATRASADA" : "📅 A pagar";
-                  return `• ${statusLabel} — Vencimento: ${venc} — Valor: ${valor}`;
-                });
-                pendingInfo =
-                  `Olá, *${clienteMatch.nome}*! 👋\n\n` +
-                  `Aqui estão suas próximas parcelas:\n\n` +
-                  lines.join("\n") +
-                  `\n\nSe precisar de mais informações, é só perguntar! 😊`;
-              } else {
-                pendingInfo =
-                  `Olá, *${clienteMatch.nome}*! 👋\n\n` +
-                  `✅ Você não possui parcelas pendentes no momento. Está tudo em dia!\n\n` +
-                  `Se tiver outra dúvida, é só perguntar.`;
-              }
-            } else {
-              pendingInfo =
-                `Olá, *${clienteMatch.nome}*! 👋\n\n` +
-                `Não encontrei cobranças associadas ao seu cadastro.\n\n` +
-                `Entre em contato com a loja para mais informações.`;
-            }
-
-            await sendWhatsApp(phoneClean, pendingInfo);
-            state.stage = "idle";
-            state.history.push(
-              { role: "user", content: messageContent },
-              { role: "assistant", content: pendingInfo }
-            );
-          }
-        } else {
-          await sendWhatsApp(phoneClean,
-            "Por favor, envie seu *CPF* com 11 dígitos (ou CNPJ com 14 dígitos).\n\nExemplo: 123.456.789-00"
-          );
-        }
-
-        // Notify admins about the interaction
-        await notifyAdmins(supabase, phoneClean, messageContent);
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // ─── Stage: Idle — Check if asking about invoices/faturas ───
-      const invoiceKeywords = [
-        "fatura", "parcela", "boleto", "pagamento", "pagar", "vencimento",
-        "quanto devo", "minha conta", "pendente", "cobrança", "cobranças",
-        "próxima parcela", "próximo pagamento", "dívida", "débito",
-      ];
-      const isInvoiceQuery = invoiceKeywords.some((kw) => msgLower.includes(kw));
-
-      if (isInvoiceQuery) {
-        state.stage = "awaiting_cpf";
-        const reply =
-          "Para consultar suas parcelas, preciso do seu *CPF*. 📋\n\n" +
-          "Por favor, envie seu CPF (somente números ou com pontuação):";
-        await sendWhatsApp(phoneClean, reply);
-        state.history.push(
-          { role: "user", content: messageContent },
-          { role: "assistant", content: reply }
-        );
-        await notifyAdmins(supabase, phoneClean, messageContent);
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // ─── General AI conversation ───
-      const systemPrompt = {
-        role: "system",
-        content:
-          "Você é o assistente virtual da *SR SOFTWARE*, empresa de tecnologia e gestão inteligente através do sistema Veloop. " +
-          "A SR SOFTWARE é liderada pelo CEO Silvio Rodrigues da Cruz Junior. " +
-          "Seja cordial, profissional e objetivo. Responda em português brasileiro. " +
-          "Se o cliente perguntar sobre faturas, parcelas, pagamentos ou boletos, peça o CPF dele. " +
-          "Você pode responder perguntas gerais sobre a empresa, serviços, produtos e suporte técnico. " +
-          "Mantenha as respostas curtas e adequadas para WhatsApp (use *negrito* e emojis). " +
-          "Assine sempre como *Assistente SR SOFTWARE*. " +
-          "Se não souber uma informação específica, sugira que o cliente entre em contato diretamente com a SR SOFTWARE.",
-      };
-
-      state.history.push({ role: "user", content: messageContent });
-      // Keep only last 10 messages
-      if (state.history.length > 10) {
-        state.history = state.history.slice(-10);
-      }
-
-      const aiReply = await callAI([systemPrompt, ...state.history]);
-      state.history.push({ role: "assistant", content: aiReply });
-
-      await sendWhatsApp(phoneClean, aiReply);
-      await notifyAdmins(supabase, phoneClean, messageContent);
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("uazapi-webhook error:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Erro interno",
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    } catch (e) { console.error("[Lovable AI] error:", e); }
   }
-});
 
-async function notifyAdmins(
-  supabase: ReturnType<typeof createClient>,
-  phone: string,
-  message: string
-) {
+  return "Desculpe, o assistente está temporariamente indisponível. Tente novamente em instantes.";
+}
+
+// ─── UAZAPI send ───
+
+async function sendWhatsApp(phone: string, message: string) {
+  const url = Deno.env.get("UAZAPI_URL");
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!url || !token) { console.error("UAZAPI not configured"); return false; }
   try {
-    const clientePhone = phone.slice(-8);
-    const { data: clienteMatch } = await supabase
-      .from("clientes")
-      .select("id, nome")
-      .or(`telefone.ilike.%${clientePhone}%`)
-      .limit(1)
-      .maybeSingle();
+    const res = await fetch(`${url.replace(/\/+$/, "")}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
+    });
+    await res.text();
+    return res.ok;
+  } catch (e) { console.error("sendWhatsApp error:", e); return false; }
+}
 
-    const { data: adminRoles } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .eq("role", "admin");
+// ─── Conversation DB helpers ───
 
-    const nome = clienteMatch?.nome || phone;
-    for (const admin of adminRoles || []) {
+async function getOrCreateConversation(supabase: any, phone: string) {
+  const { data } = await supabase.from("conversations").select("*").eq("phone", phone).maybeSingle();
+  if (data) return data;
+  const { data: created } = await supabase.from("conversations")
+    .insert({ phone, status: "auto", stage: "idle" }).select().single();
+  return created;
+}
+
+async function updateConversation(supabase: any, phone: string, updates: any) {
+  await supabase.from("conversations").update({ ...updates, updated_at: new Date().toISOString() }).eq("phone", phone);
+}
+
+async function saveMessage(supabase: any, conversationId: string, role: string, content: string) {
+  await supabase.from("messages").insert({ conversation_id: conversationId, role, content });
+}
+
+async function getHistory(supabase: any, conversationId: string, limit = 5) {
+  const { data } = await supabase.from("messages").select("role, content")
+    .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(limit);
+  return (data || []).reverse();
+}
+
+// ─── Notify admins ───
+
+async function notifyAdmins(supabase: any, phone: string, message: string) {
+  try {
+    const last8 = phone.slice(-8);
+    const { data: cliente } = await supabase.from("clientes").select("id, nome")
+      .or(`telefone.ilike.%${last8}%`).limit(1).maybeSingle();
+    const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+    const nome = cliente?.nome || phone;
+    for (const admin of admins || []) {
       await supabase.from("notificacoes").insert({
         user_id: admin.user_id,
         titulo: "💬 Mensagem WhatsApp",
         mensagem: `${nome} enviou: "${message.slice(0, 100)}"`,
         tipo: "whatsapp_recebido",
-        dados: {
-          cliente_id: clienteMatch?.id || null,
-          cliente_nome: nome,
-          telefone: phone,
-          mensagem_preview: message.slice(0, 200),
-          dedup_key: `whatsapp_${phone}_${Date.now()}`,
-        },
+        dados: { cliente_id: cliente?.id || null, cliente_nome: nome, telefone: phone, mensagem_preview: message.slice(0, 200) },
       });
     }
-  } catch (e) {
-    console.warn("notifyAdmins error:", e);
-  }
+  } catch (e) { console.warn("notifyAdmins error:", e); }
 }
+
+// ─── Main handler ───
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const body = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const rawEvent = body.event || body.type || "unknown";
+    const event = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
+    const sender = body.data?.key?.remoteJid || body.sender || null;
+    const messageContent = body.data?.message?.conversation || body.data?.message?.extendedTextMessage?.text || null;
+    const fromMe = body.data?.key?.fromMe || false;
+    const wasSentByApi = body.data?.key?.wasSentByApi || body.data?.wasSentByApi || false;
+
+    console.log(`[Webhook] Event: ${event}, From: ${sender}, FromMe: ${fromMe}, API: ${wasSentByApi}`);
+
+    // Audit log
+    await supabase.from("audit_log").insert({
+      tabela: "whatsapp_uazapi", acao: "webhook_recebido",
+      detalhes: { event, sender: sender?.replace(/\d(?=\d{4})/g, "*"), from_me: fromMe, api_sent: wasSentByApi, timestamp: new Date().toISOString() },
+    });
+
+    // Forward to n8n
+    const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
+    if (n8nUrl && !n8nUrl.includes("localhost")) {
+      fetch(n8nUrl, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "uazapi_incoming", event, sender, message: messageContent, raw: body, timestamp: new Date().toISOString() }),
+      }).catch((e) => console.warn("[n8n] error:", e));
+    }
+
+    // Track admin activity
+    if (event === "messages.upsert" && sender && fromMe) {
+      const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+      adminActivity.set(phone, Date.now());
+    }
+
+    // Process incoming private messages only
+    if (event !== "messages.upsert" || !sender || !messageContent || fromMe) {
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── ANTI-LOOP: Ignore API-sent messages ───
+    if (wasSentByApi) {
+      console.log("[Bot] Ignoring API-sent message (anti-loop)");
+      return new Response(JSON.stringify({ success: true, skipped: "api_sent" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Ignore groups
+    if (sender.endsWith("@g.us")) {
+      return new Response(JSON.stringify({ success: true, skipped: "group" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const phone = sender.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+
+    // Admin online check
+    if (isAdminOnline(phone)) {
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true, bot_skipped: "admin_online" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Get/create conversation
+    const conv = await getOrCreateConversation(supabase, phone);
+    if (!conv) {
+      console.error("[Bot] Failed to create conversation");
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── MANUAL MODE: Block bot responses ───
+    if (conv.status === "manual") {
+      console.log(`[Bot] Conversation ${phone} is in manual mode, bot silent`);
+      await saveMessage(supabase, conv.id, "user", messageContent);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true, bot_skipped: "manual_mode" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const msgLower = messageContent.trim().toLowerCase();
+
+    // ─── HUMAN HANDOFF CHECK ───
+    if (HUMAN_KEYWORDS.some((kw) => msgLower.includes(kw))) {
+      await updateConversation(supabase, phone, { status: "manual" });
+      const reply = BOT_PREFIX + "Entendido! 🙋 Estou transferindo você para o nosso suporte humano.\n\nUm atendente entrará em contato em breve. Aguarde, por favor!";
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "user", messageContent);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true, action: "handoff" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── AWAITING CPF ───
+    if (conv.stage === "awaiting_cpf") {
+      const cpfDigits = messageContent.replace(/\D/g, "");
+      if (cpfDigits.length === 11 || cpfDigits.length === 14) {
+        let { data: cliente } = await supabase.from("clientes").select("id, nome, cpf").eq("cpf", messageContent.trim()).maybeSingle();
+        if (!cliente) {
+          const { data: c2 } = await supabase.from("clientes").select("id, nome, cpf").ilike("cpf", `%${cpfDigits}%`).limit(1).maybeSingle();
+          cliente = c2;
+        }
+
+        let reply: string;
+        if (!cliente) {
+          reply = BOT_PREFIX + "❌ Não encontrei nenhum cliente com esse CPF.\n\nVerifique se digitou corretamente ou entre em contato com a loja.";
+        } else {
+          const { data: cobrancas } = await supabase.from("cobrancas").select("id, valor_parcela, cliente_nome").eq("cliente_id", cliente.id);
+          if (cobrancas?.length) {
+            const { data: parcelas } = await supabase.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status")
+              .in("cobranca_id", cobrancas.map((c: any) => c.id)).in("status", ["a_pagar", "pendente"]).order("data_vencimento", { ascending: true }).limit(5);
+            if (parcelas?.length) {
+              const cobMap = new Map(cobrancas.map((c: any) => [c.id, c]));
+              const lines = parcelas.map((p: any) => {
+                const cob = cobMap.get(p.cobranca_id);
+                return `• ${p.status === "pendente" ? "⚠️ ATRASADA" : "📅 A pagar"} — Venc: ${formatDate(p.data_vencimento)} — ${cob ? formatCurrency(cob.valor_parcela) : "N/A"}`;
+              });
+              reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\nSuas próximas parcelas:\n\n${lines.join("\n")}\n\nQualquer dúvida, é só perguntar! 😊`;
+            } else {
+              reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n✅ Sem parcelas pendentes. Tudo em dia!`;
+            }
+          } else {
+            reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\nNão encontrei cobranças no seu cadastro.\nEntre em contato com a loja para mais informações.`;
+          }
+        }
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "user", messageContent);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+      } else {
+        const reply = BOT_PREFIX + "Por favor, envie seu *CPF* com 11 dígitos (ou CNPJ com 14).\n\nExemplo: 123.456.789-00";
+        await sendWhatsApp(phone, reply);
+      }
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── INVOICE QUERY ───
+    if (INVOICE_KEYWORDS.some((kw) => msgLower.includes(kw))) {
+      await updateConversation(supabase, phone, { stage: "awaiting_cpf" });
+      const reply = BOT_PREFIX + "Para consultar suas parcelas, preciso do seu *CPF*. 📋\n\nPor favor, envie seu CPF:";
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "user", messageContent);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── GENERAL AI CONVERSATION ───
+    await saveMessage(supabase, conv.id, "user", messageContent);
+    const history = await getHistory(supabase, conv.id, 5);
+
+    const systemPrompt = {
+      role: "system",
+      content:
+        "Você é o Assistente Virtual Veloop da SR SOFTWARE, empresa de tecnologia e gestão inteligente. " +
+        "A SR SOFTWARE é liderada pelo CEO Silvio Rodrigues da Cruz Junior. " +
+        "Seu tom é ágil, profissional, cordial e objetivo — focado em logística, motoristas e entregas. " +
+        "NUNCA inclua o prefixo '🤖 [Assistente Virtual Veloop]' na sua resposta — ele é adicionado automaticamente. " +
+        "Se o cliente perguntar sobre faturas, parcelas, pagamentos ou boletos, peça o CPF dele. " +
+        "Responda em português brasileiro. Mantenha respostas curtas para WhatsApp (use *negrito* e emojis). " +
+        "Se não souber algo, sugira contato direto com a SR SOFTWARE.",
+    };
+
+    const aiReply = await callAI([systemPrompt, ...history]);
+    const fullReply = BOT_PREFIX + aiReply;
+    await sendWhatsApp(phone, fullReply);
+    await saveMessage(supabase, conv.id, "assistant", fullReply);
+    await notifyAdmins(supabase, phone, messageContent);
+
+    return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } catch (error) {
+    console.error("uazapi-webhook error:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Erro interno" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
