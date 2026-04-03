@@ -97,6 +97,27 @@ export default function IntegrationStatusPanel() {
     }
   };
 
+  const checkGoogleCalendar = async (): Promise<Partial<IntegrationStatus>> => {
+    try {
+      const { data, error } = await supabase
+        .from("google_calendar_tokens")
+        .select("id, expires_at")
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        return { status: "offline", detail: "Nenhuma conta conectada" };
+      }
+      const expired = new Date(data.expires_at) < new Date();
+      if (expired) {
+        return { status: "warning", detail: "Token expirado (renova automaticamente)" };
+      }
+      return { status: "online", detail: "Conta conectada" };
+    } catch {
+      return { status: "offline", detail: "Erro ao verificar" };
+    }
+  };
+
   const statusIcon = (s: IntegrationStatus["status"]) => {
     switch (s) {
       case "checking": return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
