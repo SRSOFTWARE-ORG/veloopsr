@@ -19,9 +19,6 @@ if (isPreviewHost || isInIframe) {
   navigator.serviceWorker?.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
-} else {
-  // Register Firebase Messaging SW in production
-  navigator.serviceWorker?.register("/firebase-messaging-sw.js").catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

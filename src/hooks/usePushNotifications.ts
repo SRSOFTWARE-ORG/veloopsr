@@ -56,11 +56,7 @@ export function usePushNotifications() {
       setPermission(perm);
       if (perm !== "granted") return false;
 
-      // Register FCM service worker
-      await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-      await navigator.serviceWorker.ready;
-
-      // Get FCM token
+      // Get FCM token using Firebase's dedicated messaging service worker scope
       const fcmToken = await getFCMToken(VAPID_KEY);
       if (!fcmToken) {
         console.error("Failed to get FCM token");
