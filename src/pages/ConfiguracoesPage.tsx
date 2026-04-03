@@ -35,6 +35,7 @@ import {
 import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
 import PermissionsManager from "@/components/PermissionsManager";
 import AISearchBar from "@/components/configuracoes/AISearchBar";
+import IntegrationStatusPanel from "@/components/configuracoes/IntegrationStatusPanel";
 
 interface UserWithPermissions {
   id: string;
