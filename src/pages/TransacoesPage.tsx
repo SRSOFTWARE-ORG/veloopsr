@@ -6,9 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, FileText, Loader2, CheckCircle2 } from "lucide-react";
+import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const PAGE_SIZE = 20;
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -70,6 +72,7 @@ function PdfButton({ cobrancaId, dataVencimento, exists }: { cobrancaId: string;
 
 export default function TransacoesPage() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [existingPdfs, setExistingPdfs] = useState<Set<string>>(new Set());
 
   const { data: pagamentos = [], isLoading } = useQuery({
@@ -80,7 +83,7 @@ export default function TransacoesPage() {
         .select("*, cobrancas(cliente_nome, valor_parcela, cliente_id, observacoes)")
         .eq("status", "pago")
         .order("pago_em", { ascending: false })
-        .limit(200);
+        .limit(500);
       if (error) throw error;
       return data || [];
     },
@@ -110,6 +113,12 @@ export default function TransacoesPage() {
     return nome.includes(s) || p.data_vencimento.includes(s);
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  useEffect(() => { setPage(0); }, [search]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -138,43 +147,62 @@ export default function TransacoesPage() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Nenhuma transação encontrada</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Parcela</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Forma</TableHead>
-                    <TableHead>Pago em</TableHead>
-                    <TableHead>Recibo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((p: any) => {
-                    const cob = p.cobrancas as any;
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{cob?.cliente_nome || "—"}</TableCell>
-                        <TableCell>{formatDate(p.data_vencimento)}</TableCell>
-                        <TableCell className="text-primary font-semibold">{formatCurrency(cob?.valor_parcela || 0)}</TableCell>
-                        <TableCell>
-                          <Badge variant={p.tipo_pagamento?.includes("pix") ? "default" : "secondary"} className="text-xs">
-                            {p.tipo_pagamento === "pix_mercadopago" ? "PIX MP" : p.tipo_pagamento || "Manual"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <PdfButton cobrancaId={p.cobranca_id} dataVencimento={p.data_vencimento} exists={existingPdfs.has(p.id)} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Parcela</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Forma</TableHead>
+                      <TableHead>Pago em</TableHead>
+                      <TableHead>Recibo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paged.map((p: any) => {
+                      const cob = p.cobrancas as any;
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{cob?.cliente_nome || "—"}</TableCell>
+                          <TableCell>{formatDate(p.data_vencimento)}</TableCell>
+                          <TableCell className="text-primary font-semibold">{formatCurrency(cob?.valor_parcela || 0)}</TableCell>
+                          <TableCell>
+                            <Badge variant={p.tipo_pagamento?.includes("pix") ? "default" : "secondary"} className="text-xs">
+                              {p.tipo_pagamento === "pix_mercadopago" ? "PIX MP" : p.tipo_pagamento || "Manual"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <PdfButton cobrancaId={p.cobranca_id} dataVencimento={p.data_vencimento} exists={existingPdfs.has(p.id)} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm px-2 text-muted-foreground">{safePage + 1}/{totalPages}</span>
+                    <Button variant="outline" size="sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
