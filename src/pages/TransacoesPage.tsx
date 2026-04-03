@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, FileText, Loader2 } from "lucide-react";
+import { Receipt, Search, FileText, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -16,10 +17,15 @@ function formatDate(d: string) {
   return d.split("-").reverse().join("/");
 }
 
-function PdfButton({ cobrancaId, dataVencimento }: { cobrancaId: string; dataVencimento: string }) {
+function PdfButton({ cobrancaId, dataVencimento, exists }: { cobrancaId: string; dataVencimento: string; exists: boolean }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
+    if (exists) {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documentos_vendas/comprovantes/${cobrancaId}_${dataVencimento}.pdf`;
+      window.open(url, "_blank");
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-payment-receipt", {
@@ -40,15 +46,31 @@ function PdfButton({ cobrancaId, dataVencimento }: { cobrancaId: string; dataVen
   };
 
   return (
-    <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={handleClick} disabled={loading}>
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-      PDF
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={handleClick} disabled={loading}>
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : exists ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <FileText className="h-3.5 w-3.5" />
+            )}
+            PDF
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {exists ? "PDF já gerado — clique para abrir" : "Clique para gerar o comprovante"}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
 export default function TransacoesPage() {
   const [search, setSearch] = useState("");
+  const [existingPdfs, setExistingPdfs] = useState<Set<string>>(new Set());
 
   const { data: pagamentos = [], isLoading } = useQuery({
     queryKey: ["transacoes-historico"],
@@ -63,6 +85,23 @@ export default function TransacoesPage() {
       return data || [];
     },
   });
+
+  useEffect(() => {
+    if (pagamentos.length === 0) return;
+    const checkExisting = async () => {
+      const { data } = await supabase.storage.from("documentos_vendas").list("comprovantes", { limit: 1000 });
+      if (data) {
+        const names = new Set(data.map((f) => f.name));
+        const found = new Set<string>();
+        pagamentos.forEach((p: any) => {
+          const key = `${p.cobranca_id}_${p.data_vencimento}.pdf`;
+          if (names.has(key)) found.add(p.id);
+        });
+        setExistingPdfs(found);
+      }
+    };
+    checkExisting();
+  }, [pagamentos]);
 
   const filtered = pagamentos.filter((p: any) => {
     if (!search) return true;
@@ -128,7 +167,7 @@ export default function TransacoesPage() {
                           {p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
                         </TableCell>
                         <TableCell>
-                          <PdfButton cobrancaId={p.cobranca_id} dataVencimento={p.data_vencimento} />
+                          <PdfButton cobrancaId={p.cobranca_id} dataVencimento={p.data_vencimento} exists={existingPdfs.has(p.id)} />
                         </TableCell>
                       </TableRow>
                     );
