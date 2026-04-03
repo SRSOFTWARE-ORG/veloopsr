@@ -156,6 +156,29 @@ export default function TransacoesPage() {
 
   const hasDateFilter = dateFrom || dateTo;
 
+  const exportCsv = () => {
+    if (filtered.length === 0) return;
+    const header = "Cliente;Parcela;Valor;Forma;Pago em";
+    const rows = filtered.map((p: any) => {
+      const cob = p.cobrancas as any;
+      const nome = cob?.cliente_nome || "";
+      const parcela = formatDate(p.data_vencimento);
+      const valor = formatCurrency(cob?.valor_parcela || 0);
+      const forma = p.tipo_pagamento === "pix_mercadopago" ? "PIX MP" : p.tipo_pagamento || "Manual";
+      const pagoEm = p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+      return `${nome};${parcela};${valor};${forma};${pagoEm}`;
+    });
+    const csv = "\uFEFF" + [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transacoes_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} transações exportadas`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
