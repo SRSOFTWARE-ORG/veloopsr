@@ -12,7 +12,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronsUpDown, Check, Smartphone, Hash, HardDrive, User, Users } from "lucide-react";
+import { ChevronsUpDown, Check, Smartphone, Hash, HardDrive, User, Users, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -20,6 +20,13 @@ interface Cliente {
   id: string;
   nome: string;
   parent_id: string | null;
+}
+
+interface Produto {
+  id: string;
+  nome: string;
+  categoria: string | null;
+  subcategoria: string | null;
 }
 
 interface DispositivoFormProps {
@@ -35,6 +42,9 @@ const MEMORIA_OPTIONS = ["32GB", "64GB", "128GB", "256GB", "512GB", "1TB"];
 const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps) => {
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [subclientePopoverOpen, setSubclientePopoverOpen] = useState(false);
+  const [produtoPopoverOpen, setProdutoPopoverOpen] = useState(false);
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [form, setForm] = useState({
     imei_serial: "",
     imei2: "",
@@ -53,8 +63,30 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
   const selectedSubcliente = clientes.find((c) => c.id === form.subcliente_id);
 
   useEffect(() => {
+    fetchProdutos();
+  }, []);
+
+  useEffect(() => {
     setForm((prev) => ({ ...prev, subcliente_id: "" }));
   }, [form.cliente_id]);
+
+  const fetchProdutos = async () => {
+    const { data } = await supabase
+      .from("produtos")
+      .select("id, nome, categoria, subcategoria")
+      .order("nome");
+    setProdutos((data as Produto[]) || []);
+  };
+
+  const handleProdutoSelect = (produto: Produto) => {
+    setSelectedProduto(produto);
+    setForm((prev) => ({
+      ...prev,
+      nome_dispositivo: produto.nome,
+      modelo: produto.subcategoria || produto.categoria || "",
+    }));
+    setProdutoPopoverOpen(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +132,50 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Nome do Dispositivo - full width */}
+      {/* Produto do catálogo */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium flex items-center gap-1.5">
+          <Package className="w-3.5 h-3.5 text-primary" /> Selecionar do Catálogo
+        </Label>
+        <Popover open={produtoPopoverOpen} onOpenChange={setProdutoPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+              {selectedProduto ? selectedProduto.nome : "Buscar produto do catálogo..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-full p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar produto..." />
+              <CommandList>
+                <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                <CommandGroup>
+                  {produtos.map((p) => (
+                    <CommandItem
+                      key={p.id}
+                      value={p.nome}
+                      onSelect={() => handleProdutoSelect(p)}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", selectedProduto?.id === p.id ? "opacity-100" : "opacity-0")} />
+                      <div className="flex flex-col">
+                        <span>{p.nome}</span>
+                        {(p.categoria || p.subcategoria) && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {[p.categoria, p.subcategoria].filter(Boolean).join(" › ")}
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <p className="text-[10px] text-muted-foreground">Selecione um produto para preencher nome e modelo automaticamente</p>
+      </div>
+
+      {/* Nome do Dispositivo */}
       <div className="space-y-1.5">
         <Label className="text-xs font-medium flex items-center gap-1.5">
           <Smartphone className="w-3.5 h-3.5 text-primary" /> Nome do Dispositivo
@@ -268,7 +343,7 @@ const DispositivoForm = ({ clientes, onSuccess, onClose }: DispositivoFormProps)
         </div>
       </div>
 
-      {/* Observações full width */}
+      {/* Observações */}
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Observações</Label>
         <Input
