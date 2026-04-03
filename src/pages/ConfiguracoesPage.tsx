@@ -35,6 +35,7 @@ import {
 import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
 import PermissionsManager from "@/components/PermissionsManager";
 import AISearchBar from "@/components/configuracoes/AISearchBar";
+import IntegrationStatusPanel from "@/components/configuracoes/IntegrationStatusPanel";
 
 interface UserWithPermissions {
   id: string;
@@ -356,6 +357,11 @@ const ConfiguracoesPage = () => {
             <p className="text-sm">Nenhum usuário cadastrado ainda.</p>
           </div>
         )}
+      </div>
+
+      {/* Integration Status Panel */}
+      <div className="mt-4 slide-up">
+        <IntegrationStatusPanel />
       </div>
 
       <details className="group mt-4">
