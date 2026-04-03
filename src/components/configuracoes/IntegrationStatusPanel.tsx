@@ -24,7 +24,7 @@ export default function IntegrationStatusPanel() {
   }, []);
 
   const checkAll = async () => {
-    const results = await Promise.allSettled([checkMP(), checkWhatsApp(), checkN8N()]);
+    const results = await Promise.allSettled([checkMP(), checkWhatsApp(), checkN8N(), checkGoogleCalendar()]);
     setIntegrations((prev) =>
       prev.map((int, i) => {
         const result = results[i];
