@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight, CalendarIcon, X } from "lucide-react";
+import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight, CalendarIcon, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
