@@ -76,7 +76,11 @@ Deno.serve(async (req) => {
 
     if (!mpResponse.ok) {
       console.error("MP Error:", JSON.stringify(mpData));
-      return new Response(JSON.stringify({ error: "Failed to create PIX payment", details: mpData }), {
+      const mpMsg = mpData?.message || "";
+      const userError = mpMsg.includes("key enabled for QR")
+        ? "A conta Mercado Pago não possui chave PIX cadastrada. Entre em contato com o vendedor."
+        : "Erro ao gerar pagamento PIX. Tente novamente em instantes.";
+      return new Response(JSON.stringify({ error: userError, mp_error: mpMsg }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
