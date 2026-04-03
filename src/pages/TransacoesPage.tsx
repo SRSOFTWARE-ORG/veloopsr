@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight, CalendarIcon, X } from "lucide-react";
+import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight, CalendarIcon, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -156,6 +156,29 @@ export default function TransacoesPage() {
 
   const hasDateFilter = dateFrom || dateTo;
 
+  const exportCsv = () => {
+    if (filtered.length === 0) return;
+    const header = "Cliente;Parcela;Valor;Forma;Pago em";
+    const rows = filtered.map((p: any) => {
+      const cob = p.cobrancas as any;
+      const nome = cob?.cliente_nome || "";
+      const parcela = formatDate(p.data_vencimento);
+      const valor = formatCurrency(cob?.valor_parcela || 0);
+      const forma = p.tipo_pagamento === "pix_mercadopago" ? "PIX MP" : p.tipo_pagamento || "Manual";
+      const pagoEm = p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+      return `${nome};${parcela};${valor};${forma};${pagoEm}`;
+    });
+    const csv = "\uFEFF" + [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transacoes_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} transações exportadas`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -180,7 +203,12 @@ export default function TransacoesPage() {
                 <X className="h-3.5 w-3.5" /> Limpar
               </Button>
             )}
-            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>
+              <Button variant="outline" size="sm" className="h-9 gap-1 text-xs" onClick={exportCsv} disabled={filtered.length === 0}>
+                <Download className="h-3.5 w-3.5" /> Exportar CSV
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
