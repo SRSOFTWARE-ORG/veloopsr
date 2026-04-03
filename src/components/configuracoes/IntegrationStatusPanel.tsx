@@ -16,6 +16,7 @@ export default function IntegrationStatusPanel() {
     { name: "Mercado Pago", description: "Pagamentos PIX", status: "checking" },
     { name: "WhatsApp (UAZAPI)", description: "Envio de mensagens", status: "checking" },
     { name: "n8n", description: "Automações", status: "checking" },
+    { name: "Google Calendar", description: "Sincronização de agenda", status: "checking" },
   ]);
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function IntegrationStatusPanel() {
   }, []);
 
   const checkAll = async () => {
-    const results = await Promise.allSettled([checkMP(), checkWhatsApp(), checkN8N()]);
+    const results = await Promise.allSettled([checkMP(), checkWhatsApp(), checkN8N(), checkGoogleCalendar()]);
     setIntegrations((prev) =>
       prev.map((int, i) => {
         const result = results[i];
@@ -93,6 +94,27 @@ export default function IntegrationStatusPanel() {
       return { status: "warning", detail: data?.error || "Verificar URL" };
     } catch {
       return { status: "offline", detail: "Erro de conexão" };
+    }
+  };
+
+  const checkGoogleCalendar = async (): Promise<Partial<IntegrationStatus>> => {
+    try {
+      const { data, error } = await supabase
+        .from("google_calendar_tokens")
+        .select("id, expires_at")
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        return { status: "offline", detail: "Nenhuma conta conectada" };
+      }
+      const expired = new Date(data.expires_at) < new Date();
+      if (expired) {
+        return { status: "warning", detail: "Token expirado (renova automaticamente)" };
+      }
+      return { status: "online", detail: "Conta conectada" };
+    } catch {
+      return { status: "offline", detail: "Erro ao verificar" };
     }
   };
 
