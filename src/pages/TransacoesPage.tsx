@@ -203,7 +203,12 @@ export default function TransacoesPage() {
                 <X className="h-3.5 w-3.5" /> Limpar
               </Button>
             )}
-            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>
+              <Button variant="outline" size="sm" className="h-9 gap-1 text-xs" onClick={exportCsv} disabled={filtered.length === 0}>
+                <Download className="h-3.5 w-3.5" /> Exportar CSV
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
