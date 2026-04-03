@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => ({
       },
       includeAssets: ["favicon.ico", "robots.txt", "icons/*.png", "notification-sound.mp3"],
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}"],
         runtimeCaching: [
