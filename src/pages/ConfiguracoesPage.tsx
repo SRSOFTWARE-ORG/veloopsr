@@ -359,6 +359,11 @@ const ConfiguracoesPage = () => {
         )}
       </div>
 
+      {/* Integration Status Panel */}
+      <div className="mt-4 slide-up">
+        <IntegrationStatusPanel />
+      </div>
+
       <details className="group mt-4">
         <summary className="flex items-center justify-between cursor-pointer py-3 px-4 rounded-xl bg-card border border-border hover:bg-secondary/50 transition-colors list-none"
           style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
