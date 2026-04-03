@@ -6,9 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Receipt, Search, FileText, Loader2, CheckCircle2, ChevronLeft, ChevronRight, CalendarIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const PAGE_SIZE = 20;
 
@@ -70,9 +75,27 @@ function PdfButton({ cobrancaId, dataVencimento, exists }: { cobrancaId: string;
   );
 }
 
+function DateFilter({ label, date, onSelect }: { label: string; date: Date | undefined; onSelect: (d: Date | undefined) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 text-xs", !date && "text-muted-foreground")}>
+          <CalendarIcon className="h-3.5 w-3.5" />
+          {date ? format(date, "dd/MM/yyyy") : label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="single" selected={date} onSelect={onSelect} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function TransacoesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [existingPdfs, setExistingPdfs] = useState<Set<string>>(new Set());
 
   const { data: pagamentos = [], isLoading } = useQuery({
@@ -107,17 +130,31 @@ export default function TransacoesPage() {
   }, [pagamentos]);
 
   const filtered = pagamentos.filter((p: any) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    const nome = (p.cobrancas as any)?.cliente_nome?.toLowerCase() || "";
-    return nome.includes(s) || p.data_vencimento.includes(s);
+    if (search) {
+      const s = search.toLowerCase();
+      const nome = (p.cobrancas as any)?.cliente_nome?.toLowerCase() || "";
+      if (!nome.includes(s) && !p.data_vencimento.includes(s)) return false;
+    }
+    if (dateFrom || dateTo) {
+      const pagoEm = p.pago_em ? new Date(p.pago_em) : null;
+      if (!pagoEm) return false;
+      if (dateFrom && pagoEm < dateFrom) return false;
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        if (pagoEm > end) return false;
+      }
+    }
+    return true;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
-  useEffect(() => { setPage(0); }, [search]);
+  useEffect(() => { setPage(0); }, [search, dateFrom, dateTo]);
+
+  const hasDateFilter = dateFrom || dateTo;
 
   return (
     <div className="space-y-4">
@@ -132,13 +169,18 @@ export default function TransacoesPage() {
             <CardTitle className="text-lg">Pagamentos Confirmados</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar cliente..."
-                className="pl-8 h-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Buscar cliente..." className="pl-8 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap pt-2">
+            <DateFilter label="Data início" date={dateFrom} onSelect={setDateFrom} />
+            <DateFilter label="Data fim" date={dateTo} onSelect={setDateTo} />
+            {hasDateFilter && (
+              <Button variant="ghost" size="sm" className="h-9 gap-1 text-xs text-muted-foreground" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }}>
+                <X className="h-3.5 w-3.5" /> Limpar
+              </Button>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>
           </div>
         </CardHeader>
         <CardContent>
