@@ -6,13 +6,45 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Search, ExternalLink, FileText } from "lucide-react";
+import { Receipt, Search, FileText, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 }
 function formatDate(d: string) {
   return d.split("-").reverse().join("/");
+}
+
+function PdfButton({ cobrancaId, dataVencimento }: { cobrancaId: string; dataVencimento: string }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-payment-receipt", {
+        body: { cobranca_id: cobrancaId, data_vencimento: dataVencimento },
+      });
+      if (error) throw error;
+      if (data?.pdf_url) {
+        window.open(data.pdf_url, "_blank");
+      } else {
+        throw new Error("URL não retornada");
+      }
+    } catch (err: any) {
+      console.error("Erro ao gerar PDF:", err);
+      toast.error("Erro ao gerar comprovante PDF");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={handleClick} disabled={loading}>
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+      PDF
+    </Button>
+  );
 }
 
 export default function TransacoesPage() {
@@ -82,7 +114,6 @@ export default function TransacoesPage() {
                 <TableBody>
                   {filtered.map((p: any) => {
                     const cob = p.cobrancas as any;
-                    const pdfUrl = `https://vajadqjzwveuxzmcywvn.supabase.co/storage/v1/object/public/documentos_vendas/comprovantes/${p.cobranca_id}_${p.data_vencimento}.pdf`;
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{cob?.cliente_nome || "—"}</TableCell>
@@ -97,12 +128,7 @@ export default function TransacoesPage() {
                           {p.pago_em ? new Date(p.pago_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" className="h-7 gap-1" asChild>
-                            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                              <FileText className="h-3.5 w-3.5" />
-                              PDF
-                            </a>
-                          </Button>
+                          <PdfButton cobrancaId={p.cobranca_id} dataVencimento={p.data_vencimento} />
                         </TableCell>
                       </TableRow>
                     );
