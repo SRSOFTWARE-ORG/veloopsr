@@ -16,6 +16,7 @@ export default function IntegrationStatusPanel() {
     { name: "Mercado Pago", description: "Pagamentos PIX", status: "checking" },
     { name: "WhatsApp (UAZAPI)", description: "Envio de mensagens", status: "checking" },
     { name: "n8n", description: "Automações", status: "checking" },
+    { name: "Google Calendar", description: "Sincronização de agenda", status: "checking" },
   ]);
 
   useEffect(() => {
