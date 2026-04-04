@@ -298,6 +298,24 @@ Deno.serve(async (req) => {
       const pixLink = `${appUrl}/pagar/${entry.cobrancaId}/${entry.date}?valor=${entry.valorParcela}&cliente=${encodeURIComponent(nomeCompleto)}&parcela=${encodeURIComponent(dataFormatada)}`;
 
       const showPixLink = entry.tipo === "D0" || entry.tipo === "D-1";
+
+      // Interest warning block for D0 message
+      const interestWarning = entry.tipo === "D0" ? [
+        ``,
+        `🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨`,
+        ``,
+        `⚠️ *ATENÇÃO — JUROS POR ATRASO* ⚠️`,
+        ``,
+        `Após *2 (dois) dias de atraso*, será cobrado`,
+        `*R$ 2,00 (dois reais) por dia* de atraso`,
+        `sobre o valor da fatura.`,
+        ``,
+        `📌 *Exemplo:* 5 dias de atraso = R$ 6,00`,
+        `de juros (3 dias × R$ 2,00)`,
+        ``,
+        `🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨`,
+      ] : [];
+
       const mensagemWpp = [
         `Olá, *${nomeCompleto}*! 👋`,
         ``,
@@ -312,6 +330,7 @@ Deno.serve(async (req) => {
         `💰 *Valor:* ${valorFormatado}`,
         `📊 *Status:* ${statusLabel}`,
         `━━━━━━━━━━━━━━━━━━`,
+        ...interestWarning,
         ``,
         ...(showPixLink ? [
           `💳 *Pague agora via PIX:*`,

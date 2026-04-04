@@ -20,12 +20,28 @@ export default function PixPaymentPage() {
   const [paid, setPaid] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
-  const valor = parseFloat(searchParams.get("valor") || "0");
+  const valorBase = parseFloat(searchParams.get("valor") || "0");
   const clienteNome = searchParams.get("cliente") || "Cliente";
   const parcela = searchParams.get("parcela") || "";
   const clienteId = searchParams.get("cliente_id") || "";
 
+  // Calculate interest: R$2/day after 2 days late
+  const jurosInfo = useMemo(() => {
+    if (!dataVencimento) return { diasAtraso: 0, juros: 0, valorFinal: valorBase };
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const venc = new Date(`${dataVencimento}T00:00:00`);
+    const diffMs = hoje.getTime() - venc.getTime();
+    const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    const diasComJuros = Math.max(0, diasAtraso - 2); // starts after 2 days
+    const juros = diasComJuros * 2; // R$2 per day
+    return { diasAtraso, diasComJuros, juros, valorFinal: valorBase + juros };
+  }, [dataVencimento, valorBase]);
+
+  const valor = jurosInfo.valorFinal;
   const valorFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+  const valorBaseFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorBase);
+  const jurosFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(jurosInfo.juros);
   const dataFormatada = dataVencimento ? dataVencimento.split("-").reverse().join("/") : "";
 
   // Create PIX payment
@@ -207,10 +223,32 @@ export default function PixPaymentPage() {
               <span className="text-gray-500">Vencimento</span>
               <span className="font-medium text-gray-800">{dataFormatada}</span>
             </div>
-            <div className="flex justify-between border-t pt-2 mt-2">
-              <span className="text-gray-500 font-medium">Valor</span>
-              <span className="font-bold text-green-700 text-lg">{valorFormatado}</span>
-            </div>
+            {jurosInfo.juros > 0 ? (
+              <>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span className="text-gray-500">Valor original</span>
+                  <span className="font-medium text-gray-800">{valorBaseFormatado}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-500 font-medium">Juros ({jurosInfo.diasComJuros} dia{jurosInfo.diasComJuros !== 1 ? 's' : ''} × R$2,00)</span>
+                  <span className="font-bold text-red-600">+{jurosFormatado}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2 mt-1">
+                  <span className="text-gray-500 font-medium">Total a pagar</span>
+                  <span className="font-bold text-green-700 text-lg">{valorFormatado}</span>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2 mt-2">
+                  <p className="text-xs text-red-600 font-medium text-center">
+                    ⚠️ Juros de R$2,00/dia aplicados após 2 dias de atraso
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <span className="text-gray-500 font-medium">Valor</span>
+                <span className="font-bold text-green-700 text-lg">{valorFormatado}</span>
+              </div>
+            )}
           </div>
         </div>
 
