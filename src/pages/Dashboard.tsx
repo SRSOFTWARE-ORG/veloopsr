@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import SalesChartCard from "@/components/dashboard/SalesChartCard";
 import CobrancaResumo from "@/components/dashboard/CobrancaResumo";
+import EnviosProgramados from "@/components/dashboard/EnviosProgramados";
 
 const frequenciaLabels: Record<string, string> = {
   semana: "Semanal",
