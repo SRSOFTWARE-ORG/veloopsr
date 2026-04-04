@@ -20,12 +20,28 @@ export default function PixPaymentPage() {
   const [paid, setPaid] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
-  const valor = parseFloat(searchParams.get("valor") || "0");
+  const valorBase = parseFloat(searchParams.get("valor") || "0");
   const clienteNome = searchParams.get("cliente") || "Cliente";
   const parcela = searchParams.get("parcela") || "";
   const clienteId = searchParams.get("cliente_id") || "";
 
+  // Calculate interest: R$2/day after 2 days late
+  const jurosInfo = useMemo(() => {
+    if (!dataVencimento) return { diasAtraso: 0, juros: 0, valorFinal: valorBase };
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const venc = new Date(`${dataVencimento}T00:00:00`);
+    const diffMs = hoje.getTime() - venc.getTime();
+    const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    const diasComJuros = Math.max(0, diasAtraso - 2); // starts after 2 days
+    const juros = diasComJuros * 2; // R$2 per day
+    return { diasAtraso, diasComJuros, juros, valorFinal: valorBase + juros };
+  }, [dataVencimento, valorBase]);
+
+  const valor = jurosInfo.valorFinal;
   const valorFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+  const valorBaseFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorBase);
+  const jurosFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(jurosInfo.juros);
   const dataFormatada = dataVencimento ? dataVencimento.split("-").reverse().join("/") : "";
 
   // Create PIX payment
