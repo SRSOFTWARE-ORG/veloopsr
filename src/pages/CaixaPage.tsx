@@ -116,7 +116,7 @@ const CaixaPage = () => {
     // Fetch entradas (recebido from cobranca_pagamentos)
     const { data: pagamentos } = await supabase
       .from("cobranca_pagamentos")
-      .select("status, cobranca_id, data_vencimento, pago_por, pago_em")
+      .select("status, cobranca_id, data_vencimento, pago_por, pago_em, tipo_pagamento")
       .gte("data_vencimento", start)
       .lte("data_vencimento", end)
       .eq("status", "pago");
@@ -143,35 +143,13 @@ const CaixaPage = () => {
         const cob = cobMap[p.cobranca_id];
         if (cob) {
           totalEntrada += cob.valor;
+          const tipoPag = (p as any).tipo_pagamento;
           detalhes.push({
             cliente_nome: cob.nome,
             valor: cob.valor,
             pago_por_nome: p.pago_por ? (profileMap[p.pago_por] || "Sistema") : "Sistema",
             pago_em: p.pago_em || "",
-            tipo: "parcela",
-          });
-        }
-      });
-    }
-
-    // Also add entradas from vendas (valor_entrada)
-    const { data: vendas } = await supabase
-      .from("vendas")
-      .select("valor_entrada, created_at, cliente_nome, vendedor_id")
-      .eq("status", "concluida");
-
-    if (vendas) {
-      vendas.forEach((v) => {
-        const vendaDate = v.created_at?.split("T")[0] || "";
-        const entrada = Number(v.valor_entrada) || 0;
-        if (entrada > 0 && vendaDate >= start && vendaDate <= end) {
-          totalEntrada += entrada;
-          detalhes.push({
-            cliente_nome: v.cliente_nome,
-            valor: entrada,
-            pago_por_nome: v.vendedor_id ? (profileMap[v.vendedor_id] || "Vendedor") : "Sistema",
-            pago_em: v.created_at || "",
-            tipo: "entrada",
+            tipo: tipoPag === "entrada" ? "entrada" : "parcela",
           });
         }
       });
