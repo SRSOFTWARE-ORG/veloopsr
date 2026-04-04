@@ -170,6 +170,10 @@ const Dashboard = () => {
       <SalesChartCard />
 
       <div className="mb-6">
+        <EnviosProgramados />
+      </div>
+
+      <div className="mb-6">
         <CobrancaResumo />
       </div>
 
