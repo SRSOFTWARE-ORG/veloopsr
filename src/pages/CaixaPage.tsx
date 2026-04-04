@@ -116,7 +116,7 @@ const CaixaPage = () => {
     // Fetch entradas (recebido from cobranca_pagamentos)
     const { data: pagamentos } = await supabase
       .from("cobranca_pagamentos")
-      .select("status, cobranca_id, data_vencimento, pago_por, pago_em")
+      .select("status, cobranca_id, data_vencimento, pago_por, pago_em, tipo_pagamento")
       .gte("data_vencimento", start)
       .lte("data_vencimento", end)
       .eq("status", "pago");
