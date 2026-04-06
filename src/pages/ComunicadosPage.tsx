@@ -162,7 +162,7 @@ export default function ComunicadosPage() {
         count = clientesComAtraso.size;
       } else if (filtroDestinatarios === "em_dia") {
         // Clients who have payments but none pending
-        count = [...clientesComPagamento].filter(id => !clientesComPendente.has(id)).length;
+        count = Array.from(clientesComPagamento).filter(id => !clientesComPendente.has(id)).length;
       }
       setFilteredCount(count);
     } catch {
