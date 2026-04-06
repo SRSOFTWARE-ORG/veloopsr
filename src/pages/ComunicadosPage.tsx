@@ -378,6 +378,24 @@ export default function ComunicadosPage() {
               )}
 
               <div>
+                <Label>Destinatários</Label>
+                <Select value={filtroDestinatarios} onValueChange={setFiltroDestinatarios}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os clientes com telefone</SelectItem>
+                    <SelectItem value="com_pendentes">Clientes com parcelas pendentes</SelectItem>
+                    <SelectItem value="com_atraso">Clientes com parcelas atrasadas</SelectItem>
+                    <SelectItem value="em_dia">Clientes em dia (sem pendências)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {filtroDestinatarios !== "todos" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {loadingFilter ? "Calculando..." : `${filteredCount ?? 0} clientes neste filtro`}
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <Label>Formato</Label>
                 <Select value={formato} onValueChange={setFormato}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -433,7 +451,7 @@ export default function ComunicadosPage() {
                 <Send className="w-4 h-4 mr-2" />
                 {agendamento && new Date(agendamento) > new Date()
                   ? "Agendar Comunicado"
-                  : `Disparar para ${clientCount - blacklistCount} clientes`}
+                  : `Disparar para ${filtroDestinatarios !== "todos" ? (filteredCount ?? "...") : clientCount - blacklistCount} clientes`}
               </Button>
 
               <p className="text-xs text-muted-foreground text-center">
