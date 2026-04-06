@@ -129,10 +129,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all clients with phone
+    // Get all clients with phone (include extra fields for template variables)
     const { data: clientes } = await serviceClient
       .from("clientes")
-      .select("id, nome, telefone")
+      .select("id, nome, telefone, cpf, email")
       .not("telefone", "is", null);
 
     if (!clientes || clientes.length === 0) {
@@ -190,14 +190,14 @@ Deno.serve(async (req) => {
 
     // Deduplicate by sanitized phone
     const seen = new Set<string>();
-    const recipients: { id: string; nome: string; telefone: string; sanitized: string }[] = [];
+    const recipients: { id: string; nome: string; telefone: string; sanitized: string; cpf: string | null; email: string | null }[] = [];
 
     for (const c of clientes) {
       const sanitized = sanitizePhone(c.telefone || "");
       if (!sanitized || seen.has(sanitized) || blackSet.has(sanitized)) continue;
       if (allowedClientIds && !allowedClientIds.has(c.id)) continue;
       seen.add(sanitized);
-      recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized });
+      recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized, cpf: c.cpf || null, email: c.email || null });
     }
 
     // Update comunicado status
