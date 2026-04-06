@@ -215,7 +215,6 @@ export default function ComunicadosPage() {
   }
 
   async function handleTestSend() {
-    if (!mensagem.trim()) { toast.error("Escreva a mensagem"); return; }
     if (!testPhone.trim()) { toast.error("Informe o número de teste"); return; }
 
     setTestSending(true);
@@ -240,11 +239,6 @@ export default function ComunicadosPage() {
   }
 
   async function handleSend() {
-    if (!titulo.trim() || !mensagem.trim()) {
-      toast.error("Preencha título e mensagem");
-      return;
-    }
-
     setSending(true);
     try {
       // Create comunicado record
