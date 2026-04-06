@@ -335,11 +335,38 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ── HANDOVER: sinalizar fim do fluxo financeiro ──
+      case "handover": {
+        const { phone, status: handoverStatus, context_id: ctxId } = body.data as {
+          phone?: string;
+          status?: string;
+          context_id?: string;
+        };
+
+        const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
+        if (webhookUrl && phone) {
+          await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              source: "lovable_handover",
+              status: handoverStatus || "financeiro_concluido",
+              phone,
+              context_id: ctxId || null,
+              timestamp: new Date().toISOString(),
+            }),
+          }).catch((e) => console.warn("[n8n-callback] handover notify error:", e));
+        }
+
+        result = { status: handoverStatus || "financeiro_concluido", phone };
+        break;
+      }
+
       default:
         return new Response(
           JSON.stringify({
             success: false,
-            error: `Ação '${body.action}' não reconhecida. Ações disponíveis: marcar_pago, enviar_notificacao, atualizar_cliente, criar_cobranca`,
+            error: `Ação '${body.action}' não reconhecida. Ações disponíveis: marcar_pago, enviar_notificacao, atualizar_cliente, criar_cobranca, handover`,
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
