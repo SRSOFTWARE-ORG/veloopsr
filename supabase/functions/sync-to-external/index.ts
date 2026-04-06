@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const EXTERNAL_SCHEMA = "veloop_automacoes";
+
 // Column mapping: source_col -> dest_col per table
 const COLUMN_MAPPINGS: Record<string, Record<string, string>> = {
   clientes: { telefone: "whatsapp" },
@@ -34,6 +36,54 @@ const SYNC_TABLES = [
   "google_calendar_tokens", "push_subscriptions",
 ];
 
+// Direct REST upsert to external Supabase using custom schema header
+async function restUpsert(
+  baseUrl: string,
+  apiKey: string,
+  table: string,
+  data: any[],
+): Promise<{ ok: boolean; error?: string }> {
+  const url = `${baseUrl}/rest/v1/${table}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "apikey": apiKey,
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Content-Profile": EXTERNAL_SCHEMA,
+      "Prefer": "resolution=merge-duplicates",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    return { ok: false, error: `${res.status}: ${body}` };
+  }
+  return { ok: true };
+}
+
+async function restDelete(
+  baseUrl: string,
+  apiKey: string,
+  table: string,
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const url = `${baseUrl}/rest/v1/${table}?id=eq.${id}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "apikey": apiKey,
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Profile": EXTERNAL_SCHEMA,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    return { ok: false, error: `${res.status}: ${body}` };
+  }
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,49 +103,13 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sourceClient = createClient(supabaseUrl, serviceKey);
-    const externalClient = createClient(externalUrl, externalKey, {
-      db: { schema: "veloop_automacoes" },
-    });
-
-    // Debug: log external URL and key details
-    console.log(`[Sync] External URL: ${externalUrl}`);
-    console.log(`[Sync] External Key prefix: ${externalKey.substring(0, 30)}...`);
-    console.log(`[Sync] External Key length: ${externalKey.length}`);
-    
-    // Decode JWT to check role claim
-    try {
-      const parts = externalKey.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        console.log(`[Sync] JWT role: ${payload.role}, ref: ${payload.ref}`);
-      }
-    } catch (e) {
-      console.log(`[Sync] Could not decode JWT: ${e}`);
-    }
-
-    // Test direct REST API call to verify credentials
-    try {
-      const testRes = await fetch(`${externalUrl}/rest/v1/`, {
-        headers: {
-          'apikey': externalKey,
-          'Authorization': `Bearer ${externalKey}`,
-        }
-      });
-      console.log(`[Sync] Direct REST test: status=${testRes.status}, statusText=${testRes.statusText}`);
-      if (!testRes.ok) {
-        const errBody = await testRes.text();
-        console.log(`[Sync] REST error body: ${errBody}`);
-      }
-    } catch (e) {
-      console.log(`[Sync] REST test error: ${e}`);
-    }
 
     const body = await req.json().catch(() => ({}));
     const { mode = "incremental", table, record, old_record, event_type } = body;
 
     // Mode 1: Single record sync (called by database webhook)
     if (mode === "webhook" && table && record) {
-      const result = await syncSingleRecord(externalClient, table, record, old_record, event_type);
+      const result = await syncSingleRecord(externalUrl, externalKey, table, record, old_record, event_type);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -107,9 +121,6 @@ Deno.serve(async (req) => {
 
       for (const tableName of SYNC_TABLES) {
         try {
-          // Ensure table exists in external DB
-          await ensureTable(externalClient, tableName);
-
           // Fetch all data from source
           let allData: any[] = [];
           let from = 0;
@@ -136,81 +147,20 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Detect available columns in external table
-          let allowedColumns: Set<string> | null = null;
-          try {
-            const { data: probe, error: probeErr } = await externalClient
-              .from(tableName)
-              .select("*")
-              .limit(0);
-            // If table is empty we can still get column names from a single row upsert attempt
-            // Use first record keys as fallback
-          } catch (_) {}
-
-          // Try first with all columns; if schema mismatch, retry with filtered columns
-          let synced = 0;
-          let errors = 0;
-
           // Apply column mappings
           allData = allData.map((row: any) => mapRecord(tableName, row));
 
+          let synced = 0;
+          let errors = 0;
+
           for (let i = 0; i < allData.length; i += 200) {
             const batch = allData.slice(i, i + 200);
-            const dataToSend = allowedColumns 
-              ? batch.map((row: any) => {
-                  const filtered: any = {};
-                  for (const key of Object.keys(row)) {
-                    if (allowedColumns!.has(key)) filtered[key] = row[key];
-                  }
-                  return filtered;
-                })
-              : batch;
-
-            const { error: upsertErr } = await externalClient
-              .from(tableName)
-              .upsert(dataToSend, { onConflict: "id", ignoreDuplicates: false });
-
-            if (upsertErr && upsertErr.message.includes("column") && upsertErr.message.includes("schema cache") && !allowedColumns) {
-              // Detect which columns exist by trying each column individually
-              console.log(`[Sync] Schema mismatch on ${tableName}, detecting columns...`);
-              const sampleRow = batch[0];
-              const validCols = new Set<string>();
-              for (const col of Object.keys(sampleRow)) {
-                const testRow: any = { id: sampleRow.id, [col]: sampleRow[col] };
-                const { error: colErr } = await externalClient
-                  .from(tableName)
-                  .upsert(testRow, { onConflict: "id", ignoreDuplicates: false });
-                if (!colErr) {
-                  validCols.add(col);
-                } else if (!colErr?.message?.includes("schema cache")) {
-                  validCols.add(col);
-                }
-              }
-              allowedColumns = validCols;
-              console.log(`[Sync] ${tableName} valid columns: ${[...validCols].join(', ')}`);
-              
-              // Retry this batch with filtered columns
-              const filteredBatch = batch.map((row: any) => {
-                const filtered: any = {};
-                for (const key of Object.keys(row)) {
-                  if (allowedColumns!.has(key)) filtered[key] = row[key];
-                }
-                return filtered;
-              });
-              const { error: retryErr } = await externalClient
-                .from(tableName)
-                .upsert(filteredBatch, { onConflict: "id", ignoreDuplicates: false });
-              if (retryErr) {
-                console.error(`[Sync] Retry upsert error ${tableName}:`, retryErr.message);
-                errors += batch.length;
-              } else {
-                synced += batch.length;
-              }
-            } else if (upsertErr) {
-              console.error(`[Sync] Upsert error ${tableName}:`, upsertErr.message);
-              errors += batch.length;
-            } else {
+            const res = await restUpsert(externalUrl, externalKey, tableName, batch);
+            if (res.ok) {
               synced += batch.length;
+            } else {
+              console.error(`[Sync] Upsert error ${tableName}:`, res.error);
+              errors += batch.length;
             }
           }
 
@@ -241,36 +191,26 @@ Deno.serve(async (req) => {
 });
 
 async function syncSingleRecord(
-  externalClient: any,
+  baseUrl: string,
+  apiKey: string,
   table: string,
   record: any,
   oldRecord: any,
-  eventType: string
+  eventType: string,
 ) {
   try {
     if (eventType === "DELETE" && oldRecord?.id) {
-      const { error } = await externalClient
-        .from(table)
-        .delete()
-        .eq("id", oldRecord.id);
-      if (error) throw error;
+      const res = await restDelete(baseUrl, apiKey, table, oldRecord.id);
+      if (!res.ok) throw new Error(res.error);
       return { success: true, action: "deleted", table };
     }
 
-    // INSERT or UPDATE -> upsert with column mapping
     const mappedRecord = mapRecord(table, record);
-    const { error } = await externalClient
-      .from(table)
-      .upsert(mappedRecord, { onConflict: "id" });
-    if (error) throw error;
+    const res = await restUpsert(baseUrl, apiKey, table, [mappedRecord]);
+    if (!res.ok) throw new Error(res.error);
     return { success: true, action: eventType?.toLowerCase() || "upserted", table };
   } catch (e: any) {
     console.error(`[Sync] Single record error on ${table}:`, e.message);
     return { success: false, error: e.message, table };
   }
-}
-
-async function ensureTable(_client: any, _tableName: string) {
-  // External tables must be pre-created with matching schema.
-  // This is a no-op placeholder - the full sync SQL will create them.
 }
