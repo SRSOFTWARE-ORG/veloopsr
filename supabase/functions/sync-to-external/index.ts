@@ -149,6 +149,9 @@ Deno.serve(async (req) => {
           let synced = 0;
           let errors = 0;
 
+          // Apply column mappings
+          allData = allData.map((row: any) => mapRecord(tableName, row));
+
           for (let i = 0; i < allData.length; i += 200) {
             const batch = allData.slice(i, i + 200);
             const dataToSend = allowedColumns 
