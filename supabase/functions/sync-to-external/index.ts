@@ -118,17 +118,74 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Upsert in batches of 200
+          // Detect available columns in external table
+          let allowedColumns: Set<string> | null = null;
+          try {
+            const { data: probe, error: probeErr } = await externalClient
+              .from(tableName)
+              .select("*")
+              .limit(0);
+            // If table is empty we can still get column names from a single row upsert attempt
+            // Use first record keys as fallback
+          } catch (_) {}
+
+          // Try first with all columns; if schema mismatch, retry with filtered columns
           let synced = 0;
           let errors = 0;
 
           for (let i = 0; i < allData.length; i += 200) {
             const batch = allData.slice(i, i + 200);
+            const dataToSend = allowedColumns 
+              ? batch.map((row: any) => {
+                  const filtered: any = {};
+                  for (const key of Object.keys(row)) {
+                    if (allowedColumns!.has(key)) filtered[key] = row[key];
+                  }
+                  return filtered;
+                })
+              : batch;
+
             const { error: upsertErr } = await externalClient
               .from(tableName)
-              .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+              .upsert(dataToSend, { onConflict: "id", ignoreDuplicates: false });
 
-            if (upsertErr) {
+            if (upsertErr && upsertErr.message.includes("column") && upsertErr.message.includes("schema cache") && !allowedColumns) {
+              // Detect which columns exist by trying each column individually
+              console.log(`[Sync] Schema mismatch on ${tableName}, detecting columns...`);
+              const sampleRow = batch[0];
+              const validCols = new Set<string>();
+              for (const col of Object.keys(sampleRow)) {
+                const testRow: any = { id: sampleRow.id, [col]: sampleRow[col] };
+                const { error: colErr } = await externalClient
+                  .from(tableName)
+                  .upsert(testRow, { onConflict: "id", ignoreDuplicates: false });
+                if (!colErr) {
+                  validCols.add(col);
+                } else if (!colErr?.message?.includes("schema cache")) {
+                  validCols.add(col);
+                }
+              }
+              allowedColumns = validCols;
+              console.log(`[Sync] ${tableName} valid columns: ${[...validCols].join(', ')}`);
+              
+              // Retry this batch with filtered columns
+              const filteredBatch = batch.map((row: any) => {
+                const filtered: any = {};
+                for (const key of Object.keys(row)) {
+                  if (allowedColumns!.has(key)) filtered[key] = row[key];
+                }
+                return filtered;
+              });
+              const { error: retryErr } = await externalClient
+                .from(tableName)
+                .upsert(filteredBatch, { onConflict: "id", ignoreDuplicates: false });
+              if (retryErr) {
+                console.error(`[Sync] Retry upsert error ${tableName}:`, retryErr.message);
+                errors += batch.length;
+              } else {
+                synced += batch.length;
+              }
+            } else if (upsertErr) {
               console.error(`[Sync] Upsert error ${tableName}:`, upsertErr.message);
               errors += batch.length;
             } else {
