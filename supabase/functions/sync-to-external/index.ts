@@ -39,6 +39,11 @@ Deno.serve(async (req) => {
     const sourceClient = createClient(supabaseUrl, serviceKey);
     const externalClient = createClient(externalUrl, externalKey);
 
+    // Debug: log external URL and key prefix
+    console.log(`[Sync] External URL: ${externalUrl}`);
+    console.log(`[Sync] External Key prefix: ${externalKey.substring(0, 20)}...`);
+    console.log(`[Sync] External Key length: ${externalKey.length}`);
+
     const body = await req.json().catch(() => ({}));
     const { mode = "incremental", table, record, old_record, event_type } = body;
 
