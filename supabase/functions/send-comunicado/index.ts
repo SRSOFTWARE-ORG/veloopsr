@@ -228,7 +228,12 @@ Deno.serve(async (req) => {
 
     for (const r of recipients) {
       const firstName = r.nome.split(" ")[0];
-      const finalMsg = comunicado.mensagem.replace(/\{\{nome\}\}/gi, firstName);
+      const finalMsg = comunicado.mensagem
+        .replace(/\{\{nome\}\}/gi, firstName)
+        .replace(/\{\{nome_completo\}\}/gi, r.nome)
+        .replace(/\{\{cpf\}\}/gi, r.cpf || "")
+        .replace(/\{\{telefone\}\}/gi, r.telefone || "")
+        .replace(/\{\{email\}\}/gi, r.email || "");
 
       let success = false;
       let erro = "";
