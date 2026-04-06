@@ -434,13 +434,13 @@ Deno.serve(async (req) => {
       if (enviado) whatsappCount++;
 
       // ── Notificação interna para vendedor + admins ──
-      const tipoLabel = entry.tipo === "D-3" ? "Em 3 dias" : entry.tipo === "D-1" ? "Amanhã" : "Hoje";
-      const emoji = entry.tipo === "D-3" ? "📆" : entry.tipo === "D-1" ? "🔔" : "📌";
+      const tipoLabel = entry.tipo === "D-3" ? "Em 3 dias" : entry.tipo === "D-1" ? "Amanhã" : entry.tipo === "D+1" ? "Regularização (D+1)" : "Hoje";
+      const emoji = entry.tipo === "D-3" ? "📆" : entry.tipo === "D-1" ? "🔔" : entry.tipo === "D+1" ? "📢" : "📌";
       const usersToNotify = new Set([entry.criadoPor, ...adminIds]);
 
       for (const userId of usersToNotify) {
-        const tipoNotif = entry.tipo === "D-3" ? "lembrete_3dias" : entry.tipo === "D-1" ? "lembrete_amanha" : "lembrete_hoje";
-        const dedupPrefix = entry.tipo === "D-3" ? "3dias" : entry.tipo === "D-1" ? "amanha" : "hoje";
+        const tipoNotif = entry.tipo === "D-3" ? "lembrete_3dias" : entry.tipo === "D-1" ? "lembrete_amanha" : entry.tipo === "D+1" ? "regularizacao_d1" : "lembrete_hoje";
+        const dedupPrefix = entry.tipo === "D-3" ? "3dias" : entry.tipo === "D-1" ? "amanha" : entry.tipo === "D+1" ? "d1" : "hoje";
         const ok = await createNotification(
           supabase,
           userId,
