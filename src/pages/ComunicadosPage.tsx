@@ -498,7 +498,7 @@ export default function ComunicadosPage() {
                 className="w-full"
                 size="lg"
                 onClick={handleSend}
-                disabled={sending || !titulo.trim() || !mensagem.trim()}
+                disabled={sending}
               >
                 <Send className="w-4 h-4 mr-2" />
                 {agendamento && new Date(agendamento) > new Date()
