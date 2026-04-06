@@ -39,10 +39,38 @@ Deno.serve(async (req) => {
     const sourceClient = createClient(supabaseUrl, serviceKey);
     const externalClient = createClient(externalUrl, externalKey);
 
-    // Debug: log external URL and key prefix
+    // Debug: log external URL and key details
     console.log(`[Sync] External URL: ${externalUrl}`);
-    console.log(`[Sync] External Key prefix: ${externalKey.substring(0, 20)}...`);
+    console.log(`[Sync] External Key prefix: ${externalKey.substring(0, 30)}...`);
     console.log(`[Sync] External Key length: ${externalKey.length}`);
+    
+    // Decode JWT to check role claim
+    try {
+      const parts = externalKey.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        console.log(`[Sync] JWT role: ${payload.role}, ref: ${payload.ref}`);
+      }
+    } catch (e) {
+      console.log(`[Sync] Could not decode JWT: ${e}`);
+    }
+
+    // Test direct REST API call to verify credentials
+    try {
+      const testRes = await fetch(`${externalUrl}/rest/v1/`, {
+        headers: {
+          'apikey': externalKey,
+          'Authorization': `Bearer ${externalKey}`,
+        }
+      });
+      console.log(`[Sync] Direct REST test: status=${testRes.status}, statusText=${testRes.statusText}`);
+      if (!testRes.ok) {
+        const errBody = await testRes.text();
+        console.log(`[Sync] REST error body: ${errBody}`);
+      }
+    } catch (e) {
+      console.log(`[Sync] REST test error: ${e}`);
+    }
 
     const body = await req.json().catch(() => ({}));
     const { mode = "incremental", table, record, old_record, event_type } = body;
