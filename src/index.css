@@ -184,7 +184,7 @@ html, body, #root {
   box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
 }
 .btn-3d:hover, .btn-3d:active {
-  transform: perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.06) translateY(-2px);
+  transform: scale(1.06) translateY(-2px);
   box-shadow: 0 10px 24px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.08);
 }
 
