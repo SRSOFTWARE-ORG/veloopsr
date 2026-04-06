@@ -53,7 +53,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sourceClient = createClient(supabaseUrl, serviceKey);
-    const externalClient = createClient(externalUrl, externalKey);
+    const externalClient = createClient(externalUrl, externalKey, {
+      db: { schema: "veloop_automacoes" },
+    });
 
     // Debug: log external URL and key details
     console.log(`[Sync] External URL: ${externalUrl}`);
