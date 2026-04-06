@@ -21,6 +21,7 @@ import {
   Wallet,
   MessageSquare,
   Receipt,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 import SobreDialog from "@/components/SobreDialog";
@@ -40,6 +41,7 @@ const navItems = [
 const adminItems = [
   { to: "/transacoes", icon: Receipt, label: "Transações" },
   { to: "/historico-envios", icon: MessageSquare, label: "Envios WhatsApp" },
+  { to: "/comunicados", icon: Megaphone, label: "Comunicados" },
   { to: "/configuracoes", icon: Settings, label: "Configurações" },
 ];
 

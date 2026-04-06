@@ -27,6 +27,7 @@ const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
 const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
 const HistoricoEnviosPage = lazy(() => import("@/pages/HistoricoEnviosPage"));
 const TransacoesPage = lazy(() => import("@/pages/TransacoesPage"));
+const ComunicadosPage = lazy(() => import("@/pages/ComunicadosPage"));
 const PixPaymentPage = lazy(() => import("@/pages/PixPaymentPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -247,6 +248,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <CaixaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/comunicados"
+                      element={
+                        <ProtectedRoute>
+                          <ComunicadosPage />
                         </ProtectedRoute>
                       }
                     />
