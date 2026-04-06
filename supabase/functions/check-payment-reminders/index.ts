@@ -457,6 +457,11 @@ Deno.serve(async (req) => {
         );
         if (ok) notifCount++;
       }
+
+      // Anti-ban: delay 15-30s between WhatsApp sends
+      if (enviado && entriesToProcess.indexOf(entry) < entriesToProcess.length - 1) {
+        await randomDelay(15, 30);
+      }
     }
 
     // ── Resumo semanal (segundas-feiras) ──
