@@ -282,7 +282,12 @@ export default function ComunicadosPage() {
   }
 
   const previewMsg = useMemo(() => {
-    return mensagem.replace(/\{\{nome\}\}/gi, "João");
+    return mensagem
+      .replace(/\{\{nome\}\}/gi, "João")
+      .replace(/\{\{nome_completo\}\}/gi, "João da Silva")
+      .replace(/\{\{cpf\}\}/gi, "123.456.789-00")
+      .replace(/\{\{telefone\}\}/gi, "(27) 99917-7265")
+      .replace(/\{\{email\}\}/gi, "joao@email.com");
   }, [mensagem]);
 
   const statusBadge = (s: string) => {
@@ -362,11 +367,30 @@ export default function ComunicadosPage() {
                 <Textarea
                   value={mensagem}
                   onChange={(e) => setMensagem(e.target.value)}
-                  placeholder="Use {{nome}} para inserir o primeiro nome do cliente automaticamente"
+                  placeholder="Olá {{nome}}, tudo bem? Segue informações importantes..."
                   rows={5}
                 />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[
+                    { var: "{{nome}}", desc: "Primeiro nome" },
+                    { var: "{{nome_completo}}", desc: "Nome completo" },
+                    { var: "{{cpf}}", desc: "CPF" },
+                    { var: "{{telefone}}", desc: "Telefone" },
+                    { var: "{{email}}", desc: "E-mail" },
+                  ].map((v) => (
+                    <button
+                      key={v.var}
+                      type="button"
+                      className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-accent border border-border transition-colors cursor-pointer"
+                      onClick={() => setMensagem((prev) => prev + v.var)}
+                      title={v.desc}
+                    >
+                      <code>{v.var}</code>
+                    </button>
+                  ))}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Variáveis disponíveis: <code className="bg-muted px-1 rounded">{"{{nome}}"}</code> = primeiro nome do cliente
+                  Clique nas variáveis acima para inserir. Os dados são preenchidos automaticamente para cada cliente.
                 </p>
               </div>
 
