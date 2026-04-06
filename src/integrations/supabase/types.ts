@@ -370,6 +370,105 @@ export type Database = {
           },
         ]
       }
+      comunicado_destinatarios: {
+        Row: {
+          cliente_id: string | null
+          comunicado_id: string
+          created_at: string | null
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          nome: string
+          status: string
+          telefone: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          comunicado_id: string
+          created_at?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          nome: string
+          status?: string
+          telefone: string
+        }
+        Update: {
+          cliente_id?: string | null
+          comunicado_id?: string
+          created_at?: string | null
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          nome?: string
+          status?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comunicado_destinatarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comunicado_destinatarios_comunicado_id_fkey"
+            columns: ["comunicado_id"]
+            isOneToOne: false
+            referencedRelation: "comunicados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comunicados: {
+        Row: {
+          agendado_para: string | null
+          created_at: string | null
+          criado_por: string
+          formato: string
+          id: string
+          media_url: string | null
+          mensagem: string
+          status: string
+          titulo: string
+          total_destinatarios: number | null
+          total_enviados: number | null
+          total_falhas: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          agendado_para?: string | null
+          created_at?: string | null
+          criado_por: string
+          formato?: string
+          id?: string
+          media_url?: string | null
+          mensagem: string
+          status?: string
+          titulo: string
+          total_destinatarios?: number | null
+          total_enviados?: number | null
+          total_falhas?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          agendado_para?: string | null
+          created_at?: string | null
+          criado_por?: string
+          formato?: string
+          id?: string
+          media_url?: string | null
+          mensagem?: string
+          status?: string
+          titulo?: string
+          total_destinatarios?: number | null
+          total_enviados?: number | null
+          total_falhas?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string | null
@@ -1073,6 +1172,27 @@ export type Database = {
           valor_parcela?: number | null
           valor_total?: number
           vendedor_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_blacklist: {
+        Row: {
+          created_at: string | null
+          id: string
+          motivo: string | null
+          telefone: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          telefone: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          telefone?: string
         }
         Relationships: []
       }
