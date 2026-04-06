@@ -7,6 +7,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Column mapping: source_col -> dest_col per table
+const COLUMN_MAPPINGS: Record<string, Record<string, string>> = {
+  clientes: { telefone: "whatsapp" },
+};
+
+function mapRecord(table: string, record: any): any {
+  const mapping = COLUMN_MAPPINGS[table];
+  if (!mapping) return record;
+  const mapped: any = {};
+  for (const [key, value] of Object.entries(record)) {
+    const destKey = mapping[key] || key;
+    mapped[destKey] = value;
+  }
+  return mapped;
+}
+
 // All tables to sync
 const SYNC_TABLES = [
   "clientes", "vendas", "venda_itens", "cobrancas", "cobranca_pagamentos",
