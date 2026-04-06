@@ -9,6 +9,11 @@ const corsHeaders = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = Math.floor(Math.random() * (max - min + 1) + min) * 1000;
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function formatDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -451,6 +456,11 @@ Deno.serve(async (req) => {
           `${dedupPrefix}_${entry.cobrancaId}_${entry.date}`
         );
         if (ok) notifCount++;
+      }
+
+      // Anti-ban: delay 15-30s between WhatsApp sends
+      if (enviado && entriesToProcess.indexOf(entry) < entriesToProcess.length - 1) {
+        await randomDelay(15, 30);
       }
     }
 
