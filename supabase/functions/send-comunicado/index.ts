@@ -81,7 +81,12 @@ Deno.serve(async (req) => {
       }
 
       const { mensagem, formato, media_url } = body;
-      const finalMsg = (mensagem || "").replace(/\{\{nome\}\}/gi, test_name || "Cliente");
+      const finalMsg = (mensagem || "")
+        .replace(/\{\{nome\}\}/gi, test_name || "Cliente")
+        .replace(/\{\{nome_completo\}\}/gi, test_name || "Cliente Teste")
+        .replace(/\{\{cpf\}\}/gi, "000.000.000-00")
+        .replace(/\{\{telefone\}\}/gi, test_phone)
+        .replace(/\{\{email\}\}/gi, "teste@email.com");
 
       let success = false;
       if (formato === "midia" && media_url) {
