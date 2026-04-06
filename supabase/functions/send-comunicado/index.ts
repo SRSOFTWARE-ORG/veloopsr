@@ -81,7 +81,12 @@ Deno.serve(async (req) => {
       }
 
       const { mensagem, formato, media_url } = body;
-      const finalMsg = (mensagem || "").replace(/\{\{nome\}\}/gi, test_name || "Cliente");
+      const finalMsg = (mensagem || "")
+        .replace(/\{\{nome\}\}/gi, test_name || "Cliente")
+        .replace(/\{\{nome_completo\}\}/gi, test_name || "Cliente Teste")
+        .replace(/\{\{cpf\}\}/gi, "000.000.000-00")
+        .replace(/\{\{telefone\}\}/gi, test_phone)
+        .replace(/\{\{email\}\}/gi, "teste@email.com");
 
       let success = false;
       if (formato === "midia" && media_url) {
@@ -129,10 +134,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all clients with phone
+    // Get all clients with phone (include extra fields for template variables)
     const { data: clientes } = await serviceClient
       .from("clientes")
-      .select("id, nome, telefone")
+      .select("id, nome, telefone, cpf, email")
       .not("telefone", "is", null);
 
     if (!clientes || clientes.length === 0) {
@@ -190,14 +195,14 @@ Deno.serve(async (req) => {
 
     // Deduplicate by sanitized phone
     const seen = new Set<string>();
-    const recipients: { id: string; nome: string; telefone: string; sanitized: string }[] = [];
+    const recipients: { id: string; nome: string; telefone: string; sanitized: string; cpf: string | null; email: string | null }[] = [];
 
     for (const c of clientes) {
       const sanitized = sanitizePhone(c.telefone || "");
       if (!sanitized || seen.has(sanitized) || blackSet.has(sanitized)) continue;
       if (allowedClientIds && !allowedClientIds.has(c.id)) continue;
       seen.add(sanitized);
-      recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized });
+      recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized, cpf: c.cpf || null, email: c.email || null });
     }
 
     // Update comunicado status
@@ -228,7 +233,12 @@ Deno.serve(async (req) => {
 
     for (const r of recipients) {
       const firstName = r.nome.split(" ")[0];
-      const finalMsg = comunicado.mensagem.replace(/\{\{nome\}\}/gi, firstName);
+      const finalMsg = comunicado.mensagem
+        .replace(/\{\{nome\}\}/gi, firstName)
+        .replace(/\{\{nome_completo\}\}/gi, r.nome)
+        .replace(/\{\{cpf\}\}/gi, r.cpf || "")
+        .replace(/\{\{telefone\}\}/gi, r.telefone || "")
+        .replace(/\{\{email\}\}/gi, r.email || "");
 
       let success = false;
       let erro = "";
