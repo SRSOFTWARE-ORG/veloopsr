@@ -7,7 +7,7 @@ const cardBaseStyle = {
   transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease',
 };
 const cardHoverStyle = {
-  transform: 'perspective(800px) rotateX(2deg) rotateY(-2deg) scale(1.03) translateY(-4px)',
+  transform: 'scale(1.03) translateY(-4px)',
   boxShadow: '0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)',
 };
 
