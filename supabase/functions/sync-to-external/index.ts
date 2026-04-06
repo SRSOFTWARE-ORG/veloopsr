@@ -7,6 +7,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Column mapping: source_col -> dest_col per table
+const COLUMN_MAPPINGS: Record<string, Record<string, string>> = {
+  clientes: { telefone: "whatsapp" },
+};
+
+function mapRecord(table: string, record: any): any {
+  const mapping = COLUMN_MAPPINGS[table];
+  if (!mapping) return record;
+  const mapped: any = {};
+  for (const [key, value] of Object.entries(record)) {
+    const destKey = mapping[key] || key;
+    mapped[destKey] = value;
+  }
+  return mapped;
+}
+
 // All tables to sync
 const SYNC_TABLES = [
   "clientes", "vendas", "venda_itens", "cobrancas", "cobranca_pagamentos",
@@ -133,6 +149,9 @@ Deno.serve(async (req) => {
           let synced = 0;
           let errors = 0;
 
+          // Apply column mappings
+          allData = allData.map((row: any) => mapRecord(tableName, row));
+
           for (let i = 0; i < allData.length; i += 200) {
             const batch = allData.slice(i, i + 200);
             const dataToSend = allowedColumns 
@@ -236,10 +255,11 @@ async function syncSingleRecord(
       return { success: true, action: "deleted", table };
     }
 
-    // INSERT or UPDATE -> upsert
+    // INSERT or UPDATE -> upsert with column mapping
+    const mappedRecord = mapRecord(table, record);
     const { error } = await externalClient
       .from(table)
-      .upsert(record, { onConflict: "id" });
+      .upsert(mappedRecord, { onConflict: "id" });
     if (error) throw error;
     return { success: true, action: eventType?.toLowerCase() || "upserted", table };
   } catch (e: any) {
