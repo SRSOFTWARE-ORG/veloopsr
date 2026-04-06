@@ -260,6 +260,34 @@ Deno.serve(async (req) => {
       detalhes: { total: recipients.length, enviados, falhas },
     });
 
+    // Dispatch webhook to n8n with full campaign data
+    const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
+    if (n8nUrl) {
+      try {
+        const clientesList = recipients.map((r) => ({
+          nome: r.nome,
+          telefone: r.sanitized,
+        }));
+        await fetch(n8nUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "comunicado_enviado",
+            comunicado_id,
+            titulo: comunicado.titulo,
+            mensagem: comunicado.mensagem,
+            formato: comunicado.formato,
+            clientes: clientesList,
+            resultado: { total: recipients.length, enviados, falhas },
+            timestamp: new Date().toISOString(),
+            source: "veloop",
+          }),
+        });
+      } catch (e) {
+        console.error("[Webhook n8n] Error:", e);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, total: recipients.length, enviados, falhas }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
