@@ -9,6 +9,11 @@ const corsHeaders = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function randomDelay(min: number, max: number): Promise<void> {
+  const ms = Math.floor(Math.random() * (max - min + 1) + min) * 1000;
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function formatDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
