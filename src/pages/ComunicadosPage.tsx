@@ -114,43 +114,75 @@ export default function ComunicadosPage() {
     }
     setLoadingFilter(true);
     try {
-      // Get clients with pending/overdue payments
       const { data: pagamentos } = await supabase
         .from("cobranca_pagamentos")
         .select("cobranca_id, status, data_vencimento");
 
       const { data: cobrancas } = await supabase
         .from("cobrancas")
-        .select("id, cliente_id");
+        .select("id, cliente_id, data_inicio, data_fim, frequencia");
 
       const { data: clientes } = await supabase
         .from("clientes")
         .select("id")
         .not("telefone", "is", null);
 
-      if (!pagamentos || !cobrancas || !clientes) {
+      if (!cobrancas || !clientes) {
         setFilteredCount(0);
         setLoadingFilter(false);
         return;
       }
 
-      const cobrancaToCliente = new Map(cobrancas.map(c => [c.id, c.cliente_id]));
       const clienteIds = new Set(clientes.map(c => c.id));
       const hoje = new Date().toISOString().split("T")[0];
 
-      // Categorize clients
+      // Build a map of existing payment statuses
+      const statusMap = new Map<string, string>();
+      for (const p of (pagamentos || [])) {
+        statusMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
+      }
+
+      // Project dates helper
+      function addMonths(date: Date, months: number): Date {
+        const next = new Date(date);
+        const originalDay = next.getUTCDate();
+        next.setUTCDate(1);
+        next.setUTCMonth(next.getUTCMonth() + months);
+        const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+        next.setUTCDate(Math.min(originalDay, lastDay));
+        return next;
+      }
+
+      function generateDates(inicio: string, fim: string, freq: string): string[] {
+        const start = new Date(`${inicio}T00:00:00Z`);
+        const end = new Date(`${fim}T00:00:00Z`);
+        const dates: string[] = [];
+        let cur = new Date(start);
+        while (cur <= end) {
+          dates.push(cur.toISOString().slice(0, 10));
+          if (freq === "semana") cur = new Date(cur.getTime() + 7 * 86400000);
+          else if (freq === "quinzena") cur = new Date(cur.getTime() + 15 * 86400000);
+          else cur = addMonths(cur, 1);
+        }
+        return dates;
+      }
+
+      // Categorize clients using projected dates
       const clientesComPendente = new Set<string>();
       const clientesComAtraso = new Set<string>();
-      const clientesComPagamento = new Set<string>();
+      const clientesComCobranca = new Set<string>();
 
-      for (const p of pagamentos) {
-        const clienteId = cobrancaToCliente.get(p.cobranca_id);
-        if (!clienteId || !clienteIds.has(clienteId)) continue;
-        clientesComPagamento.add(clienteId);
-        if (p.status === "a_pagar" || p.status === "pendente") {
-          clientesComPendente.add(clienteId);
-          if (p.data_vencimento < hoje) {
-            clientesComAtraso.add(clienteId);
+      for (const cob of cobrancas) {
+        if (!clienteIds.has(cob.cliente_id)) continue;
+        const dates = generateDates(cob.data_inicio, cob.data_fim, cob.frequencia);
+        for (const date of dates) {
+          const key = `${cob.id}_${date}`;
+          const status = statusMap.get(key) || "a_pagar";
+          if (status === "pago" || status === "isento") continue;
+          clientesComCobranca.add(cob.cliente_id);
+          clientesComPendente.add(cob.cliente_id);
+          if (date < hoje) {
+            clientesComAtraso.add(cob.cliente_id);
           }
         }
       }
@@ -161,8 +193,10 @@ export default function ComunicadosPage() {
       } else if (filtroDestinatarios === "com_atraso") {
         count = clientesComAtraso.size;
       } else if (filtroDestinatarios === "em_dia") {
-        // Clients who have payments but none pending
-        count = Array.from(clientesComPagamento).filter(id => !clientesComPendente.has(id)).length;
+        count = Array.from(clienteIds).filter(id => {
+          // Has at least one cobranca but no pending dates
+          return clientesComCobranca.has(id) && !clientesComPendente.has(id);
+        }).length;
       }
       setFilteredCount(count);
     } catch {
