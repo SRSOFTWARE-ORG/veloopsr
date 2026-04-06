@@ -36,6 +36,85 @@ const SYNC_TABLES = [
   "google_calendar_tokens", "push_subscriptions",
 ];
 
+// Cache for external table columns
+const externalColumnsCache: Record<string, Set<string> | null> = {};
+
+async function getExternalColumns(
+  baseUrl: string,
+  apiKey: string,
+  table: string,
+): Promise<Set<string> | null> {
+  if (table in externalColumnsCache) return externalColumnsCache[table];
+  try {
+    const url = `${baseUrl}/rest/v1/${table}?limit=0`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept-Profile": EXTERNAL_SCHEMA,
+      },
+    });
+    if (!res.ok) {
+      await res.text();
+      externalColumnsCache[table] = null;
+      return null;
+    }
+    await res.text();
+    const cols = res.headers.get("content-profile-columns") || "";
+    // PostgREST doesn't return columns in headers, so we use OPTIONS/columns endpoint
+    const optRes = await fetch(`${baseUrl}/rest/v1/${table}?select=*&limit=0`, {
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept-Profile": EXTERNAL_SCHEMA,
+        "Accept": "application/json",
+        "Prefer": "count=exact",
+      },
+    });
+    if (!optRes.ok) {
+      await optRes.text();
+      externalColumnsCache[table] = null;
+      return null;
+    }
+    const optBody = await optRes.text();
+    // Try to detect columns from an empty array response or headers
+    // Alternative: use OpenAPI endpoint
+    const apiRes = await fetch(`${baseUrl}/rest/v1/?select`, {
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept-Profile": EXTERNAL_SCHEMA,
+      },
+    });
+    if (apiRes.ok) {
+      const apiData = await apiRes.json();
+      if (apiData.definitions?.[table]?.properties) {
+        const colSet = new Set<string>(Object.keys(apiData.definitions[table].properties));
+        externalColumnsCache[table] = colSet;
+        return colSet;
+      }
+    } else {
+      await apiRes.text();
+    }
+    externalColumnsCache[table] = null;
+    return null;
+  } catch {
+    externalColumnsCache[table] = null;
+    return null;
+  }
+}
+
+function filterColumns(data: any[], columns: Set<string>): any[] {
+  return data.map((row) => {
+    const filtered: any = {};
+    for (const [key, value] of Object.entries(row)) {
+      if (columns.has(key)) filtered[key] = value;
+    }
+    return filtered;
+  });
+}
+
 // Direct REST upsert to external Supabase using custom schema header
 async function restUpsert(
   baseUrl: string,
@@ -43,6 +122,10 @@ async function restUpsert(
   table: string,
   data: any[],
 ): Promise<{ ok: boolean; error?: string }> {
+  // Auto-detect and filter columns
+  const extCols = await getExternalColumns(baseUrl, apiKey, table);
+  const finalData = extCols ? filterColumns(data, extCols) : data;
+
   const url = `${baseUrl}/rest/v1/${table}`;
   const res = await fetch(url, {
     method: "POST",
@@ -53,12 +136,13 @@ async function restUpsert(
       "Content-Profile": EXTERNAL_SCHEMA,
       "Prefer": "resolution=merge-duplicates",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(finalData),
   });
   if (!res.ok) {
     const body = await res.text();
     return { ok: false, error: `${res.status}: ${body}` };
   }
+  await res.text();
   return { ok: true };
 }
 
