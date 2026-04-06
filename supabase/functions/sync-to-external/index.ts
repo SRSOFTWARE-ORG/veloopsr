@@ -255,10 +255,11 @@ async function syncSingleRecord(
       return { success: true, action: "deleted", table };
     }
 
-    // INSERT or UPDATE -> upsert
+    // INSERT or UPDATE -> upsert with column mapping
+    const mappedRecord = mapRecord(table, record);
     const { error } = await externalClient
       .from(table)
-      .upsert(record, { onConflict: "id" });
+      .upsert(mappedRecord, { onConflict: "id" });
     if (error) throw error;
     return { success: true, action: eventType?.toLowerCase() || "upserted", table };
   } catch (e: any) {
