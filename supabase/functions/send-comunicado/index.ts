@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json();
-    const { comunicado_id, test_phone, test_name } = body;
+    const { comunicado_id, test_phone, test_name, filtro } = body;
 
     const isTest = !!test_phone;
 
@@ -142,6 +142,45 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Apply payment status filter if specified
+    let allowedClientIds: Set<string> | null = null;
+    if (filtro && filtro !== "todos") {
+      const { data: cobrancas } = await serviceClient.from("cobrancas").select("id, cliente_id");
+      const { data: pagamentos } = await serviceClient.from("cobranca_pagamentos").select("cobranca_id, status, data_vencimento");
+
+      if (cobrancas && pagamentos) {
+        const cobrancaToCliente = new Map(cobrancas.map((c: any) => [c.id, c.cliente_id]));
+        const hoje = new Date().toISOString().split("T")[0];
+
+        const clientesComPendente = new Set<string>();
+        const clientesComAtraso = new Set<string>();
+        const clientesComPagamento = new Set<string>();
+
+        for (const p of pagamentos) {
+          const clienteId = cobrancaToCliente.get(p.cobranca_id);
+          if (!clienteId) continue;
+          clientesComPagamento.add(clienteId);
+          if (p.status === "a_pagar" || p.status === "pendente") {
+            clientesComPendente.add(clienteId);
+            if (p.data_vencimento < hoje) {
+              clientesComAtraso.add(clienteId);
+            }
+          }
+        }
+
+        allowedClientIds = new Set<string>();
+        if (filtro === "com_pendentes") {
+          clientesComPendente.forEach(id => allowedClientIds!.add(id));
+        } else if (filtro === "com_atraso") {
+          clientesComAtraso.forEach(id => allowedClientIds!.add(id));
+        } else if (filtro === "em_dia") {
+          clientesComPagamento.forEach(id => {
+            if (!clientesComPendente.has(id)) allowedClientIds!.add(id);
+          });
+        }
+      }
+    }
+
     // Get blacklist
     const { data: blacklist } = await serviceClient
       .from("whatsapp_blacklist")
@@ -156,6 +195,7 @@ Deno.serve(async (req) => {
     for (const c of clientes) {
       const sanitized = sanitizePhone(c.telefone || "");
       if (!sanitized || seen.has(sanitized) || blackSet.has(sanitized)) continue;
+      if (allowedClientIds && !allowedClientIds.has(c.id)) continue;
       seen.add(sanitized);
       recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized });
     }
