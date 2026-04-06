@@ -147,28 +147,58 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Apply payment status filter if specified
+    // Apply payment status filter using projected dates (same logic as agenda)
     let allowedClientIds: Set<string> | null = null;
     if (filtro && filtro !== "todos") {
-      const { data: cobrancas } = await serviceClient.from("cobrancas").select("id, cliente_id");
+      const { data: cobrancas } = await serviceClient.from("cobrancas").select("id, cliente_id, data_inicio, data_fim, frequencia");
       const { data: pagamentos } = await serviceClient.from("cobranca_pagamentos").select("cobranca_id, status, data_vencimento");
 
-      if (cobrancas && pagamentos) {
-        const cobrancaToCliente = new Map(cobrancas.map((c: any) => [c.id, c.cliente_id]));
+      if (cobrancas) {
         const hoje = new Date().toISOString().split("T")[0];
+        const DAY = 86400000;
+
+        const statusMap = new Map<string, string>();
+        for (const p of (pagamentos || [])) {
+          statusMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
+        }
+
+        function addMonthsP(date: Date, months: number): Date {
+          const next = new Date(date);
+          const originalDay = next.getUTCDate();
+          next.setUTCDate(1);
+          next.setUTCMonth(next.getUTCMonth() + months);
+          const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+          next.setUTCDate(Math.min(originalDay, lastDay));
+          return next;
+        }
+
+        function genDates(inicio: string, fim: string, freq: string): string[] {
+          const start = new Date(`${inicio}T00:00:00Z`);
+          const end = new Date(`${fim}T00:00:00Z`);
+          const dates: string[] = [];
+          let cur = new Date(start);
+          while (cur <= end) {
+            dates.push(cur.toISOString().slice(0, 10));
+            if (freq === "semana") cur = new Date(cur.getTime() + 7 * DAY);
+            else if (freq === "quinzena") cur = new Date(cur.getTime() + 15 * DAY);
+            else cur = addMonthsP(cur, 1);
+          }
+          return dates;
+        }
 
         const clientesComPendente = new Set<string>();
         const clientesComAtraso = new Set<string>();
-        const clientesComPagamento = new Set<string>();
+        const clientesComCobranca = new Set<string>();
 
-        for (const p of pagamentos) {
-          const clienteId = cobrancaToCliente.get(p.cobranca_id);
-          if (!clienteId) continue;
-          clientesComPagamento.add(clienteId);
-          if (p.status === "a_pagar" || p.status === "pendente") {
-            clientesComPendente.add(clienteId);
-            if (p.data_vencimento < hoje) {
-              clientesComAtraso.add(clienteId);
+        for (const cob of cobrancas) {
+          const dates = genDates(cob.data_inicio, cob.data_fim, cob.frequencia);
+          for (const date of dates) {
+            const status = statusMap.get(`${cob.id}_${date}`) || "a_pagar";
+            if (status === "pago" || status === "isento") continue;
+            clientesComCobranca.add(cob.cliente_id);
+            clientesComPendente.add(cob.cliente_id);
+            if (date < hoje) {
+              clientesComAtraso.add(cob.cliente_id);
             }
           }
         }
@@ -179,7 +209,7 @@ Deno.serve(async (req) => {
         } else if (filtro === "com_atraso") {
           clientesComAtraso.forEach(id => allowedClientIds!.add(id));
         } else if (filtro === "em_dia") {
-          clientesComPagamento.forEach(id => {
+          clientesComCobranca.forEach(id => {
             if (!clientesComPendente.has(id)) allowedClientIds!.add(id);
           });
         }
