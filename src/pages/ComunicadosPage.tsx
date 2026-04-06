@@ -50,10 +50,13 @@ export default function ComunicadosPage() {
   const [mediaUrl, setMediaUrl] = useState("");
   const [agendamento, setAgendamento] = useState("");
   const [testPhone, setTestPhone] = useState("");
+  const [filtroDestinatarios, setFiltroDestinatarios] = useState("todos");
 
   // Data
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [clientCount, setClientCount] = useState(0);
+  const [filteredCount, setFilteredCount] = useState<number | null>(null);
+  const [loadingFilter, setLoadingFilter] = useState(false);
   const [blacklistCount, setBlacklistCount] = useState(0);
   const [sending, setSending] = useState(false);
   const [testSending, setTestSending] = useState(false);
@@ -98,6 +101,74 @@ export default function ComunicadosPage() {
     ]);
     setClientCount(cc || 0);
     setBlacklistCount(bc || 0);
+  }
+
+  useEffect(() => {
+    loadFilteredCount();
+  }, [filtroDestinatarios]);
+
+  async function loadFilteredCount() {
+    if (filtroDestinatarios === "todos") {
+      setFilteredCount(null);
+      return;
+    }
+    setLoadingFilter(true);
+    try {
+      // Get clients with pending/overdue payments
+      const { data: pagamentos } = await supabase
+        .from("cobranca_pagamentos")
+        .select("cobranca_id, status, data_vencimento");
+
+      const { data: cobrancas } = await supabase
+        .from("cobrancas")
+        .select("id, cliente_id");
+
+      const { data: clientes } = await supabase
+        .from("clientes")
+        .select("id")
+        .not("telefone", "is", null);
+
+      if (!pagamentos || !cobrancas || !clientes) {
+        setFilteredCount(0);
+        setLoadingFilter(false);
+        return;
+      }
+
+      const cobrancaToCliente = new Map(cobrancas.map(c => [c.id, c.cliente_id]));
+      const clienteIds = new Set(clientes.map(c => c.id));
+      const hoje = new Date().toISOString().split("T")[0];
+
+      // Categorize clients
+      const clientesComPendente = new Set<string>();
+      const clientesComAtraso = new Set<string>();
+      const clientesComPagamento = new Set<string>();
+
+      for (const p of pagamentos) {
+        const clienteId = cobrancaToCliente.get(p.cobranca_id);
+        if (!clienteId || !clienteIds.has(clienteId)) continue;
+        clientesComPagamento.add(clienteId);
+        if (p.status === "a_pagar" || p.status === "pendente") {
+          clientesComPendente.add(clienteId);
+          if (p.data_vencimento < hoje) {
+            clientesComAtraso.add(clienteId);
+          }
+        }
+      }
+
+      let count = 0;
+      if (filtroDestinatarios === "com_pendentes") {
+        count = clientesComPendente.size;
+      } else if (filtroDestinatarios === "com_atraso") {
+        count = clientesComAtraso.size;
+      } else if (filtroDestinatarios === "em_dia") {
+        // Clients who have payments but none pending
+        count = [...clientesComPagamento].filter(id => !clientesComPendente.has(id)).length;
+      }
+      setFilteredCount(count);
+    } catch {
+      setFilteredCount(0);
+    }
+    setLoadingFilter(false);
   }
 
   async function loadDestinatarios(cId: string) {
@@ -171,7 +242,7 @@ export default function ComunicadosPage() {
       loadComunicados();
 
       supabase.functions.invoke("send-comunicado", {
-        body: { comunicado_id: (com as any).id },
+        body: { comunicado_id: (com as any).id, filtro: filtroDestinatarios },
       }).then(({ data, error }) => {
         if (error) console.error("send-comunicado error:", error);
         else console.log("send-comunicado result:", data);
@@ -192,6 +263,8 @@ export default function ComunicadosPage() {
     setFormato("texto");
     setMediaUrl("");
     setAgendamento("");
+    setFiltroDestinatarios("todos");
+    setFilteredCount(null);
   }
 
   async function handleDelete(id: string) {
