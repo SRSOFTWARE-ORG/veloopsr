@@ -159,12 +159,23 @@ const NotificationBell = () => {
 
   const startTestNotification = () => {
     if (testCountdown !== null || !user) return;
+
+    // Fallback: alert if push not enabled
+    if (!pushSubscribed) {
+      const shouldContinue = window.confirm(
+        "⚠️ Notificações Push não estão ativadas!\n\n" +
+        "Você receberá apenas a notificação interna (sino). " +
+        "Para receber notificações no celular/navegador, ative o Push acima.\n\n" +
+        "Deseja enviar o teste mesmo assim?"
+      );
+      if (!shouldContinue) return;
+    }
+
     setTestCountdown(10);
     const interval = setInterval(() => {
       setTestCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
-          // Send test via edge function (triggers real Web Push + in-app)
           supabase.functions.invoke("send-test-push").then(({ error }) => {
             if (error) console.error("Test push error:", error);
           });
