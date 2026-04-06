@@ -226,10 +226,16 @@ Deno.serve(async (req) => {
       valorParcela: number;
       criadoPor: string;
       date: string;
-      tipo: "D-3" | "D-1" | "D0";
+      tipo: "D-3" | "D-1" | "D0" | "D+1";
     }
 
     const entriesToProcess: ProcessEntry[] = [];
+
+    // D+1 activation date: only send regularization from 2026-04-09 onwards
+    const D1_ACTIVATION_DATE = "2026-04-09";
+
+    const yesterdayDate = new Date(now.getTime() - DAY_MS);
+    const yesterdayStr = formatDateOnly(yesterdayDate);
 
     for (const cob of cobrancas || []) {
       const dates = generateProjectedDates(cob.data_inicio, cob.data_fim, cob.frequencia);
@@ -244,10 +250,12 @@ Deno.serve(async (req) => {
         const threeDaysAhead = new Date(now.getTime() + 3 * DAY_MS);
         const threeDaysStr = formatDateOnly(threeDaysAhead);
 
-        let tipo: "D-3" | "D-1" | "D0" | null = null;
+        let tipo: "D-3" | "D-1" | "D0" | "D+1" | null = null;
         if (date === threeDaysStr) tipo = "D-3";
         else if (date === tomorrowStr) tipo = "D-1";
         else if (date === todayStr) tipo = "D0";
+        // D+1: venceu ontem e ainda não pago (ativar a partir de 09/04/2026)
+        else if (date === yesterdayStr && todayStr >= D1_ACTIVATION_DATE) tipo = "D+1";
 
         if (!tipo) continue;
 
