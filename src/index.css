@@ -81,29 +81,25 @@
   .stat-card {
     @apply bg-card rounded-xl p-4 border border-border/60 w-full min-w-0 overflow-hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+    transition: box-shadow 0.25s ease;
   }
   .stat-card:hover {
-    transform: scale(1.03) translateY(-4px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
   }
   .stat-card:active {
-    transform: scale(0.97);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
   }
 
   .quick-action-btn {
     @apply flex flex-col items-center justify-center gap-2 rounded-xl bg-card border border-border/60 p-5 text-sm font-semibold cursor-pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+    transition: box-shadow 0.25s ease;
   }
   .quick-action-btn:hover {
-    transform: scale(1.03) translateY(-4px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
   }
   .quick-action-btn:active {
-    transform: scale(0.97);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
   }
 
   .page-container {
@@ -178,14 +174,13 @@ html, body, #root {
 .delay-5 { animation-delay: 300ms; }
 .delay-6 { animation-delay: 360ms; }
 
-/* 3D zoom button effect */
+/* Flat button effect */
 .btn-3d {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  transition: box-shadow 0.25s ease;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
 }
 .btn-3d:hover, .btn-3d:active {
-  transform: scale(1.06) translateY(-2px);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
 }
 
 /* Tab animation */
