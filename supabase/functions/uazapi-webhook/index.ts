@@ -328,11 +328,52 @@ async function notifyAdmins(supabase: any, phone: string, message: string) {
   } catch (e) { console.warn("notifyAdmins error:", e); }
 }
 
+// ─── CPF/CNPJ Validation ───
+
+function isValidCpf(cpf: string): boolean {
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false; // all same digits
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+  let check = 11 - (sum % 11);
+  if (check >= 10) check = 0;
+  if (parseInt(digits[9]) !== check) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+  check = 11 - (sum % 11);
+  if (check >= 10) check = 0;
+  return parseInt(digits[10]) === check;
+}
+
+function isValidCnpj(cnpj: string): boolean {
+  const digits = cnpj.replace(/\D/g, "");
+  if (digits.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(digits)) return false;
+  const weights1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(digits[i]) * weights1[i];
+  let check = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  if (parseInt(digits[12]) !== check) return false;
+  const weights2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+  sum = 0;
+  for (let i = 0; i < 13; i++) sum += parseInt(digits[i]) * weights2[i];
+  check = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+  return parseInt(digits[13]) === check;
+}
+
+function isValidCpfOrCnpj(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11) return isValidCpf(digits);
+  if (digits.length === 14) return isValidCnpj(digits);
+  return false;
+}
+
 // ─── CPF lookup (with or without punctuation) ───
 
 async function lookupClienteByCpf(supabase: any, rawCpf: string) {
   const digits = rawCpf.replace(/\D/g, "");
-  if (digits.length !== 11 && digits.length !== 14) return null;
+  if (!isValidCpfOrCnpj(digits)) return null;
   const { data: c1 } = await supabase.from("clientes").select("id, nome, cpf").eq("cpf", rawCpf.trim()).maybeSingle();
   if (c1) return c1;
   if (digits.length === 11) {
@@ -551,7 +592,7 @@ Deno.serve(async (req) => {
       await saveMessage(supabase, conv.id, "user", messageContent);
 
       const cpfDigits = messageContent.replace(/\D/g, "");
-      if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      if (!isValidCpfOrCnpj(cpfDigits)) {
         const reply = BOT_PREFIX + "Por favor, envie um *CPF válido* para eu consultar seu financeiro. 📄";
         await sendWhatsApp(phone, reply);
         await saveMessage(supabase, conv.id, "assistant", reply);
@@ -580,7 +621,7 @@ Deno.serve(async (req) => {
     // ─── STAGE: AWAITING CPF (payment flow) ───
     if (conv.stage === "awaiting_cpf_payment") {
       const cpfDigits = messageContent.replace(/\D/g, "");
-      if (cpfDigits.length === 11 || cpfDigits.length === 14) {
+      if (isValidCpfOrCnpj(cpfDigits)) {
         const cliente = await lookupClienteByCpf(supabase, messageContent);
         let reply: string;
         if (!cliente) {
@@ -765,9 +806,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ─── DIRECT CPF FALLBACK ───
+    // ─── DIRECT CPF FALLBACK (only valid CPF/CNPJ, not phone numbers) ───
     const directCpfDigits = messageContent.replace(/\D/g, "");
-    if (conv.stage === "idle" && (directCpfDigits.length === 11 || directCpfDigits.length === 14)) {
+    if (conv.stage === "idle" && isValidCpfOrCnpj(directCpfDigits)) {
       await saveMessage(supabase, conv.id, "user", messageContent);
 
       try {
