@@ -11,12 +11,29 @@ export function usePushNotifications() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
 
+  // Sync permission state continuously
   useEffect(() => {
     const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     setIsSupported(supported);
-    if (supported) {
-      setPermission(Notification.permission);
-    }
+    if (!supported) return;
+
+    setPermission(Notification.permission);
+
+    // Listen to permission changes via the Permissions API
+    let cleanup: (() => void) | undefined;
+    navigator.permissions?.query({ name: "notifications" }).then((status) => {
+      const onChange = () => {
+        setPermission(status.state as NotificationPermission);
+        // If permission was revoked, mark as unsubscribed
+        if (status.state === "denied") {
+          setIsSubscribed(false);
+        }
+      };
+      status.addEventListener("change", onChange);
+      cleanup = () => status.removeEventListener("change", onChange);
+    }).catch(() => {});
+
+    return () => cleanup?.();
   }, []);
 
   // Check existing FCM token in database
@@ -29,7 +46,9 @@ export function usePushNotifications() {
       .eq("user_id", user.id)
       .limit(1)
       .then(({ data }) => {
-        setIsSubscribed(!!(data && data.length > 0));
+        const hasToken = !!(data && data.length > 0);
+        // Only mark as subscribed if we have a token AND permission is granted
+        setIsSubscribed(hasToken && Notification.permission === "granted");
       });
   }, [isSupported, user]);
 
@@ -40,7 +59,6 @@ export function usePushNotifications() {
     let unsubscribe: (() => void) | undefined;
     onFCMMessage((payload) => {
       console.log("[FCM] Foreground message:", payload);
-      // Foreground notifications are handled by NotificationBell via realtime
     }).then((unsub) => {
       if (typeof unsub === "function") unsubscribe = unsub;
     });
@@ -51,12 +69,23 @@ export function usePushNotifications() {
   const subscribe = useCallback(async () => {
     if (!isSupported || !user) return false;
 
+    // Check if permission is denied — show instructions
+    if (Notification.permission === "denied") {
+      showDeniedAlert();
+      return false;
+    }
+
     try {
       const perm = await Notification.requestPermission();
       setPermission(perm);
-      if (perm !== "granted") return false;
+      if (perm !== "granted") {
+        if (perm === "denied") {
+          showDeniedAlert();
+        }
+        return false;
+      }
 
-      // Get FCM token using Firebase's dedicated messaging service worker scope
+      // Get FCM token
       const fcmToken = await getFCMToken(VAPID_KEY);
       if (!fcmToken) {
         console.error("Failed to get FCM token");
@@ -67,8 +96,8 @@ export function usePushNotifications() {
       await supabase.from("push_subscriptions").upsert(
         {
           user_id: user.id,
-          endpoint: fcmToken, // FCM token stored as endpoint
-          p256dh: "fcm", // marker to identify FCM tokens
+          endpoint: fcmToken,
+          p256dh: "fcm",
           auth: "fcm",
         },
         { onConflict: "user_id,endpoint" }
@@ -86,7 +115,6 @@ export function usePushNotifications() {
     if (!isSupported || !user) return;
 
     try {
-      // Remove all push subscriptions for this user
       await supabase
         .from("push_subscriptions")
         .delete()
@@ -99,4 +127,26 @@ export function usePushNotifications() {
   }, [isSupported, user]);
 
   return { isSupported, isSubscribed, permission, subscribe, unsubscribe };
+}
+
+function showDeniedAlert() {
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  let instructions = "";
+  if (isAndroid) {
+    instructions =
+      "📱 Android:\n1. Toque no ícone de cadeado (🔒) na barra de endereço\n2. Toque em 'Permissões' ou 'Configurações do site'\n3. Ative 'Notificações'\n4. Recarregue a página";
+  } else if (isIOS) {
+    instructions =
+      "📱 iPhone/iPad:\n1. Abra Ajustes > Safari > Notificações\n2. Encontre 'Veloop' e ative as notificações\n3. Volte ao app e recarregue a página";
+  } else {
+    instructions =
+      "💻 Desktop:\n1. Clique no ícone de cadeado (🔒) ao lado da URL\n2. Clique em 'Configurações do site' ou 'Permissões'\n3. Altere 'Notificações' para 'Permitir'\n4. Recarregue a página";
+  }
+
+  alert(
+    "🔔 Notificações Bloqueadas\n\nAs notificações foram bloqueadas no seu navegador. Para reativá-las:\n\n" +
+      instructions
+  );
 }

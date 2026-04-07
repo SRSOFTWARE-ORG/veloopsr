@@ -232,6 +232,9 @@ const NotificationBell = () => {
                   <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <BellRing className="w-3.5 h-3.5" />
                     Push no celular
+                    {pushPermission === "denied" && (
+                      <span className="text-destructive ml-1">(bloqueado)</span>
+                    )}
                   </span>
                   <button
                     onClick={() =>
@@ -240,10 +243,12 @@ const NotificationBell = () => {
                     className={`text-xs px-3 py-1 rounded-full font-medium transition-all ${
                       pushSubscribed
                         ? "bg-primary text-primary-foreground shadow-sm"
+                        : pushPermission === "denied"
+                        ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
                         : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                     }`}
                   >
-                    {pushSubscribed ? "Ativado" : "Ativar"}
+                    {pushSubscribed ? "Ativado" : pushPermission === "denied" ? "Desbloquear" : "Ativar"}
                   </button>
                 </div>
               )}
