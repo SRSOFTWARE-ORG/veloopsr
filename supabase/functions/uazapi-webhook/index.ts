@@ -171,8 +171,33 @@ async function sendWhatsApp(phone: string, message: string) {
       headers: { "Content-Type": "application/json", token },
       body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
     });
-    await res.text();
-    return res.ok;
+    const rawBody = await res.text();
+    let parsedBody: any = null;
+    try {
+      parsedBody = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      parsedBody = rawBody;
+    }
+
+    const statusValue = parsedBody?.status;
+    const hasExplicitError =
+      parsedBody?.error &&
+      parsedBody?.error !== false &&
+      parsedBody?.error !== "false";
+
+    const failed =
+      !res.ok ||
+      hasExplicitError ||
+      statusValue === false ||
+      statusValue === "error" ||
+      statusValue === "ERROR";
+
+    if (failed) {
+      console.error("sendWhatsApp failed:", { status: res.status, body: parsedBody });
+      return false;
+    }
+
+    return true;
   } catch (e) { console.error("sendWhatsApp error:", e); return false; }
 }
 
@@ -785,15 +810,6 @@ Deno.serve(async (req) => {
     }
 
     await notifyAdmins(supabase, phone, isAudioMessage ? `🎤 [Áudio]: ${messageContent}` : messageContent);
-
-    // Forward to n8n
-    const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
-    if (n8nUrl && !n8nUrl.includes("localhost")) {
-      fetch(n8nUrl, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "uazapi_incoming", event, sender, message: messageContent, timestamp: new Date().toISOString() }),
-      }).catch((e) => console.warn("[n8n] error:", e));
-    }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
