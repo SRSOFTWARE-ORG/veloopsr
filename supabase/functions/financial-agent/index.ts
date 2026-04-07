@@ -19,17 +19,12 @@ function formatDate(d: string) {
 }
 
 function isAuthorizedRequest(req: Request) {
-  const expectedToken = Deno.env.get("N8N_CALLBACK_TOKEN");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  const n8nHeaderToken = req.headers.get("x-n8n-token")?.trim();
   const authHeader = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   const apiKeyHeader = req.headers.get("apikey")?.trim();
-
-  const tokenMatches = !!expectedToken && (n8nHeaderToken === expectedToken || authHeader === expectedToken);
   const serviceRoleMatches = !!serviceRoleKey && (authHeader === serviceRoleKey || apiKeyHeader === serviceRoleKey);
 
-  return tokenMatches || serviceRoleMatches;
+  return serviceRoleMatches;
 }
 
 interface WhatsAppSendResult {
@@ -74,10 +69,19 @@ async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSen
       parsedBody = rawBody;
     }
 
-    const errorMessage =
-      parsedBody?.error ||
-      parsedBody?.message ||
-      (!res.ok ? rawBody || `HTTP ${res.status}` : undefined);
+    const statusValue = parsedBody?.status;
+    const hasExplicitError =
+      parsedBody?.error &&
+      parsedBody?.error !== false &&
+      parsedBody?.error !== "false";
+
+    const errorMessage = !res.ok
+      ? parsedBody?.error || parsedBody?.message || rawBody || `HTTP ${res.status}`
+      : hasExplicitError
+      ? String(parsedBody.error)
+      : statusValue === false || statusValue === "error" || statusValue === "ERROR"
+      ? parsedBody?.message || rawBody || "Erro ao enviar WhatsApp"
+      : undefined;
 
     if (!res.ok || errorMessage) {
       console.error("[financial-agent] sendWhatsApp failed:", {
@@ -105,23 +109,10 @@ async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSen
 }
 
 async function notifyN8nHandover(status: string, phone: string, context: Record<string, unknown>) {
-  const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
-  if (!n8nUrl) return;
-  try {
-    await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "lovable_financial_agent",
-        status,
-        phone,
-        context,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch (e) {
-    console.warn("[financial-agent] n8n handover notify error:", e);
-  }
+  void status;
+  void phone;
+  void context;
+  return;
 }
 
 // ─── Financial Intent Keywords ───
@@ -349,10 +340,10 @@ Deno.serve(async (req) => {
           intent,
           should_handle: intent !== "general",
           description: intent === "financial"
-            ? "Assunto financeiro detectado — Lovable deve processar"
+              ? "Assunto financeiro detectado — agente local deve processar"
             : intent === "data"
-            ? "Alteração de dados sensíveis — Lovable deve processar"
-            : "Assunto geral — n8n deve continuar",
+              ? "Alteração de dados sensíveis — agente local deve processar"
+            : "Conversa geral — agente local pode responder normalmente",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -373,7 +364,6 @@ Deno.serve(async (req) => {
         const transitionMsg = "Entendido. Vou acessar os detalhes do seu financeiro agora... 🔍\n\n" +
           "❌ Não consegui localizar seu cadastro automaticamente. " +
           "Por favor, me informe seu *CPF* para que eu possa consultar suas informações.";
-        const cpfRequestDelivery = await sendWhatsApp(fullPhone, transitionMsg);
 
         return new Response(
           JSON.stringify({
@@ -381,22 +371,14 @@ Deno.serve(async (req) => {
             action: "awaiting_cpf",
             message: "Cliente não encontrado, CPF solicitado",
             reply_text: transitionMsg,
-            message_sent: cpfRequestDelivery.ok,
-            delivery_error: cpfRequestDelivery.error,
+            message_sent: false,
+            delivery_error: "delivery_delegated_to_webhook",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Transition message
-      const transitionDelivery = await sendWhatsApp(fullPhone,
-        `Entendido. Vou acessar os detalhes do seu financeiro agora para te passar as informações precisas... 🔍`
-      );
-
-      // Anti-ban delay
-      if (transitionDelivery.ok) {
-        await randomDelay(10, 18);
-      }
+      await randomDelay(10, 18);
 
       const { summary, parcelas, totalPendente } = await fetchFinancialSummary(supabase, cliente.id);
 
@@ -412,15 +394,13 @@ Deno.serve(async (req) => {
         `_Se precisar de algo mais, estou aqui!_ 😊`,
       ].filter(Boolean).join("\n");
 
-      const summaryDelivery = await sendWhatsApp(fullPhone, fullMessage);
-
       // Log
       await supabase.from("audit_log").insert({
         tabela: "financial_agent",
         acao: "consulta_financeira",
         registro_id: cliente.id,
         detalhes: {
-          via: "n8n",
+          via: "whatsapp_local_agent",
           phone: fullPhone,
           total_pendente: totalPendente,
           parcelas_pendentes: parcelas.length,
@@ -445,8 +425,8 @@ Deno.serve(async (req) => {
           total_pendente: totalPendente,
           parcelas_pendentes: parcelas.length,
           reply_text: fullMessage,
-          message_sent: summaryDelivery.ok,
-          delivery_error: summaryDelivery.error,
+          message_sent: false,
+          delivery_error: "delivery_delegated_to_webhook",
           status: "financeiro_concluido",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -487,8 +467,6 @@ Deno.serve(async (req) => {
         `_O pagamento será confirmado automaticamente!_ 🎉`,
       ].join("\n");
 
-      const pixDelivery = await sendWhatsApp(fullPhone, pixMessage);
-
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
         action: "pix_gerado",
         cobranca_id,
@@ -502,8 +480,8 @@ Deno.serve(async (req) => {
           action: "pix_gerado",
           pix_link: pixLink,
           reply_text: pixMessage,
-          message_sent: pixDelivery.ok,
-          delivery_error: pixDelivery.error,
+          message_sent: false,
+          delivery_error: "delivery_delegated_to_webhook",
           status: "financeiro_concluido",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -537,13 +515,12 @@ Deno.serve(async (req) => {
       if (updateError) throw updateError;
 
       const confirmMsg = `✅ *Dados Atualizados!*\n\nO campo *${campo}* do cadastro de *${cliente.nome}* foi atualizado com sucesso.\n\n_Se precisar de mais alguma alteração, é só falar!_ 😊`;
-      const updateDelivery = await sendWhatsApp(fullPhone, confirmMsg);
 
       await supabase.from("audit_log").insert({
         tabela: "clientes",
         acao: "financial_agent_atualizar_dados",
         registro_id: cliente.id,
-        detalhes: { campo, via: "n8n_financial_agent", context_id },
+        detalhes: { campo, via: "whatsapp_local_agent", context_id },
       });
 
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
@@ -559,8 +536,8 @@ Deno.serve(async (req) => {
           action: "dados_atualizados",
           campo,
           reply_text: confirmMsg,
-          message_sent: updateDelivery.ok,
-          delivery_error: updateDelivery.error,
+          message_sent: false,
+          delivery_error: "delivery_delegated_to_webhook",
           status: "financeiro_concluido",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -570,7 +547,6 @@ Deno.serve(async (req) => {
     // ─── ACTION: Handover de volta ao n8n ───
     if (action === "handover_n8n") {
       const exitMsg = "Certo, a parte financeira foi resolvida. Vou te passar de volta para nosso assistente de atendimento para continuar com suas outras dúvidas. 😊";
-      const handoverDelivery = await sendWhatsApp(fullPhone, exitMsg);
 
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
         action: "handover_manual",
@@ -582,8 +558,8 @@ Deno.serve(async (req) => {
           success: true,
           status: "financeiro_concluido",
           reply_text: exitMsg,
-          message_sent: handoverDelivery.ok,
-          delivery_error: handoverDelivery.error,
+            message_sent: false,
+            delivery_error: "delivery_delegated_to_webhook",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
