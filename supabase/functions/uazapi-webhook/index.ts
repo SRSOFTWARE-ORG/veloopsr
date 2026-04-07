@@ -60,6 +60,9 @@ interface FinancialAgentResponse {
   status?: string;
   message?: string;
   error?: string;
+  reply_text?: string;
+  message_sent?: boolean;
+  delivery_error?: string;
 }
 
 async function triggerFinancialAgent(phone: string, message: string, cpf?: string): Promise<FinancialAgentResponse> {
@@ -90,6 +93,43 @@ async function triggerFinancialAgent(phone: string, message: string, cpf?: strin
   }
 
   return payload as FinancialAgentResponse;
+}
+
+async function handleFinancialAgentReply(
+  supabase: any,
+  conversationId: string,
+  phone: string,
+  financialResponse: FinancialAgentResponse,
+) {
+  if (!financialResponse.reply_text) return;
+
+  if (financialResponse.message_sent === false) {
+    console.warn("[Webhook] financial-agent delivery failed, retrying via webhook sender", {
+      phone,
+      action: financialResponse.action,
+      error: financialResponse.delivery_error,
+    });
+
+    const fallbackSent = await sendWhatsApp(phone, financialResponse.reply_text);
+
+    await saveMessage(
+      supabase,
+      conversationId,
+      "system",
+      JSON.stringify({
+        financial_reply_retry: true,
+        action: financialResponse.action,
+        fallback_sent: fallbackSent,
+        delivery_error: financialResponse.delivery_error || null,
+      }),
+    );
+
+    if (!fallbackSent) {
+      throw new Error(financialResponse.delivery_error || "Falha ao enviar resposta financeira");
+    }
+  }
+
+  await saveMessage(supabase, conversationId, "assistant", financialResponse.reply_text);
 }
 
 // ─── AI: Gemini ───
@@ -455,6 +495,7 @@ Deno.serve(async (req) => {
         await updateConversation(supabase, phone, {
           stage: financialResponse.action === "awaiting_cpf" ? "awaiting_cpf" : "idle",
         });
+        await handleFinancialAgentReply(supabase, conv.id, phone, financialResponse);
         await saveMessage(supabase, conv.id, "system", JSON.stringify({ routed_to: "financial-agent", action: financialResponse.action || "consulta_financeira" }));
       } catch (error) {
         console.error("[Webhook] financial-agent CPF error:", error);
@@ -681,6 +722,7 @@ Deno.serve(async (req) => {
         await updateConversation(supabase, phone, {
           stage: financialResponse.action === "awaiting_cpf" ? "awaiting_cpf" : "idle",
         });
+        await handleFinancialAgentReply(supabase, conv.id, phone, financialResponse);
         await saveMessage(supabase, conv.id, "system", JSON.stringify({ routed_to: "financial-agent", action: financialResponse.action || "consulta_financeira" }));
       } catch (error) {
         console.error("[Webhook] financial-agent routing error:", error);
