@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
 
     console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
 
-    const rawEvent = body.event || body.type || body.action || body.EventType || body.eventType || body.data?.event || "unknown";
+    const rawEvent = body.event || body.type || body.action || body.EventType || body.eventType || body.data?.event || body.body?.event || "unknown";
     const rawEventString = typeof rawEvent === "string" ? rawEvent : String(rawEvent?.event || rawEvent?.type || "unknown");
     const normalizedEvent = rawEventString.toLowerCase();
     const event = (
@@ -402,19 +402,48 @@ Deno.serve(async (req) => {
       normalizedEvent === "messages.upsert" || normalizedEvent === "message.upsert"
     ) ? "messages.upsert" : rawEventString;
 
-    const messageId = body.data?.key?.id || body.body?.key?.id || body.key?.id || body.message?.id || body.id || null;
-
-    const sender = body.data?.key?.remoteJid || body.body?.key?.remoteJid || body.key?.remoteJid
-      || body.message?.chatid || body.chat?.wa_chatid || body.sender || body.from || body.remoteJid
-      || (body.chat?.phone ? `${String(body.chat.phone).replace(/\D/g, "")}@s.whatsapp.net` : null)
+    const messageEnvelope = body.data?.messages?.[0]
+      || body.body?.messages?.[0]
+      || body.messages?.[0]
       || null;
 
-    const rawMessageContent = body.data?.message?.conversation
-      || body.data?.message?.extendedTextMessage?.text
-      || body.body?.message?.conversation || body.body?.message?.extendedTextMessage?.text
-      || body.message?.conversation || body.message?.extendedTextMessage?.text
-      || body.message?.content || (typeof body.message === "string" ? body.message : null)
-      || body.text || body.content || null;
+    const keySource = messageEnvelope?.key
+      || body.data?.key
+      || body.body?.key
+      || body.key
+      || body.message?.key
+      || null;
+
+    const messageSource = messageEnvelope?.message
+      || body.data?.message
+      || body.body?.message
+      || body.message
+      || null;
+
+    const messageId = keySource?.id || messageEnvelope?.id || body.message?.id || body.id || null;
+
+    const sender = keySource?.remoteJid
+      || messageEnvelope?.senderPn
+      || messageEnvelope?.cleanedSenderPn
+      || body.message?.chatid
+      || body.chat?.wa_chatid
+      || body.sender
+      || body.from
+      || body.remoteJid
+      || (body.chat?.phone ? `${String(body.chat.phone).replace(/\D/g, "")}@s.whatsapp.net` : null)
+      || (messageEnvelope?.cleanedSenderPn ? `${String(messageEnvelope.cleanedSenderPn).replace(/\D/g, "")}@s.whatsapp.net` : null)
+      || null;
+
+    const rawMessageContent = messageSource?.conversation
+      || messageSource?.extendedTextMessage?.text
+      || messageSource?.imageMessage?.caption
+      || messageSource?.videoMessage?.caption
+      || messageSource?.documentMessage?.caption
+      || messageEnvelope?.text
+      || (typeof messageSource === "string" ? messageSource : null)
+      || body.text
+      || body.content
+      || null;
 
     let messageContent = typeof rawMessageContent === "string" ? rawMessageContent.trim()
       : (rawMessageContent && typeof rawMessageContent === "object"
@@ -422,17 +451,31 @@ Deno.serve(async (req) => {
         : null);
 
     // ─── AUDIO MESSAGE DETECTION ───
-    const audioMessage = body.data?.message?.audioMessage
+    const audioMessage = messageSource?.audioMessage
+      || messageEnvelope?.audioMessage
+      || body.data?.message?.audioMessage
       || body.body?.message?.audioMessage
-      || body.message?.audioMessage || null;
+      || body.message?.audioMessage
+      || null;
     let isAudioMessage = false;
 
-    const fromMeRaw = body.data?.key?.fromMe ?? body.body?.key?.fromMe ?? body.key?.fromMe ?? body.message?.fromMe ?? body.fromMe ?? false;
-    const fromMe = fromMeRaw === true || fromMeRaw === "true" || fromMeRaw === 1 || fromMeRaw === "1";
+    const fromMeRaw = keySource?.fromMe
+      ?? messageEnvelope?.fromMe
+      ?? body.data?.key?.fromMe
+      ?? body.body?.key?.fromMe
+      ?? body.key?.fromMe
+      ?? body.message?.fromMe
+      ?? body.fromMe
+      ?? false;
 
-    const wasSentByApiRaw = body.data?.key?.wasSentByApi ?? body.data?.wasSentByApi ?? body.body?.key?.wasSentByApi
-      ?? body.message?.wasSentByApi ?? body.message?.fromApi ?? body.wasSentByApi ?? false;
-    const wasSentByApi = wasSentByApiRaw === true || wasSentByApiRaw === "true" || wasSentByApiRaw === 1 || wasSentByApiRaw === "1";
+    const wasSentByApiRaw = keySource?.wasSentByApi
+      ?? messageEnvelope?.wasSentByApi
+      ?? body.data?.wasSentByApi
+      ?? body.body?.key?.wasSentByApi
+      ?? body.message?.wasSentByApi
+      ?? body.message?.fromApi
+      ?? body.wasSentByApi
+      ?? false;
 
     // If audio message without text, try to transcribe
     if (!messageContent && audioMessage && !fromMe) {
@@ -719,6 +762,29 @@ Deno.serve(async (req) => {
       const reply = BOT_PREFIX + "Por favor, responda *sim* para confirmar ou *não* para cancelar.";
       await sendWhatsApp(phone, reply);
       await saveMessage(supabase, conv.id, "assistant", reply);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── DIRECT CPF FALLBACK ───
+    const directCpfDigits = messageContent.replace(/\D/g, "");
+    if (conv.stage === "idle" && (directCpfDigits.length === 11 || directCpfDigits.length === 14)) {
+      await saveMessage(supabase, conv.id, "user", messageContent);
+
+      try {
+        const financialResponse = await triggerFinancialAgent(phone, messageContent, messageContent);
+        await updateConversation(supabase, phone, {
+          stage: financialResponse.action === "awaiting_cpf" ? "awaiting_cpf" : "idle",
+        });
+        await handleFinancialAgentReply(supabase, conv.id, phone, financialResponse);
+        await saveMessage(supabase, conv.id, "system", JSON.stringify({ routed_to: "financial-agent", action: financialResponse.action || "consulta_financeira", source: "direct-cpf" }));
+      } catch (error) {
+        console.error("[Webhook] financial-agent direct CPF error:", error);
+        const reply = BOT_PREFIX + "⚠️ Não consegui consultar seu CPF agora. Tente novamente em instantes.";
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+      }
+
+      await notifyAdmins(supabase, phone, messageContent);
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
