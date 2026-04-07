@@ -66,6 +66,7 @@ const NotificationBell = () => {
   const {
     isSupported: pushSupported,
     isSubscribed: pushSubscribed,
+    permission: pushPermission,
     subscribe: pushSubscribe,
     unsubscribe: pushUnsubscribe,
   } = usePushNotifications();
