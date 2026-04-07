@@ -19,17 +19,12 @@ function formatDate(d: string) {
 }
 
 function isAuthorizedRequest(req: Request) {
-  const expectedToken = Deno.env.get("N8N_CALLBACK_TOKEN");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  const n8nHeaderToken = req.headers.get("x-n8n-token")?.trim();
   const authHeader = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   const apiKeyHeader = req.headers.get("apikey")?.trim();
-
-  const tokenMatches = !!expectedToken && (n8nHeaderToken === expectedToken || authHeader === expectedToken);
   const serviceRoleMatches = !!serviceRoleKey && (authHeader === serviceRoleKey || apiKeyHeader === serviceRoleKey);
 
-  return tokenMatches || serviceRoleMatches;
+  return serviceRoleMatches;
 }
 
 interface WhatsAppSendResult {
@@ -74,10 +69,19 @@ async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSen
       parsedBody = rawBody;
     }
 
-    const errorMessage =
-      parsedBody?.error ||
-      parsedBody?.message ||
-      (!res.ok ? rawBody || `HTTP ${res.status}` : undefined);
+    const statusValue = parsedBody?.status;
+    const hasExplicitError =
+      parsedBody?.error &&
+      parsedBody?.error !== false &&
+      parsedBody?.error !== "false";
+
+    const errorMessage = !res.ok
+      ? parsedBody?.error || parsedBody?.message || rawBody || `HTTP ${res.status}`
+      : hasExplicitError
+      ? String(parsedBody.error)
+      : statusValue === false || statusValue === "error" || statusValue === "ERROR"
+      ? parsedBody?.message || rawBody || "Erro ao enviar WhatsApp"
+      : undefined;
 
     if (!res.ok || errorMessage) {
       console.error("[financial-agent] sendWhatsApp failed:", {
@@ -105,23 +109,10 @@ async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSen
 }
 
 async function notifyN8nHandover(status: string, phone: string, context: Record<string, unknown>) {
-  const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
-  if (!n8nUrl) return;
-  try {
-    await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "lovable_financial_agent",
-        status,
-        phone,
-        context,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch (e) {
-    console.warn("[financial-agent] n8n handover notify error:", e);
-  }
+  void status;
+  void phone;
+  void context;
+  return;
 }
 
 // ─── Financial Intent Keywords ───
@@ -349,10 +340,10 @@ Deno.serve(async (req) => {
           intent,
           should_handle: intent !== "general",
           description: intent === "financial"
-            ? "Assunto financeiro detectado — Lovable deve processar"
+              ? "Assunto financeiro detectado — agente local deve processar"
             : intent === "data"
-            ? "Alteração de dados sensíveis — Lovable deve processar"
-            : "Assunto geral — n8n deve continuar",
+              ? "Alteração de dados sensíveis — agente local deve processar"
+            : "Conversa geral — agente local pode responder normalmente",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -420,7 +411,7 @@ Deno.serve(async (req) => {
         acao: "consulta_financeira",
         registro_id: cliente.id,
         detalhes: {
-          via: "n8n",
+          via: "whatsapp_local_agent",
           phone: fullPhone,
           total_pendente: totalPendente,
           parcelas_pendentes: parcelas.length,
@@ -543,7 +534,7 @@ Deno.serve(async (req) => {
         tabela: "clientes",
         acao: "financial_agent_atualizar_dados",
         registro_id: cliente.id,
-        detalhes: { campo, via: "n8n_financial_agent", context_id },
+        detalhes: { campo, via: "whatsapp_local_agent", context_id },
       });
 
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
