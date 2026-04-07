@@ -32,20 +32,75 @@ function isAuthorizedRequest(req: Request) {
   return tokenMatches || serviceRoleMatches;
 }
 
-async function sendWhatsApp(phone: string, message: string) {
+interface WhatsAppSendResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+}
+
+function normalizePhone(phone: string) {
+  const digits = phone.replace(/\D/g, "").replace(/^0+/, "");
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
+function digitsOnly(value?: string | null) {
+  return (value || "").replace(/\D/g, "");
+}
+
+function randomDelay(min: number, max: number) {
+  const ms = Math.floor(Math.random() * (max - min + 1) + min) * 1000;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSendResult> {
   const url = Deno.env.get("UAZAPI_URL");
   const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) return false;
+  if (!url || !token) {
+    return { ok: false, status: 500, error: "UAZAPI_URL ou UAZAPI_TOKEN não configurados" };
+  }
+
   try {
     const res = await fetch(`${url.replace(/\/+$/, "")}/send/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
+      body: JSON.stringify({ number: normalizePhone(phone), text: message, linkPreview: false }),
     });
-    return res.ok;
+
+    const rawBody = await res.text();
+    let parsedBody: any = null;
+    try {
+      parsedBody = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      parsedBody = rawBody;
+    }
+
+    const errorMessage =
+      parsedBody?.error ||
+      parsedBody?.message ||
+      (!res.ok ? rawBody || `HTTP ${res.status}` : undefined);
+
+    if (!res.ok || errorMessage) {
+      console.error("[financial-agent] sendWhatsApp failed:", {
+        status: res.status,
+        error: errorMessage,
+        body: parsedBody,
+      });
+
+      return {
+        ok: false,
+        status: res.status,
+        error: errorMessage,
+      };
+    }
+
+    return { ok: true, status: res.status };
   } catch (e) {
     console.error("[financial-agent] sendWhatsApp error:", e);
-    return false;
+    return {
+      ok: false,
+      status: 500,
+      error: e instanceof Error ? e.message : "Erro desconhecido ao enviar WhatsApp",
+    };
   }
 }
 
@@ -119,10 +174,59 @@ async function lookupClienteByCpf(supabase: any, rawCpf: string) {
 // ─── Lookup by Phone ───
 
 async function lookupClienteByPhone(supabase: any, phone: string) {
-  const last8 = phone.slice(-8);
-  const { data } = await supabase.from("clientes").select("id, nome, cpf, telefone, email")
-    .or(`telefone.ilike.%${last8}%`).limit(1).maybeSingle();
-  return data || null;
+  const digits = digitsOnly(phone);
+  const localDigits = digits.startsWith("55") && digits.length > 11 ? digits.slice(-11) : digits;
+  const local10 = localDigits.slice(-10);
+  const local11 = localDigits.slice(-11);
+
+  const exactCandidates = [
+    phone.trim(),
+    digits,
+    localDigits,
+    local10,
+    local11,
+    local11.length === 11 ? `(${local11.slice(0, 2)}) ${local11.slice(2, 7)}-${local11.slice(7)}` : null,
+    local10.length === 10 ? `(${local10.slice(0, 2)}) ${local10.slice(2, 6)}-${local10.slice(6)}` : null,
+  ].filter(Boolean) as string[];
+
+  for (const candidate of exactCandidates) {
+    const { data } = await supabase
+      .from("clientes")
+      .select("id, nome, cpf, telefone, email")
+      .eq("telefone", candidate)
+      .maybeSingle();
+
+    if (data) return data;
+  }
+
+  const suffixes = [...new Set([
+    local11.slice(-9),
+    local11.slice(-8),
+    local10.slice(-8),
+    local10.slice(-4),
+  ].filter((value) => value && value.length >= 4))];
+
+  for (const suffix of suffixes) {
+    const { data } = await supabase
+      .from("clientes")
+      .select("id, nome, cpf, telefone, email")
+      .ilike("telefone", `%${suffix}%`)
+      .limit(25);
+
+    const match = (data || []).find((cliente: any) => {
+      const clientDigits = digitsOnly(cliente.telefone);
+      return (
+        clientDigits === digits ||
+        clientDigits === localDigits ||
+        clientDigits.endsWith(local11) ||
+        clientDigits.endsWith(local10)
+      );
+    });
+
+    if (match) return match;
+  }
+
+  return null;
 }
 
 // ─── Fetch Financial Summary ───
@@ -269,25 +373,30 @@ Deno.serve(async (req) => {
         const transitionMsg = "Entendido. Vou acessar os detalhes do seu financeiro agora... 🔍\n\n" +
           "❌ Não consegui localizar seu cadastro automaticamente. " +
           "Por favor, me informe seu *CPF* para que eu possa consultar suas informações.";
-        await sendWhatsApp(fullPhone, transitionMsg);
+        const cpfRequestDelivery = await sendWhatsApp(fullPhone, transitionMsg);
 
         return new Response(
           JSON.stringify({
             success: true,
             action: "awaiting_cpf",
             message: "Cliente não encontrado, CPF solicitado",
+            reply_text: transitionMsg,
+            message_sent: cpfRequestDelivery.ok,
+            delivery_error: cpfRequestDelivery.error,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       // Transition message
-      await sendWhatsApp(fullPhone,
+      const transitionDelivery = await sendWhatsApp(fullPhone,
         `Entendido. Vou acessar os detalhes do seu financeiro agora para te passar as informações precisas... 🔍`
       );
 
       // Anti-ban delay
-      await new Promise((r) => setTimeout(r, (Math.random() * 3 + 2) * 1000));
+      if (transitionDelivery.ok) {
+        await randomDelay(10, 18);
+      }
 
       const { summary, parcelas, totalPendente } = await fetchFinancialSummary(supabase, cliente.id);
 
@@ -303,7 +412,7 @@ Deno.serve(async (req) => {
         `_Se precisar de algo mais, estou aqui!_ 😊`,
       ].filter(Boolean).join("\n");
 
-      await sendWhatsApp(fullPhone, fullMessage);
+      const summaryDelivery = await sendWhatsApp(fullPhone, fullMessage);
 
       // Log
       await supabase.from("audit_log").insert({
@@ -335,6 +444,9 @@ Deno.serve(async (req) => {
           cliente: { id: cliente.id, nome: cliente.nome },
           total_pendente: totalPendente,
           parcelas_pendentes: parcelas.length,
+          reply_text: fullMessage,
+          message_sent: summaryDelivery.ok,
+          delivery_error: summaryDelivery.error,
           status: "financeiro_concluido",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -375,7 +487,7 @@ Deno.serve(async (req) => {
         `_O pagamento será confirmado automaticamente!_ 🎉`,
       ].join("\n");
 
-      await sendWhatsApp(fullPhone, pixMessage);
+      const pixDelivery = await sendWhatsApp(fullPhone, pixMessage);
 
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
         action: "pix_gerado",
@@ -385,7 +497,15 @@ Deno.serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ success: true, action: "pix_gerado", pix_link: pixLink, status: "financeiro_concluido" }),
+        JSON.stringify({
+          success: true,
+          action: "pix_gerado",
+          pix_link: pixLink,
+          reply_text: pixMessage,
+          message_sent: pixDelivery.ok,
+          delivery_error: pixDelivery.error,
+          status: "financeiro_concluido",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -417,7 +537,7 @@ Deno.serve(async (req) => {
       if (updateError) throw updateError;
 
       const confirmMsg = `✅ *Dados Atualizados!*\n\nO campo *${campo}* do cadastro de *${cliente.nome}* foi atualizado com sucesso.\n\n_Se precisar de mais alguma alteração, é só falar!_ 😊`;
-      await sendWhatsApp(fullPhone, confirmMsg);
+      const updateDelivery = await sendWhatsApp(fullPhone, confirmMsg);
 
       await supabase.from("audit_log").insert({
         tabela: "clientes",
@@ -434,7 +554,15 @@ Deno.serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ success: true, action: "dados_atualizados", campo, status: "financeiro_concluido" }),
+        JSON.stringify({
+          success: true,
+          action: "dados_atualizados",
+          campo,
+          reply_text: confirmMsg,
+          message_sent: updateDelivery.ok,
+          delivery_error: updateDelivery.error,
+          status: "financeiro_concluido",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -442,7 +570,7 @@ Deno.serve(async (req) => {
     // ─── ACTION: Handover de volta ao n8n ───
     if (action === "handover_n8n") {
       const exitMsg = "Certo, a parte financeira foi resolvida. Vou te passar de volta para nosso assistente de atendimento para continuar com suas outras dúvidas. 😊";
-      await sendWhatsApp(fullPhone, exitMsg);
+      const handoverDelivery = await sendWhatsApp(fullPhone, exitMsg);
 
       await notifyN8nHandover("financeiro_concluido", fullPhone, {
         action: "handover_manual",
@@ -450,7 +578,13 @@ Deno.serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ success: true, status: "financeiro_concluido" }),
+        JSON.stringify({
+          success: true,
+          status: "financeiro_concluido",
+          reply_text: exitMsg,
+          message_sent: handoverDelivery.ok,
+          delivery_error: handoverDelivery.error,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
