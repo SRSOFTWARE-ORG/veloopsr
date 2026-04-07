@@ -592,7 +592,7 @@ Deno.serve(async (req) => {
       await saveMessage(supabase, conv.id, "user", messageContent);
 
       const cpfDigits = messageContent.replace(/\D/g, "");
-      if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      if (!isValidCpfOrCnpj(cpfDigits)) {
         const reply = BOT_PREFIX + "Por favor, envie um *CPF válido* para eu consultar seu financeiro. 📄";
         await sendWhatsApp(phone, reply);
         await saveMessage(supabase, conv.id, "assistant", reply);
@@ -621,7 +621,7 @@ Deno.serve(async (req) => {
     // ─── STAGE: AWAITING CPF (payment flow) ───
     if (conv.stage === "awaiting_cpf_payment") {
       const cpfDigits = messageContent.replace(/\D/g, "");
-      if (cpfDigits.length === 11 || cpfDigits.length === 14) {
+      if (isValidCpfOrCnpj(cpfDigits)) {
         const cliente = await lookupClienteByCpf(supabase, messageContent);
         let reply: string;
         if (!cliente) {

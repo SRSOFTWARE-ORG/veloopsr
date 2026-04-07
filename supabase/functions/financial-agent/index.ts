@@ -142,6 +142,21 @@ async function lookupClienteByCpf(supabase: any, rawCpf: string) {
   const digits = rawCpf.replace(/\D/g, "");
   if (digits.length !== 11 && digits.length !== 14) return null;
 
+  // Validate CPF check digits
+  if (digits.length === 11) {
+    if (/^(\d)\1{10}$/.test(digits)) return null;
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+    let check = 11 - (sum % 11);
+    if (check >= 10) check = 0;
+    if (parseInt(digits[9]) !== check) return null;
+    sum = 0;
+    for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+    check = 11 - (sum % 11);
+    if (check >= 10) check = 0;
+    if (parseInt(digits[10]) !== check) return null;
+  }
+
   const { data: c1 } = await supabase.from("clientes").select("id, nome, cpf, telefone, email")
     .eq("cpf", rawCpf.trim()).maybeSingle();
   if (c1) return c1;
