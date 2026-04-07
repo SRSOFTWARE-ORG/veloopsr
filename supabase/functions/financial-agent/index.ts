@@ -18,6 +18,20 @@ function formatDate(d: string) {
   return `${dd}/${m}/${y}`;
 }
 
+function isAuthorizedRequest(req: Request) {
+  const expectedToken = Deno.env.get("N8N_CALLBACK_TOKEN");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  const n8nHeaderToken = req.headers.get("x-n8n-token")?.trim();
+  const authHeader = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  const apiKeyHeader = req.headers.get("apikey")?.trim();
+
+  const tokenMatches = !!expectedToken && (n8nHeaderToken === expectedToken || authHeader === expectedToken);
+  const serviceRoleMatches = !!serviceRoleKey && (authHeader === serviceRoleKey || apiKeyHeader === serviceRoleKey);
+
+  return tokenMatches || serviceRoleMatches;
+}
+
 async function sendWhatsApp(phone: string, message: string) {
   const url = Deno.env.get("UAZAPI_URL");
   const token = Deno.env.get("UAZAPI_TOKEN");
@@ -180,11 +194,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth: accept n8n token or service role
-    const token = req.headers.get("x-n8n-token") || req.headers.get("authorization")?.replace("Bearer ", "");
-    const expectedToken = Deno.env.get("N8N_CALLBACK_TOKEN");
+    if (!isAuthorizedRequest(req)) {
+      console.warn("[financial-agent] Unauthorized request", {
+        hasN8nToken: !!Deno.env.get("N8N_CALLBACK_TOKEN"),
+        hasServiceRole: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+        authSource: req.headers.get("x-n8n-token")
+          ? "x-n8n-token"
+          : req.headers.get("authorization")
+          ? "authorization"
+          : req.headers.get("apikey")
+          ? "apikey"
+          : "none",
+      });
 
-    if (!expectedToken || !token || token !== expectedToken) {
       return new Response(
         JSON.stringify({ success: false, error: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }

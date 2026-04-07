@@ -27,6 +27,19 @@ function isDuplicate(messageId: string): boolean {
 
 const HUMAN_KEYWORDS = ["atendente", "humano", "pessoa", "suporte"];
 
+const FINANCIAL_KEYWORDS = [
+  "pagamento", "pagar", "parcela", "parcelas", "boleto", "pix", "fatura", "faturas",
+  "devo", "vence", "vencimento", "cobrança", "cobrar", "débito", "debito", "atraso",
+  "renegociar", "renegociação", "renegociacao", "comprovante", "cartão", "cartao",
+  "crédito", "credito", "quanto eu devo", "quando vence", "ver minha fatura",
+  "consultar parcela", "consultar parcelas", "minha parcela", "minhas parcelas",
+];
+
+function isFinancialIntent(message: string): boolean {
+  const lower = message.toLowerCase();
+  return FINANCIAL_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
 function isAdminOnline(phone: string): boolean {
   const last = adminActivity.get(phone);
   return !!last && Date.now() - last < ADMIN_ONLINE_WINDOW_MS;
@@ -39,6 +52,44 @@ function formatCurrency(v: number) {
 function formatDate(d: string) {
   const [y, m, dd] = d.split("-");
   return `${dd}/${m}/${y}`;
+}
+
+interface FinancialAgentResponse {
+  success: boolean;
+  action?: string;
+  status?: string;
+  message?: string;
+  error?: string;
+}
+
+async function triggerFinancialAgent(phone: string, message: string, cpf?: string): Promise<FinancialAgentResponse> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl) throw new Error("SUPABASE_URL não configurada");
+  if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada");
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/financial-agent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({
+      phone,
+      message,
+      cpf,
+      action: "consulta_financeira",
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.error || `financial-agent ${response.status}`);
+  }
+
+  return payload as FinancialAgentResponse;
 }
 
 // ─── AI: Gemini ───
@@ -387,8 +438,38 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, action: "handoff" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ─── STAGE: AWAITING CPF (for payment or invoice lookup) ───
-    if (conv.stage === "awaiting_cpf" || conv.stage === "awaiting_cpf_payment") {
+    // ─── STAGE: AWAITING CPF (financial lookup) ───
+    if (conv.stage === "awaiting_cpf") {
+      await saveMessage(supabase, conv.id, "user", messageContent);
+
+      const cpfDigits = messageContent.replace(/\D/g, "");
+      if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+        const reply = BOT_PREFIX + "Por favor, envie um *CPF válido* para eu consultar seu financeiro. 📄";
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      try {
+        const financialResponse = await triggerFinancialAgent(phone, messageContent, messageContent);
+        await updateConversation(supabase, phone, {
+          stage: financialResponse.action === "awaiting_cpf" ? "awaiting_cpf" : "idle",
+        });
+        await saveMessage(supabase, conv.id, "system", JSON.stringify({ routed_to: "financial-agent", action: financialResponse.action || "consulta_financeira" }));
+      } catch (error) {
+        console.error("[Webhook] financial-agent CPF error:", error);
+        const reply = BOT_PREFIX + "⚠️ Tive uma instabilidade ao consultar seu financeiro agora. Tente novamente em instantes.";
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+      }
+
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── STAGE: AWAITING CPF (payment flow) ───
+    if (conv.stage === "awaiting_cpf_payment") {
       const cpfDigits = messageContent.replace(/\D/g, "");
       if (cpfDigits.length === 11 || cpfDigits.length === 14) {
         const cliente = await lookupClienteByCpf(supabase, messageContent);
@@ -398,15 +479,9 @@ Deno.serve(async (req) => {
           await updateConversation(supabase, phone, { stage: "idle" });
         } else {
           const { text, parcelas } = await fetchPendingInvoices(supabase, cliente.id);
-          if (conv.stage === "awaiting_cpf_payment" && parcelas.length > 0) {
-            // Payment flow: show parcelas and ask which one to pay
+          if (parcelas.length > 0) {
             reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n${text}\n\n💳 *Deseja pagar alguma dessas parcelas?*\nResponda com o *número* da parcela que deseja pagar (ex: *1*)\n\nOu digite *cancelar* para voltar.`;
-            // Store client and parcelas data in conversation for next step
-            await updateConversation(supabase, phone, {
-              stage: "awaiting_payment_choice",
-              // Store data as JSON string - we'll parse it back
-            });
-            // Save parcelas info in a message for context
+            await updateConversation(supabase, phone, { stage: "awaiting_payment_choice" });
             await saveMessage(supabase, conv.id, "system", JSON.stringify({ cliente_id: cliente.id, cliente_nome: cliente.nome, parcelas }));
           } else {
             reply = BOT_PREFIX + `Olá, *${cliente.nome}*! 👋\n\n${text}\n\n💡 _Se desejar pagar alguma parcela antecipadamente, basta digitar *pagar*._`;
@@ -419,7 +494,12 @@ Deno.serve(async (req) => {
         await notifyAdmins(supabase, phone, messageContent);
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      await updateConversation(supabase, phone, { stage: "idle" });
+
+      const reply = BOT_PREFIX + "Por favor, envie um *CPF válido* para continuar o pagamento. 💳";
+      await sendWhatsApp(phone, reply);
+      await saveMessage(supabase, conv.id, "user", messageContent);
+      await saveMessage(supabase, conv.id, "assistant", reply);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ─── STAGE: AWAITING PAYMENT CHOICE (user picks parcela number) ───
@@ -584,6 +664,32 @@ Deno.serve(async (req) => {
       await sendWhatsApp(phone, reply);
       await saveMessage(supabase, conv.id, "user", messageContent);
       await saveMessage(supabase, conv.id, "assistant", reply);
+      await notifyAdmins(supabase, phone, messageContent);
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (conv.stage === "idle" && isFinancialIntent(messageContent)) {
+      await saveMessage(supabase, conv.id, "user", messageContent);
+
+      try {
+        console.log("[Webhook] Routing financial intent to financial-agent", {
+          phone,
+          preview: messageContent.slice(0, 80),
+        });
+
+        const financialResponse = await triggerFinancialAgent(phone, messageContent);
+        await updateConversation(supabase, phone, {
+          stage: financialResponse.action === "awaiting_cpf" ? "awaiting_cpf" : "idle",
+        });
+        await saveMessage(supabase, conv.id, "system", JSON.stringify({ routed_to: "financial-agent", action: financialResponse.action || "consulta_financeira" }));
+      } catch (error) {
+        console.error("[Webhook] financial-agent routing error:", error);
+        const reply = BOT_PREFIX + "⚠️ Não consegui acessar o setor financeiro agora. Tente novamente em instantes ou envie seu *CPF* para eu refazer a consulta.";
+        await updateConversation(supabase, phone, { stage: "idle" });
+        await sendWhatsApp(phone, reply);
+        await saveMessage(supabase, conv.id, "assistant", reply);
+      }
+
       await notifyAdmins(supabase, phone, messageContent);
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
