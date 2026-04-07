@@ -28,6 +28,7 @@ const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
 const HistoricoEnviosPage = lazy(() => import("@/pages/HistoricoEnviosPage"));
 const TransacoesPage = lazy(() => import("@/pages/TransacoesPage"));
 const ComunicadosPage = lazy(() => import("@/pages/ComunicadosPage"));
+const WhatsAppMonitorPage = lazy(() => import("@/pages/WhatsAppMonitorPage"));
 const PixPaymentPage = lazy(() => import("@/pages/PixPaymentPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -256,6 +257,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <ComunicadosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/whatsapp-monitor"
+                      element={
+                        <ProtectedRoute requirePrimaryAdmin>
+                          <WhatsAppMonitorPage />
                         </ProtectedRoute>
                       }
                     />

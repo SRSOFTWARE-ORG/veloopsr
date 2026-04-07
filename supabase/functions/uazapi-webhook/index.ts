@@ -518,6 +518,9 @@ Deno.serve(async (req) => {
       ?? body.wasSentByApi
       ?? false;
 
+    const fromMe = fromMeRaw === true || fromMeRaw === "true";
+    const wasSentByApi = wasSentByApiRaw === true || wasSentByApiRaw === "true";
+
     // If audio message without text, try to transcribe
     if (!messageContent && audioMessage && !fromMe) {
       console.log("[Webhook] Audio message detected, attempting transcription...");
