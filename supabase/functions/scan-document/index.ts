@@ -217,6 +217,72 @@ NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preci
     if (!response.ok) {
       const t = await response.text().catch(() => "");
       console.error("AI error:", response.status, t);
+
+      // Fallback: tenta Gemini API diretamente quando rate-limit/credits
+      const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+      if ((response.status === 402 || response.status === 429) && GEMINI_API_KEY) {
+        try {
+          console.log("[scan-document] Fallback para Gemini direto");
+          const systemPrompt = `Você é um assistente especializado em identificar e extrair ABSOLUTAMENTE TODOS os dados visíveis de documentos financeiros brasileiros (boleto, carnê ou nota fiscal). O nome do arquivo é: "${nome_arquivo}".`;
+          const userPrompt = `Analise este documento e extraia TODOS os dados visíveis (nome, CPF/CNPJ, telefone, endereço completo, valores, datas, parcelas, etc.). Identifique se é boleto, carne ou nota_fiscal.`;
+          const fnDecl = {
+            name: "extract_document_data",
+            description: "Dados extraídos do documento financeiro",
+            parameters: {
+              type: "object",
+              properties: {
+                tipo_documento: { type: "string", enum: ["boleto", "carne", "nota_fiscal"] },
+                cliente_nome: { type: "string" },
+                cliente_cpf: { type: "string" },
+                telefone: { type: "string" },
+                email: { type: "string" },
+                endereco: { type: "string" },
+                complemento: { type: "string" },
+                bairro: { type: "string" },
+                cidade: { type: "string" },
+                uf: { type: "string" },
+                cep: { type: "string" },
+                rg: { type: "string" },
+                rg_emissor: { type: "string" },
+                rg_data_emissao: { type: "string" },
+                data_nascimento: { type: "string" },
+                naturalidade: { type: "string" },
+                estado_civil: { type: "string" },
+                nome_pai: { type: "string" },
+                nome_mae: { type: "string" },
+                tipo: { type: "string" },
+                inscricao_estadual: { type: "string" },
+                valor: { type: "number" },
+                data_vencimento: { type: "string" },
+                numero_documento: { type: "string" },
+                beneficiario: { type: "string" },
+                cliente_telefone: { type: "string" },
+                valor_total: { type: "number" },
+                valor_parcela: { type: "number" },
+                num_parcelas: { type: "number" },
+                data_primeira_parcela: { type: "string" },
+                frequencia: { type: "string", enum: ["semana", "quinzena", "mes"] },
+                valor_entrada: { type: "number" },
+              },
+              required: ["tipo_documento", "cliente_nome"],
+            },
+          };
+          const extracted = await callGeminiDirect({
+            apiKey: GEMINI_API_KEY,
+            systemInstruction: systemPrompt,
+            userText: userPrompt,
+            fileBase64,
+            mimeType,
+            functionDeclaration: fnDecl,
+          });
+          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (fbErr) {
+          console.error("[scan-document] Gemini direct fallback falhou:", fbErr);
+        }
+      }
+
       let errorPayload: { error: string; fallback: boolean };
       if (response.status === 429) {
         errorPayload = { error: "Limite de requisições excedido. Tente novamente em instantes.", fallback: false };
