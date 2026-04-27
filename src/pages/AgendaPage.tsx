@@ -369,11 +369,18 @@ const AgendaPage = () => {
 
   const handleSendWhatsApp = async (cobranca: Cobranca, dateKey: string) => {
     const cliente = clientes.find((c) => c.id === cobranca.cliente_id);
-    const telefone = cliente?.telefone;
+    const rawTelefone = cliente?.telefone;
     const cpf = cliente?.cpf;
 
-    if (!telefone) {
+    if (!rawTelefone) {
       toast.error("Cliente não possui telefone cadastrado");
+      return;
+    }
+
+    const { normalizeBrazilianPhone } = await import("@/lib/phone-utils");
+    const telefone = normalizeBrazilianPhone(rawTelefone);
+    if (!telefone) {
+      toast.error("Telefone do cliente é inválido (use DDD + número)");
       return;
     }
 
