@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // Fallback: chama Gemini API diretamente quando Lovable AI sem créditos.
-// Usa a mesma function-declaration (tools) para extrair JSON estruturado.
+// Inclui retry exponencial em 429/503.
 async function callGeminiDirect(opts: {
   apiKey: string;
   systemInstruction: string;
@@ -15,44 +15,103 @@ async function callGeminiDirect(opts: {
   mimeType: string;
   functionDeclaration: any;
   model?: string;
-}): Promise<any> {
+  maxRetries?: number;
+  fnLabel?: string;
+}): Promise<{ data: any; attempts: number }> {
   const model = opts.model || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${opts.apiKey}`;
   const body = {
     systemInstruction: { parts: [{ text: opts.systemInstruction }] },
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: opts.userText },
-          { inlineData: { mimeType: opts.mimeType, data: opts.fileBase64 } },
-        ],
-      },
-    ],
+    contents: [{ role: "user", parts: [
+      { text: opts.userText },
+      { inlineData: { mimeType: opts.mimeType, data: opts.fileBase64 } },
+    ] }],
     tools: [{ functionDeclarations: [opts.functionDeclaration] }],
-    toolConfig: {
-      functionCallingConfig: { mode: "ANY", allowedFunctionNames: [opts.functionDeclaration.name] },
-    },
+    toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [opts.functionDeclaration.name] } },
   };
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const t = await resp.text().catch(() => "");
-    throw new Error(`Gemini direct error ${resp.status}: ${t}`);
+  const maxRetries = opts.maxRetries ?? 3;
+  const label = opts.fnLabel || "gemini-direct";
+  let attempt = 0;
+  let lastErr: any = null;
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (resp.status === 429 || resp.status === 503) {
+        const t = await resp.text().catch(() => "");
+        const backoff = Math.min(8000, 1000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 400);
+        console.warn(`[${label}] Gemini ${resp.status} tentativa ${attempt}/${maxRetries}, aguardando ${backoff}ms. Body: ${t.slice(0, 200)}`);
+        if (attempt >= maxRetries) throw new Error(`Gemini direct ${resp.status} após ${attempt} tentativas`);
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => "");
+        throw new Error(`Gemini direct error ${resp.status}: ${t.slice(0, 300)}`);
+      }
+      const json = await resp.json();
+      const parts = json?.candidates?.[0]?.content?.parts || [];
+      const fnCall = parts.find((p: any) => p.functionCall)?.functionCall;
+      if (fnCall?.args) return { data: fnCall.args, attempts: attempt };
+      const txt = parts.find((p: any) => p.text)?.text || "";
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) return { data: JSON.parse(m[0]), attempts: attempt };
+      throw new Error("Gemini direct: resposta sem dados estruturados");
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= maxRetries) break;
+    }
   }
-  const json = await resp.json();
-  const parts = json?.candidates?.[0]?.content?.parts || [];
-  const fnCall = parts.find((p: any) => p.functionCall)?.functionCall;
-  if (fnCall?.args) return fnCall.args;
-  // fallback: tentar JSON em texto
-  const txt = parts.find((p: any) => p.text)?.text || "";
-  const m = txt.match(/\{[\s\S]*\}/);
-  if (m) return JSON.parse(m[0]);
-  throw new Error("Gemini direct: resposta sem dados estruturados");
+  throw lastErr ?? new Error("Gemini direct: falha desconhecida");
+}
+
+// Validação simples de schema (campos obrigatórios + tipos esperados)
+function validateExtracted(data: any, required: string[]): { ok: true } | { ok: false; error: string } {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ok: false, error: "Resposta não é um objeto JSON válido" };
+  }
+  for (const k of required) {
+    const v = data[k];
+    if (v === undefined || v === null || v === "" || v === "null") {
+      return { ok: false, error: `Campo obrigatório ausente: ${k}` };
+    }
+  }
+  return { ok: true };
+}
+
+// Loga uma execução do scan no banco (best-effort, não bloqueia resposta)
+async function logScan(entry: {
+  function_name: string;
+  provider: string;
+  status: string;
+  http_status?: number | null;
+  attempts?: number;
+  latency_ms?: number;
+  error_message?: string | null;
+  nome_arquivo?: string | null;
+}) {
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(entry),
+    });
+  } catch (e) {
+    console.error("[logScan] falha:", e);
+  }
 }
 
 serve(async (req) => {
