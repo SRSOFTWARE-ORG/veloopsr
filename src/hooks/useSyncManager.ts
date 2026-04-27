@@ -86,8 +86,14 @@ async function processAction(action: SyncAction) {
     }
     case "whatsapp": {
       toast.info("Enviando WhatsApp pendente...");
+      const { normalizeBrazilianPhone } = await import("@/lib/phone-utils");
+      const normalizedPhone = normalizeBrazilianPhone((payload as any)?.telefone);
+      const mensagem = (payload as any)?.mensagem;
+      if (!normalizedPhone || !mensagem) {
+        throw new Error("Payload WhatsApp inválido: telefone ou mensagem ausente/inválido");
+      }
       const { error } = await supabase.functions.invoke("send-whatsapp-uazapi", {
-        body: payload,
+        body: { ...(payload as any), telefone: normalizedPhone },
       });
       if (error) throw error;
       break;
