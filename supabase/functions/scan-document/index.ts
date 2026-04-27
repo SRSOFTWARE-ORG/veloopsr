@@ -329,19 +329,59 @@ NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preci
               required: ["tipo_documento", "cliente_nome"],
             },
           };
-          const extracted = await callGeminiDirect({
+          const { data: extracted, attempts } = await callGeminiDirect({
             apiKey: GEMINI_API_KEY,
             systemInstruction: systemPrompt,
             userText: userPrompt,
             fileBase64,
             mimeType,
             functionDeclaration: fnDecl,
+            fnLabel: "scan-document",
           });
-          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct" }), {
+
+          const valid = validateExtracted(extracted, ["tipo_documento", "cliente_nome"]);
+          if (!valid.ok) {
+            console.error(`[scan-document] Validação falhou: ${valid.error}`, extracted);
+            await logScan({
+              function_name: "scan-document",
+              provider: "gemini-direct",
+              status: "invalid_schema",
+              http_status: response.status,
+              attempts,
+              latency_ms: Date.now() - startedAt,
+              error_message: valid.error,
+              nome_arquivo: nome_arquivoCtx,
+            });
+            return new Response(JSON.stringify({ error: `Resposta inválida do Gemini: ${valid.error}`, fallback: false }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          console.log(`[scan-document] Fallback OK gemini-direct em ${attempts} tentativa(s)`);
+          await logScan({
+            function_name: "scan-document",
+            provider: "gemini-direct",
+            status: "success",
+            http_status: response.status,
+            attempts,
+            latency_ms: Date.now() - startedAt,
+            nome_arquivo: nome_arquivoCtx,
+          });
+          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct", attempts }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         } catch (fbErr) {
-          console.error("[scan-document] Gemini direct fallback falhou:", fbErr);
+          const msg = fbErr instanceof Error ? fbErr.message : String(fbErr);
+          console.error("[scan-document] Gemini direct fallback falhou:", msg);
+          await logScan({
+            function_name: "scan-document",
+            provider: "gemini-direct",
+            status: "error",
+            http_status: response.status,
+            latency_ms: Date.now() - startedAt,
+            error_message: msg,
+            nome_arquivo: nome_arquivoCtx,
+          });
         }
       }
 
@@ -355,6 +395,15 @@ NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preci
       } else {
         errorPayload = { error: `Erro na IA (${response.status})`, fallback: false };
       }
+      await logScan({
+        function_name: "scan-document",
+        provider: "lovable-ai",
+        status: "error",
+        http_status: response.status,
+        latency_ms: Date.now() - startedAt,
+        error_message: errorPayload.error,
+        nome_arquivo: nome_arquivoCtx,
+      });
       return new Response(JSON.stringify(errorPayload), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -372,12 +421,29 @@ NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preci
       if (jsonMatch) extracted = JSON.parse(jsonMatch[0]);
     }
 
-    return new Response(JSON.stringify({ data: extracted }), {
+    await logScan({
+      function_name: "scan-document",
+      provider: "lovable-ai",
+      status: "success",
+      http_status: 200,
+      latency_ms: Date.now() - startedAt,
+      nome_arquivo: nome_arquivoCtx,
+    });
+    return new Response(JSON.stringify({ data: extracted, provider: "lovable-ai" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("scan-document error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido", fallback: true }), {
+    const msg = e instanceof Error ? e.message : "Erro desconhecido";
+    console.error("scan-document error:", msg);
+    await logScan({
+      function_name: "scan-document",
+      provider: "unknown",
+      status: "exception",
+      latency_ms: Date.now() - startedAt,
+      error_message: msg,
+      nome_arquivo: nome_arquivoCtx,
+    });
+    return new Response(JSON.stringify({ error: msg, fallback: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
