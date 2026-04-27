@@ -13,13 +13,24 @@ Deno.serve(async (req) => {
 
   try {
     const MP_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+
+    const body = await req.json().catch(() => ({}));
+
+    // Healthcheck mode: just report whether the token is configured
+    if (body?.health === true) {
+      return new Response(
+        JSON.stringify({ ok: !!MP_TOKEN, configured: !!MP_TOKEN }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (!MP_TOKEN) throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { cobranca_id, data_vencimento, valor, cliente_nome, cliente_id } = await req.json();
+    const { cobranca_id, data_vencimento, valor, cliente_nome, cliente_id } = body;
 
     if (!cobranca_id || !data_vencimento || !valor) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
