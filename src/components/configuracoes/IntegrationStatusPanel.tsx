@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,20 +11,43 @@ interface IntegrationStatus {
   detail?: string;
 }
 
+const CHECK_INTERVAL_MS = 8 * 60 * 60 * 1000; // 8 horas
+const LAST_CHECK_KEY = "integration_status_last_check";
+
 export default function IntegrationStatusPanel() {
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([
     { name: "Mercado Pago", description: "Pagamentos PIX", status: "checking" },
     { name: "WhatsApp (UAZAPI)", description: "Envio de mensagens", status: "checking" },
-    { name: "n8n", description: "Automações", status: "checking" },
     { name: "Google Calendar", description: "Sincronização de agenda", status: "checking" },
+    { name: "Lovable AI / Gemini", description: "Escaneamento de documentos", status: "checking" },
   ]);
+  const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    checkAll();
+    // Run on mount, then every 8h
+    runCheck();
+    intervalRef.current = window.setInterval(runCheck, CHECK_INTERVAL_MS);
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const runCheck = async () => {
+    await checkAll();
+    const now = new Date();
+    setLastCheck(now);
+    try { localStorage.setItem(LAST_CHECK_KEY, now.toISOString()); } catch {}
+  };
+
   const checkAll = async () => {
-    const results = await Promise.allSettled([checkMP(), checkWhatsApp(), checkN8N(), checkGoogleCalendar()]);
+    const results = await Promise.allSettled([
+      checkMP(),
+      checkWhatsApp(),
+      checkGoogleCalendar(),
+      checkAI(),
+    ]);
     setIntegrations((prev) =>
       prev.map((int, i) => {
         const result = results[i];
@@ -76,27 +99,6 @@ export default function IntegrationStatusPanel() {
     }
   };
 
-  const checkN8N = async (): Promise<Partial<IntegrationStatus>> => {
-    try {
-      const res = await supabase.functions.invoke("send-webhook", {
-        body: { event: "__health__", data: {} },
-      });
-      if (res.error?.message?.includes("FunctionsFetchError")) {
-        return { status: "offline", detail: "Função indisponível" };
-      }
-      const data = res.data;
-      if (data?.error?.includes("N8N_WEBHOOK_URL")) {
-        return { status: "offline", detail: "URL não configurada" };
-      }
-      if (data?.success || data?.sent) {
-        return { status: "online", detail: "Webhook ativo" };
-      }
-      return { status: "warning", detail: data?.error || "Verificar URL" };
-    } catch {
-      return { status: "offline", detail: "Erro de conexão" };
-    }
-  };
-
   const checkGoogleCalendar = async (): Promise<Partial<IntegrationStatus>> => {
     try {
       const { data, error } = await supabase
@@ -115,6 +117,24 @@ export default function IntegrationStatusPanel() {
       return { status: "online", detail: "Conta conectada" };
     } catch {
       return { status: "offline", detail: "Erro ao verificar" };
+    }
+  };
+
+  const checkAI = async (): Promise<Partial<IntegrationStatus>> => {
+    try {
+      const res = await supabase.functions.invoke("scan-health", { body: {} });
+      if (res.error?.message?.includes("FunctionsFetchError")) {
+        return { status: "offline", detail: "Função indisponível" };
+      }
+      const data: any = res.data;
+      const lovableOk = data?.lovable_ai?.ok || data?.lovableAI?.ok;
+      const geminiOk = data?.gemini?.ok;
+      if (lovableOk && geminiOk) return { status: "online", detail: "Lovable AI + Gemini ativos" };
+      if (lovableOk) return { status: "online", detail: "Lovable AI ativo" };
+      if (geminiOk) return { status: "warning", detail: "Apenas Gemini direto disponível" };
+      return { status: "warning", detail: "Verificar créditos / chaves" };
+    } catch {
+      return { status: "offline", detail: "Erro de conexão" };
     }
   };
 
@@ -157,12 +177,19 @@ export default function IntegrationStatusPanel() {
             {statusBadge(int.status)}
           </div>
         ))}
-        <button
-          onClick={checkAll}
-          className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1.5"
-        >
-          Verificar novamente
-        </button>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[10px] text-muted-foreground">
+            {lastCheck
+              ? `Última verificação: ${lastCheck.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} • Auto a cada 8h`
+              : "Auto-verificação a cada 8h"}
+          </p>
+          <button
+            onClick={runCheck}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1.5"
+          >
+            Verificar agora
+          </button>
+        </div>
       </CardContent>
     </Card>
   );
