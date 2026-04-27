@@ -199,8 +199,8 @@ NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preci
     });
   } catch (e) {
     console.error("scan-document error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido", fallback: true }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
