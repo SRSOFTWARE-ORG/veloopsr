@@ -1052,6 +1052,48 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_logs: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          error_message: string | null
+          function_name: string
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          nome_arquivo: string | null
+          provider: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          function_name: string
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          nome_arquivo?: string | null
+          provider: string
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          function_name?: string
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          nome_arquivo?: string | null
+          provider?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
