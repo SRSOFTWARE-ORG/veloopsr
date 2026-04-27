@@ -13,44 +13,109 @@ async function callGeminiDirect(opts: {
   mimeType: string;
   functionDeclaration: any;
   model?: string;
-}): Promise<any> {
+  maxRetries?: number;
+  fnLabel?: string;
+}): Promise<{ data: any; attempts: number }> {
   const model = opts.model || "gemini-2.5-pro";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${opts.apiKey}`;
   const body = {
     systemInstruction: { parts: [{ text: opts.systemInstruction }] },
-    contents: [
-      { role: "user", parts: [
-        { text: opts.userText },
-        { inlineData: { mimeType: opts.mimeType, data: opts.fileBase64 } },
-      ] },
-    ],
+    contents: [{ role: "user", parts: [
+      { text: opts.userText },
+      { inlineData: { mimeType: opts.mimeType, data: opts.fileBase64 } },
+    ] }],
     tools: [{ functionDeclarations: [opts.functionDeclaration] }],
     toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [opts.functionDeclaration.name] } },
   };
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const t = await resp.text().catch(() => "");
-    throw new Error(`Gemini direct error ${resp.status}: ${t}`);
+  const maxRetries = opts.maxRetries ?? 3;
+  const label = opts.fnLabel || "gemini-direct";
+  let attempt = 0;
+  let lastErr: any = null;
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (resp.status === 429 || resp.status === 503) {
+        const t = await resp.text().catch(() => "");
+        const backoff = Math.min(8000, 1000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 400);
+        console.warn(`[${label}] Gemini ${resp.status} tentativa ${attempt}/${maxRetries}, aguardando ${backoff}ms. Body: ${t.slice(0, 200)}`);
+        if (attempt >= maxRetries) throw new Error(`Gemini direct ${resp.status} após ${attempt} tentativas`);
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => "");
+        throw new Error(`Gemini direct error ${resp.status}: ${t.slice(0, 300)}`);
+      }
+      const json = await resp.json();
+      const parts = json?.candidates?.[0]?.content?.parts || [];
+      const fnCall = parts.find((p: any) => p.functionCall)?.functionCall;
+      if (fnCall?.args) return { data: fnCall.args, attempts: attempt };
+      const txt = parts.find((p: any) => p.text)?.text || "";
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) return { data: JSON.parse(m[0]), attempts: attempt };
+      throw new Error("Gemini direct: resposta sem dados estruturados");
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= maxRetries) break;
+    }
   }
-  const json = await resp.json();
-  const parts = json?.candidates?.[0]?.content?.parts || [];
-  const fnCall = parts.find((p: any) => p.functionCall)?.functionCall;
-  if (fnCall?.args) return fnCall.args;
-  const txt = parts.find((p: any) => p.text)?.text || "";
-  const m = txt.match(/\{[\s\S]*\}/);
-  if (m) return JSON.parse(m[0]);
-  throw new Error("Gemini direct: resposta sem dados estruturados");
+  throw lastErr ?? new Error("Gemini direct: falha desconhecida");
+}
+
+function validateProducts(data: any): { ok: true } | { ok: false; error: string } {
+  if (!data || typeof data !== "object") return { ok: false, error: "Resposta não é objeto" };
+  if (!Array.isArray(data.produtos)) return { ok: false, error: "Campo 'produtos' ausente ou inválido" };
+  if (data.produtos.length === 0) return { ok: false, error: "Nenhum produto extraído" };
+  for (const [i, p] of data.produtos.entries()) {
+    if (!p || typeof p !== "object" || !p.nome || typeof p.nome !== "string") {
+      return { ok: false, error: `Produto #${i + 1} sem campo 'nome' válido` };
+    }
+  }
+  return { ok: true };
+}
+
+async function logScan(entry: {
+  function_name: string;
+  provider: string;
+  status: string;
+  http_status?: number | null;
+  attempts?: number;
+  latency_ms?: number;
+  error_message?: string | null;
+  nome_arquivo?: string | null;
+}) {
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(entry),
+    });
+  } catch (e) {
+    console.error("[logScan] falha:", e);
+  }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const startedAt = Date.now();
+  let nome_arquivoCtx: string | null = null;
   try {
     const { file_url, nome_arquivo } = await req.json();
+    nome_arquivoCtx = nome_arquivo ?? null;
     if (!file_url) {
       return new Response(JSON.stringify({ error: "URL do arquivo não fornecida" }), {
         status: 400,
@@ -173,19 +238,59 @@ Retorne TODOS os produtos encontrados como array.`,
               required: ["produtos"],
             },
           };
-          const extracted = await callGeminiDirect({
+          const { data: extracted, attempts } = await callGeminiDirect({
             apiKey: GEMINI_API_KEY,
             systemInstruction: "Você é especialista em extrair listas de produtos. Para cada produto, capture codigo_barras (EAN), referencia e nome.",
             userText: "Extraia TODOS os produtos visíveis nesta imagem/documento.",
             fileBase64,
             mimeType,
             functionDeclaration: fnDecl,
+            fnLabel: "scan-products",
           });
-          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct" }), {
+
+          const valid = validateProducts(extracted);
+          if (!valid.ok) {
+            console.error(`[scan-products] Validação falhou: ${valid.error}`);
+            await logScan({
+              function_name: "scan-products",
+              provider: "gemini-direct",
+              status: "invalid_schema",
+              http_status: response.status,
+              attempts,
+              latency_ms: Date.now() - startedAt,
+              error_message: valid.error,
+              nome_arquivo: nome_arquivoCtx,
+            });
+            return new Response(JSON.stringify({ error: `Resposta inválida do Gemini: ${valid.error}`, fallback: false }), {
+              status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          console.log(`[scan-products] Fallback OK gemini-direct em ${attempts} tentativa(s) — ${extracted.produtos?.length ?? 0} produtos`);
+          await logScan({
+            function_name: "scan-products",
+            provider: "gemini-direct",
+            status: "success",
+            http_status: response.status,
+            attempts,
+            latency_ms: Date.now() - startedAt,
+            nome_arquivo: nome_arquivoCtx,
+          });
+          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct", attempts }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         } catch (fbErr) {
-          console.error("[scan-products] Gemini direct fallback falhou:", fbErr);
+          const msg = fbErr instanceof Error ? fbErr.message : String(fbErr);
+          console.error("[scan-products] Gemini direct fallback falhou:", msg);
+          await logScan({
+            function_name: "scan-products",
+            provider: "gemini-direct",
+            status: "error",
+            http_status: response.status,
+            latency_ms: Date.now() - startedAt,
+            error_message: msg,
+            nome_arquivo: nome_arquivoCtx,
+          });
         }
       }
 
@@ -199,6 +304,15 @@ Retorne TODOS os produtos encontrados como array.`,
       } else {
         errorPayload = { error: `Erro na IA (${response.status})`, fallback: false };
       }
+      await logScan({
+        function_name: "scan-products",
+        provider: "lovable-ai",
+        status: "error",
+        http_status: response.status,
+        latency_ms: Date.now() - startedAt,
+        error_message: errorPayload.error,
+        nome_arquivo: nome_arquivoCtx,
+      });
       return new Response(JSON.stringify(errorPayload), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -216,12 +330,29 @@ Retorne TODOS os produtos encontrados como array.`,
       if (jsonMatch) extracted = JSON.parse(jsonMatch[0]);
     }
 
-    return new Response(JSON.stringify({ data: extracted }), {
+    await logScan({
+      function_name: "scan-products",
+      provider: "lovable-ai",
+      status: "success",
+      http_status: 200,
+      latency_ms: Date.now() - startedAt,
+      nome_arquivo: nome_arquivoCtx,
+    });
+    return new Response(JSON.stringify({ data: extracted, provider: "lovable-ai" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("scan-products error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido", fallback: true }), {
+    const msg = e instanceof Error ? e.message : "Erro desconhecido";
+    console.error("scan-products error:", msg);
+    await logScan({
+      function_name: "scan-products",
+      provider: "unknown",
+      status: "exception",
+      latency_ms: Date.now() - startedAt,
+      error_message: msg,
+      nome_arquivo: nome_arquivoCtx,
+    });
+    return new Response(JSON.stringify({ error: msg, fallback: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
