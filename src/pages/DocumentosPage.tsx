@@ -319,12 +319,12 @@ const DocumentosPage = () => {
         if (newCob && valorEntrada > 0) {
           const today = new Date().toISOString().split("T")[0];
 
-          // DEDUP: Check if entrada already exists for this client
+          // DEDUP por documento: cliente pode ter várias entradas (uma por carnê).
           const { data: existingEntrada } = await supabase
             .from("cobrancas")
             .select("id")
             .eq("cliente_id", clienteId)
-            .ilike("observacoes", "Entrada%")
+            .ilike("observacoes", `Entrada do carnê: ${doc.nome_arquivo}%`)
             .limit(1);
 
           if (!existingEntrada || existingEntrada.length === 0) {
