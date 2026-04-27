@@ -146,6 +146,49 @@ Retorne TODOS os produtos encontrados como array.`,
     if (!response.ok) {
       const t = await response.text().catch(() => "");
       console.error("AI error:", response.status, t);
+
+      const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+      if ((response.status === 402 || response.status === 429) && GEMINI_API_KEY) {
+        try {
+          console.log("[scan-products] Fallback para Gemini direto");
+          const fnDecl = {
+            name: "extract_products",
+            description: "Lista de produtos extraídos do documento",
+            parameters: {
+              type: "object",
+              properties: {
+                produtos: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      codigo_barras: { type: "string" },
+                      referencia: { type: "string" },
+                      nome: { type: "string" },
+                    },
+                    required: ["nome"],
+                  },
+                },
+              },
+              required: ["produtos"],
+            },
+          };
+          const extracted = await callGeminiDirect({
+            apiKey: GEMINI_API_KEY,
+            systemInstruction: "Você é especialista em extrair listas de produtos. Para cada produto, capture codigo_barras (EAN), referencia e nome.",
+            userText: "Extraia TODOS os produtos visíveis nesta imagem/documento.",
+            fileBase64,
+            mimeType,
+            functionDeclaration: fnDecl,
+          });
+          return new Response(JSON.stringify({ data: extracted, provider: "gemini-direct" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (fbErr) {
+          console.error("[scan-products] Gemini direct fallback falhou:", fbErr);
+        }
+      }
+
       let errorPayload: { error: string; fallback: boolean };
       if (response.status === 429) {
         errorPayload = { error: "Limite de requisições excedido. Tente novamente em instantes.", fallback: false };
