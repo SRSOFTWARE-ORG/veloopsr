@@ -36,6 +36,17 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
+
+    // Healthcheck mode: report config status without sending anything
+    if (body?.health === true) {
+      const url = Deno.env.get("UAZAPI_URL");
+      const token = Deno.env.get("UAZAPI_TOKEN");
+      return new Response(
+        JSON.stringify({ ok: !!(url && token), configured: !!(url && token) }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { telefone, mensagem, nome_cliente, valor_transacao, data_vencimento, tipo, cobranca_id, cliente_id, cpf, status_parcela } = body;
 
     if (!telefone || !mensagem) {

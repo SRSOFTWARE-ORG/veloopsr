@@ -60,19 +60,12 @@ export default function IntegrationStatusPanel() {
   const checkMP = async (): Promise<Partial<IntegrationStatus>> => {
     try {
       const res = await supabase.functions.invoke("create-pix-payment", {
-        body: { cobranca_id: "__health__", data_vencimento: "2000-01-01", valor: 0 },
+        body: { health: true },
       });
-      if (res.error?.message?.includes("FunctionsFetchError")) {
-        return { status: "offline", detail: "Função indisponível" };
-      }
-      const data = res.data;
-      if (data?.error?.includes("Missing required")) {
-        return { status: "online", detail: "Token configurado" };
-      }
-      if (data?.error?.includes("MERCADOPAGO_ACCESS_TOKEN")) {
-        return { status: "offline", detail: "Token não configurado" };
-      }
-      return { status: "online", detail: "Ativo" };
+      if (res.error) return { status: "offline", detail: "Função indisponível" };
+      const data: any = res.data;
+      if (data?.ok) return { status: "online", detail: "Token configurado" };
+      return { status: "offline", detail: "Token não configurado" };
     } catch {
       return { status: "offline", detail: "Erro de conexão" };
     }
@@ -81,19 +74,12 @@ export default function IntegrationStatusPanel() {
   const checkWhatsApp = async (): Promise<Partial<IntegrationStatus>> => {
     try {
       const res = await supabase.functions.invoke("send-whatsapp-uazapi", {
-        body: { phone: "__health__", message: "" },
+        body: { health: true },
       });
-      if (res.error?.message?.includes("FunctionsFetchError")) {
-        return { status: "offline", detail: "Função indisponível" };
-      }
-      const data = res.data;
-      if (data?.error?.includes("UAZAPI")) {
-        return { status: "offline", detail: "Token não configurado" };
-      }
-      if (data?.error?.includes("phone") || data?.error?.includes("Missing")) {
-        return { status: "online", detail: "Configurado" };
-      }
-      return { status: "warning", detail: data?.error || "Verificar configuração" };
+      if (res.error) return { status: "offline", detail: "Função indisponível" };
+      const data: any = res.data;
+      if (data?.ok) return { status: "online", detail: "URL e token configurados" };
+      return { status: "warning", detail: "Verificar configuração" };
     } catch {
       return { status: "offline", detail: "Erro de conexão" };
     }
