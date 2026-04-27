@@ -111,8 +111,11 @@ async function logScan(entry: {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const startedAt = Date.now();
+  let nome_arquivoCtx: string | null = null;
   try {
     const { file_url, nome_arquivo } = await req.json();
+    nome_arquivoCtx = nome_arquivo ?? null;
     if (!file_url) {
       return new Response(JSON.stringify({ error: "URL do arquivo não fornecida" }), {
         status: 400,
