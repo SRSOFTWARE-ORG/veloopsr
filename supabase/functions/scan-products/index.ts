@@ -5,6 +5,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function callGeminiDirect(opts: {
+  apiKey: string;
+  systemInstruction: string;
+  userText: string;
+  fileBase64: string;
+  mimeType: string;
+  functionDeclaration: any;
+  model?: string;
+}): Promise<any> {
+  const model = opts.model || "gemini-2.5-pro";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${opts.apiKey}`;
+  const body = {
+    systemInstruction: { parts: [{ text: opts.systemInstruction }] },
+    contents: [
+      { role: "user", parts: [
+        { text: opts.userText },
+        { inlineData: { mimeType: opts.mimeType, data: opts.fileBase64 } },
+      ] },
+    ],
+    tools: [{ functionDeclarations: [opts.functionDeclaration] }],
+    toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [opts.functionDeclaration.name] } },
+  };
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => "");
+    throw new Error(`Gemini direct error ${resp.status}: ${t}`);
+  }
+  const json = await resp.json();
+  const parts = json?.candidates?.[0]?.content?.parts || [];
+  const fnCall = parts.find((p: any) => p.functionCall)?.functionCall;
+  if (fnCall?.args) return fnCall.args;
+  const txt = parts.find((p: any) => p.text)?.text || "";
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (m) return JSON.parse(m[0]);
+  throw new Error("Gemini direct: resposta sem dados estruturados");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
