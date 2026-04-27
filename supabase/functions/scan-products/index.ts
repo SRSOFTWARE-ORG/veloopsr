@@ -103,19 +103,22 @@ Retorne TODOS os produtos encontrados como array.`,
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
+      const t = await response.text().catch(() => "");
       console.error("AI error:", response.status, t);
-      throw new Error("Erro na IA");
+      let errorPayload: { error: string; fallback: boolean };
+      if (response.status === 429) {
+        errorPayload = { error: "Limite de requisições excedido. Tente novamente em instantes.", fallback: false };
+      } else if (response.status === 402) {
+        errorPayload = { error: "Créditos de IA insuficientes. Adicione créditos em Configurações → Workspace → Cloud & AI balance.", fallback: false };
+      } else if (response.status >= 500) {
+        errorPayload = { error: "SERVICE_UNAVAILABLE", fallback: true };
+      } else {
+        errorPayload = { error: `Erro na IA (${response.status})`, fallback: false };
+      }
+      return new Response(JSON.stringify(errorPayload), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const result = await response.json();
