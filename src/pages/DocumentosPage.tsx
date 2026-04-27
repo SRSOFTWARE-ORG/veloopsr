@@ -396,26 +396,13 @@ const DocumentosPage = () => {
 
     const valorNota = extracted.valor || extracted.valor_total || 0;
 
-    // Check if a venda already exists for this client (by CPF or name)
-    let existingVendas: any[] | null = null;
-    if (extracted.cliente_cpf) {
-      const { data } = await supabase
-        .from("vendas")
-        .select("id")
-        .eq("cliente_cpf", extracted.cliente_cpf)
-        .eq("status", "concluida")
-        .limit(1);
-      existingVendas = data;
-    }
-    if (!existingVendas || existingVendas.length === 0) {
-      const { data } = await supabase
-        .from("vendas")
-        .select("id")
-        .ilike("cliente_nome", clienteNome)
-        .eq("status", "concluida")
-        .limit(1);
-      existingVendas = data;
-    }
+    // DEDUP por documento (não por cliente): cliente pode ter várias notas fiscais.
+    // Só ignoramos se o MESMO arquivo já foi importado.
+    const { data: existingVendas } = await supabase
+      .from("vendas")
+      .select("id")
+      .ilike("observacoes", `%${doc.nome_arquivo}%`)
+      .limit(1);
 
     if (!existingVendas || existingVendas.length === 0) {
       await supabase.from("vendas").insert({
