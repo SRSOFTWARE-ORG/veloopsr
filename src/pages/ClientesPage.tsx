@@ -277,60 +277,46 @@ const ClientesPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    // 1. Detecta dependências para avisar o usuário
-    const [cob, disp, assist, sub, pix, comDest] = await Promise.all([
-      supabase.from("cobrancas").select("id").eq("cliente_id", id),
-      supabase.from("dispositivos").select("id").or(`cliente_id.eq.${id},subcliente_id.eq.${id}`),
-      supabase.from("assistencias").select("id").eq("cliente_id", id),
-      supabase.from("clientes").select("id").eq("parent_id", id),
-      supabase.from("pix_payments").select("id").eq("cliente_id", id),
-      supabase.from("comunicado_destinatarios").select("id").eq("cliente_id", id),
-    ]);
-
-    const counts = {
-      cobrancas: cob.data?.length || 0,
-      dispositivos: disp.data?.length || 0,
-      assistencias: assist.data?.length || 0,
-      subclientes: sub.data?.length || 0,
-      pix: pix.data?.length || 0,
-      comunicados: comDest.data?.length || 0,
-    };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-    const detalhes = total > 0
-      ? `\n\nVínculos que serão excluídos:\n` +
-        Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => `• ${v} ${k}`).join("\n")
-      : "";
-
-    if (!confirm(`Excluir este registro?${detalhes}`)) return;
-
     try {
-      // 2. Cascata manual (não há FK CASCADE no schema)
-      const cobrancaIds = cob.data?.map((c: any) => c.id) || [];
-      if (cobrancaIds.length > 0) {
-        await supabase.from("cobranca_pagamentos").delete().in("cobranca_id", cobrancaIds);
-        await supabase.from("envio_cobranca").delete().in("cobranca_id", cobrancaIds);
-        await supabase.from("pix_payments").delete().in("cobranca_id", cobrancaIds);
-        const { error: eCob } = await supabase.from("cobrancas").delete().in("id", cobrancaIds);
-        if (eCob) throw eCob;
-      }
-      if (counts.pix > 0) await supabase.from("pix_payments").delete().eq("cliente_id", id);
-      if (counts.comunicados > 0) await supabase.from("comunicado_destinatarios").delete().eq("cliente_id", id);
-      if (counts.assistencias > 0) await supabase.from("assistencias").delete().eq("cliente_id", id);
-      if (counts.dispositivos > 0) {
-        await supabase.from("dispositivos").delete().or(`cliente_id.eq.${id},subcliente_id.eq.${id}`);
-      }
-      if (counts.subclientes > 0) await supabase.from("clientes").delete().eq("parent_id", id);
+      // 1. Pré-visualização do que será excluído via Edge Function
+      const { data: checkData, error: checkError } = await supabase.functions.invoke("manage-client-deletion", {
+        body: { action: "pre_check", cliente_id: id }
+      });
 
-      // 3. Por fim, o cliente
-      const { error } = await supabase.from("clientes").delete().eq("id", id);
-      if (error) throw error;
+      if (checkError) throw checkError;
+      
+      const counts = checkData.counts as Record<string, number>;
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
-      toast.success("Registro e vínculos excluídos");
+      const detalhes = total > 0
+        ? `\n\nVínculos que serão excluídos definitivamente:\n` +
+          Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => `• ${v} ${k}`).join("\n")
+        : "\n\nNenhum vínculo dependente encontrado.";
+
+      if (!confirm(`⚠️ ATENÇÃO: Esta ação é irreversível e apagará TODOS os dados relacionados.${detalhes}\n\nDeseja prosseguir com a exclusão completa?`)) return;
+
+      toast.loading("Excluindo cliente e dependências...", { id: "delete-loading" });
+
+      // 2. Executar deleção em cascata transacional no backend
+      const { data: deleteData, error: deleteError } = await supabase.functions.invoke("manage-client-deletion", {
+        body: { action: "delete_cascade", cliente_id: id }
+      });
+
+      if (deleteError || !deleteData?.success) {
+        // Exibir erro real do Supabase/Edge Function
+        const errorMsg = deleteData?.error || deleteError?.message || "Erro desconhecido";
+        const errorCode = deleteData?.code ? ` [Código: ${deleteData.code}]` : "";
+        throw new Error(`${errorMsg}${errorCode}`);
+      }
+
+      toast.success("Cliente e todos os seus vínculos foram excluídos com sucesso!", { id: "delete-loading" });
       fetchClientes();
     } catch (err: any) {
       console.error("Erro ao excluir cliente:", err);
-      toast.error(`Erro ao excluir: ${err.message || "verifique permissões"}`);
+      toast.error(`Falha na exclusão: ${err.message}`, { 
+        id: "delete-loading",
+        duration: 5000 
+      });
     }
   };
 

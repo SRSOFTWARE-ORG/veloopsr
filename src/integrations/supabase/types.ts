@@ -1238,6 +1238,41 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_resend_logs: {
+        Row: {
+          created_at: string | null
+          envio_id: string | null
+          erro: string | null
+          id: string
+          status: string
+          tentativa: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          envio_id?: string | null
+          erro?: string | null
+          id?: string
+          status: string
+          tentativa?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          envio_id?: string | null
+          erro?: string | null
+          id?: string
+          status?: string
+          tentativa?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_resend_logs_envio_id_fkey"
+            columns: ["envio_id"]
+            isOneToOne: false
+            referencedRelation: "envio_cobranca"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
