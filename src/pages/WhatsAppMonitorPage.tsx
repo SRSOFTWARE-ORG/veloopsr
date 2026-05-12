@@ -43,60 +43,72 @@ export default function WhatsAppMonitorPage() {
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState(false);
   const [clienteNames, setClienteNames] = useState<Record<string, string>>({});
+  const [summary, setSummary] = useState({ whatsapp_pending: 0, pix_pending: 0 });
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: convs } = await supabase
-      .from("conversations")
-      .select("*")
-      .order("updated_at", { ascending: false })
-      .limit(50);
+    try {
+      const [convsRes, summaryRes] = await Promise.all([
+        supabase.from("conversations").select("*").order("updated_at", { ascending: false }).limit(50),
+        supabase.functions.invoke("admin-whatsapp-actions", { body: { action: "summary" } })
+      ]);
 
-    if (convs) {
-      setConversations(convs);
+      const convs = convsRes.data;
+      if (convs) {
+        setConversations(convs);
+        const phones = convs.map((c) => c.phone);
+        const names: Record<string, string> = {};
+        for (const phone of phones) {
+          const last8 = phone.slice(-8);
+          const { data: cliente } = await supabase.from("clientes").select("nome").or(`telefone.ilike.%${last8}%`).limit(1).maybeSingle();
+          if (cliente) names[phone] = cliente.nome;
+        }
+        setClienteNames(names);
 
-      // Fetch client names by phone
-      const phones = convs.map((c) => c.phone);
-      const names: Record<string, string> = {};
-      for (const phone of phones) {
-        const last8 = phone.slice(-8);
-        const { data: cliente } = await supabase
-          .from("clientes")
-          .select("nome")
-          .or(`telefone.ilike.%${last8}%`)
-          .limit(1)
-          .maybeSingle();
-        if (cliente) names[phone] = cliente.nome;
+        const msgMap: Record<string, Message[]> = {};
+        for (const conv of convs) {
+          const { data: msgs } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: false }).limit(5);
+          if (msgs) msgMap[conv.id] = msgs.reverse();
+        }
+        setMessages(msgMap);
       }
-      setClienteNames(names);
 
-      // Fetch latest messages for each conversation
-      const msgMap: Record<string, Message[]> = {};
-      for (const conv of convs) {
-        const { data: msgs } = await supabase
-          .from("messages")
-          .select("*")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(5);
-        if (msgs) msgMap[conv.id] = msgs.reverse();
+      if (summaryRes.data?.success) {
+        setSummary(summaryRes.data.summary);
       }
-      setMessages(msgMap);
+    } catch (e) {
+      console.error("Error fetching monitor data:", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleResendPending = async () => {
+    if (summary.whatsapp_pending === 0) {
+      toast.info("Não há mensagens pendentes para reenviar.");
+      return;
+    }
+    setResending(true);
+    toast.loading(`Reenviando ${summary.whatsapp_pending} mensagens...`, { id: "resend-wa" });
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-whatsapp-actions", {
+        body: { action: "resend_all" }
+      });
+      if (error) throw error;
+      toast.success(`${data.count} mensagens reenviadas com sucesso!`, { id: "resend-wa" });
+      fetchData();
+    } catch (e: any) {
+      toast.error(`Falha no reenvio: ${e.message}`, { id: "resend-wa" });
+    } finally {
+      setResending(false);
+    }
   };
 
   useEffect(() => {
     fetchData();
-
-    // Realtime subscription
-    const channel = supabase
-      .channel("whatsapp-monitor")
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => fetchData())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => fetchData())
-      .subscribe();
-
+    const channel = supabase.channel("whatsapp-monitor").on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => fetchData()).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
