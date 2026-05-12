@@ -285,12 +285,12 @@ const ClientesPage = () => {
 
       if (checkError) throw checkError;
       
-      const counts = checkData.counts;
-      const total = Object.values(counts).reduce((a: any, b: any) => a + b, 0);
+      const counts = checkData.counts as Record<string, number>;
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
       const detalhes = total > 0
         ? `\n\nVínculos que serão excluídos definitivamente:\n` +
-          Object.entries(counts).filter(([, v]) => (v as number) > 0).map(([k, v]) => `• ${v} ${k}`).join("\n")
+          Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => `• ${v} ${k}`).join("\n")
         : "\n\nNenhum vínculo dependente encontrado.";
 
       if (!confirm(`⚠️ ATENÇÃO: Esta ação é irreversível e apagará TODOS os dados relacionados.${detalhes}\n\nDeseja prosseguir com a exclusão completa?`)) return;
