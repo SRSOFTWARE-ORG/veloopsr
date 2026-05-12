@@ -135,38 +135,49 @@ export default function IntegrationStatusPanel() {
           const missing = /Missing|obrigat/i.test(msg) ? " (campos ausentes)" : "";
           return { value: { status: "offline", detail: `Função indisponível${missing}` }, ok: false, detail: msg };
         }
+        
         const data: any = res.data;
-        if (data?.ok) return { value: { status: "online", detail: "URL e token configurados" }, ok: true, status: 200 };
+        const isOnline = data?.ok;
         
-        // Se a função retornar ok=false, significa que a instância da UAZAPI pode estar desconectada
-        // Vamos verificar se os tokens existem mas a conexão falhou
-        const statusDetail = data?.configured ? "Instância desconectada" : "Verificar configuração";
+        // Detectar mudança de estado (desconexão/reconexão)
+        const waInt = integrations.find(i => i.key === 'wa');
+        const wasOnline = waInt?.status === 'online';
         
-        // Se a instância estiver desconectada, enviamos uma notificação para o admin
-        if (data?.configured && !data?.ok) {
-          try {
-            const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
-            const adminIds = adminRoles?.map((r: any) => r.user_id) || [];
-            
-            for (const adminId of adminIds) {
-              await supabase.from("notificacoes").insert({
-                user_id: adminId,
-                titulo: "⚠️ WhatsApp Desconectado",
-                mensagem: "A instância da UAZAPI foi detectada como offline durante o checkup automático. Verifique a conexão do QR Code.",
-                tipo: "integracao_uazapi_erro",
-                dados: { error: "instance_disconnected", timestamp: new Date().toISOString() },
-              });
-            }
-          } catch (e) {
-            console.error("Erro ao notificar admin sobre WhatsApp offline:", e);
-          }
+        if (isOnline && !wasOnline && waInt?.status !== 'checking') {
+          toast.success("WhatsApp reconectado! Iniciando reprocessamento automático...", { duration: 5000 });
+          supabase.functions.invoke("admin-whatsapp-actions", { body: { action: "resend_all" } });
+          notifyAdmins("✅ WhatsApp Reconectado", "A instância da UAZAPI voltou a ficar online. Iniciando reprocessamento da fila de mensagens falhas.");
+        } else if (!isOnline && wasOnline) {
+          toast.error("WhatsApp desconectado!", { duration: 5000 });
+          notifyAdmins("⚠️ WhatsApp Desconectado", "A instância da UAZAPI foi detectada como offline. Verifique a conexão.");
         }
 
+        if (isOnline) return { value: { status: "online", detail: "URL e token configurados" }, ok: true, status: 200 };
+        
+        const statusDetail = data?.configured ? "Instância desconectada" : "Verificar configuração";
         return { value: { status: "offline", detail: statusDetail }, ok: false, status: 200, detail: "instancia_offline" };
       },
       (e) => appendLog("wa", e),
     );
     updateOne("wa", result);
+  };
+
+  const notifyAdmins = async (titulo: string, mensagem: string) => {
+    try {
+      const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      const adminIds = adminRoles?.map((r: any) => r.user_id) || [];
+      for (const adminId of adminIds) {
+        await supabase.from("notificacoes").insert({
+          user_id: adminId,
+          titulo,
+          mensagem,
+          tipo: "integracao_uazapi_erro",
+          dados: { timestamp: new Date().toISOString() },
+        });
+      }
+    } catch (e) {
+      console.error("Erro ao notificar admin:", e);
+    }
   };
 
   const checkGoogleCalendar = async () => {
