@@ -49,7 +49,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check if instance is actually online
       try {
         const apiUrl = url.replace(/\/+$/, "");
         const res = await fetch(`${apiUrl}/instance/status`, {
@@ -57,6 +56,9 @@ Deno.serve(async (req) => {
         });
         const data = await res.json();
         const isOnline = res.ok && data?.status === "connected";
+        
+        // Se estava offline e agora está online, poderíamos disparar o reprocessamento aqui
+        // mas é melhor deixar isso para o painel ou um cron job dedicado para evitar recursão
         
         return new Response(
           JSON.stringify({ 
