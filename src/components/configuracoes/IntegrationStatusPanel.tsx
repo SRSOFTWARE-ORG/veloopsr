@@ -131,14 +131,38 @@ export default function IntegrationStatusPanel() {
       async () => {
         const res = await supabase.functions.invoke("send-whatsapp-uazapi", { body: { health: true } });
         if (res.error) {
-          // Tenta extrair detalhes do erro 400
           const msg = res.error.message || "Erro";
           const missing = /Missing|obrigat/i.test(msg) ? " (campos ausentes)" : "";
           return { value: { status: "offline", detail: `Função indisponível${missing}` }, ok: false, detail: msg };
         }
         const data: any = res.data;
         if (data?.ok) return { value: { status: "online", detail: "URL e token configurados" }, ok: true, status: 200 };
-        return { value: { status: "warning", detail: "Verificar configuração" }, ok: false, status: 200, detail: "ok=false" };
+        
+        // Se a função retornar ok=false, significa que a instância da UAZAPI pode estar desconectada
+        // Vamos verificar se os tokens existem mas a conexão falhou
+        const statusDetail = data?.configured ? "Instância desconectada" : "Verificar configuração";
+        
+        // Se a instância estiver desconectada, enviamos uma notificação para o admin
+        if (data?.configured && !data?.ok) {
+          try {
+            const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+            const adminIds = adminRoles?.map((r: any) => r.user_id) || [];
+            
+            for (const adminId of adminIds) {
+              await supabase.from("notificacoes").insert({
+                user_id: adminId,
+                titulo: "⚠️ WhatsApp Desconectado",
+                mensagem: "A instância da UAZAPI foi detectada como offline durante o checkup automático. Verifique a conexão do QR Code.",
+                tipo: "integracao_uazapi_erro",
+                dados: { error: "instance_disconnected", timestamp: new Date().toISOString() },
+              });
+            }
+          } catch (e) {
+            console.error("Erro ao notificar admin sobre WhatsApp offline:", e);
+          }
+        }
+
+        return { value: { status: "offline", detail: statusDetail }, ok: false, status: 200, detail: "instancia_offline" };
       },
       (e) => appendLog("wa", e),
     );
