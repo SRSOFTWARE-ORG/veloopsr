@@ -33,29 +33,40 @@ Deno.serve(async (req) => {
     let failCount = 0;
     const results = [];
 
-    // 2. Tentar reenviar cada um via send-whatsapp-uazapi
+    // 2. Tentar reenviar cada um diretamente para a UAZAPI
+    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+
+    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
+      throw new Error("UAZAPI não configurada (URL ou Token ausentes no ambiente)");
+    }
+
+    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+
     for (const envio of enviosFalhos) {
       try {
-        const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp-uazapi`, {
+        // Normalização de telefone
+        let phone = envio.telefone.replace(/\D/g, "");
+        if (phone.startsWith("0")) phone = phone.slice(1);
+        if (!phone.startsWith("55")) phone = "55" + phone;
+
+        const response = await fetch(`${apiUrl}/send/text`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
+            "token": UAZAPI_TOKEN,
           },
           body: JSON.stringify({
-            telefone: envio.telefone,
-            mensagem: envio.mensagem,
-            cobranca_id: envio.cobranca_id,
-            cliente_id: envio.cliente_id,
-            cpf: envio.cpf,
-            status_parcela: envio.status_fatura,
-            tipo: envio.tipo_envio || "reenvio_manual",
+            number: phone,
+            text: envio.mensagem,
+            linkPreview: false,
           }),
         });
 
         const result = await response.json();
+        const success = response.ok && !result.error;
 
-        if (response.ok && result.success) {
+        if (success) {
           // Atualizar o registro original para sucesso
           await supabase
             .from("envio_cobranca")
