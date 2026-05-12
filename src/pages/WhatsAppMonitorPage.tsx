@@ -202,15 +202,26 @@ export default function WhatsAppMonitorPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 pb-24 md:pb-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Monitor WhatsApp</h1>
           <p className="text-sm text-muted-foreground">Acompanhe conversas ativas e status do bot em tempo real</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+          <Button 
+            size="sm" 
+            className="gap-2" 
+            onClick={handleResendPending} 
+            disabled={resending || summary.whatsapp_pending === 0}
+          >
+            <Send className="w-4 h-4" />
+            Reenviar Pendentes ({summary.whatsapp_pending})
+          </Button>
+        </div>
       </div>
 
       {/* Status Cards */}
