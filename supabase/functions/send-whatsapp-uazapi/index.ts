@@ -41,10 +41,37 @@ Deno.serve(async (req) => {
     if (body?.health === true) {
       const url = Deno.env.get("UAZAPI_URL");
       const token = Deno.env.get("UAZAPI_TOKEN");
-      return new Response(
-        JSON.stringify({ ok: !!(url && token), configured: !!(url && token) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      
+      if (!url || !token) {
+        return new Response(
+          JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if instance is actually online
+      try {
+        const apiUrl = url.replace(/\/+$/, "");
+        const res = await fetch(`${apiUrl}/instance/status`, {
+          headers: { "token": token }
+        });
+        const data = await res.json();
+        const isOnline = res.ok && data?.status === "connected";
+        
+        return new Response(
+          JSON.stringify({ 
+            ok: isOnline, 
+            configured: true, 
+            status: data?.status || "unknown" 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ ok: false, configured: true, error: "Falha na comunicação com UAZAPI" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const { telefone, mensagem, nome_cliente, valor_transacao, data_vencimento, tipo, cobranca_id, cliente_id, cpf, status_parcela } = body;
