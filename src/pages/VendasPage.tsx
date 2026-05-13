@@ -87,6 +87,7 @@ const VendasPage = () => {
   const [search, setSearch] = useState("");
   const [expandedVendaId, setExpandedVendaId] = useState<string | null>(null);
   const [step, setStep] = useState(1); // 1=produtos, 2=cliente, 3=pagamento, 4=resumo
+  const [submittingVenda, setSubmittingVenda] = useState(false);
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
