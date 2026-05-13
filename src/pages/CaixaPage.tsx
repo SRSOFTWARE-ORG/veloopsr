@@ -103,6 +103,13 @@ const CaixaPage = () => {
 
   useEffect(() => {
     fetchProfiles();
+    const onUpdate = () => fetchData();
+    window.addEventListener("venda-updated", onUpdate);
+    window.addEventListener("focus", onUpdate);
+    return () => {
+      window.removeEventListener("venda-updated", onUpdate);
+      window.removeEventListener("focus", onUpdate);
+    };
   }, []);
 
   const fetchProfiles = async () => {
