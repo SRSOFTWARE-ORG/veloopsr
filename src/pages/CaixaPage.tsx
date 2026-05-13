@@ -113,12 +113,12 @@ const CaixaPage = () => {
   const fetchData = async () => {
     const { start, end } = getDateRange(periodo);
 
-    // Fetch entradas (recebido from cobranca_pagamentos)
+    // Fetch entradas (recebido from cobranca_pagamentos) — filtra por pago_em
     const { data: pagamentos } = await supabase
       .from("cobranca_pagamentos")
       .select("status, cobranca_id, data_vencimento, pago_por, pago_em, tipo_pagamento")
-      .gte("data_vencimento", start)
-      .lte("data_vencimento", end)
+      .gte("pago_em", `${start}T00:00:00`)
+      .lte("pago_em", `${end}T23:59:59`)
       .eq("status", "pago");
 
     let totalEntrada = 0;
@@ -151,6 +151,42 @@ const CaixaPage = () => {
             pago_em: p.pago_em || "",
             tipo: tipoPag === "entrada" ? "entrada" : "parcela",
           });
+        }
+      });
+    }
+
+    // Fallback: pull entradas from vendas.valor_entrada that don't have a
+    // matching cobranca_pagamentos entrada record (avoids ghost entries
+    // like Jailton's R$ 400 disappearing from Caixa).
+    const { data: vendas } = await supabase
+      .from("vendas")
+      .select("id, cliente_nome, valor_entrada, data_entrada, created_at, vendedor_id")
+      .eq("status", "concluida");
+
+    if (vendas) {
+      const trackedEntradas = new Set(
+        detalhes
+          .filter((d) => d.tipo === "entrada")
+          .map((d) => `${d.cliente_nome.trim().toUpperCase()}_${(d.pago_em || "").split("T")[0]}`)
+      );
+
+      vendas.forEach((v) => {
+        const entradaVal = Number(v.valor_entrada) || 0;
+        if (entradaVal <= 0) return;
+        const dataEntrada = (v as any).data_entrada || v.created_at?.split("T")[0] || "";
+        if (dataEntrada >= start && dataEntrada <= end) {
+          const dedupKey = `${v.cliente_nome.trim().toUpperCase()}_${dataEntrada}`;
+          if (!trackedEntradas.has(dedupKey)) {
+            totalEntrada += entradaVal;
+            detalhes.push({
+              cliente_nome: v.cliente_nome,
+              valor: entradaVal,
+              pago_por_nome: v.vendedor_id ? (profileMap[v.vendedor_id] || "Sistema") : "Sistema",
+              pago_em: `${dataEntrada}T12:00:00`,
+              tipo: "entrada",
+            });
+            trackedEntradas.add(dedupKey);
+          }
         }
       });
     }
