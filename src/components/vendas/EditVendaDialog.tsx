@@ -62,6 +62,7 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
   const [clienteTelefone, setClienteTelefone] = useState("");
   const [clienteCpf, setClienteCpf] = useState("");
   const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (venda) {
