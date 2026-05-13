@@ -294,44 +294,24 @@ const VendasPage = () => {
         }
       }
 
-      // Auto-register entrada in cobranca system (with dedup guard)
-      if (temEntrada && entrada > 0) {
-        const entradaDate = dataEntrada || new Date().toISOString().split("T")[0];
-        
-        // DEDUP: Check if entrada already exists for this client on this date
-        const { data: existingEntrada } = await supabase
-          .from("cobrancas")
-          .select("id")
-          .eq("cliente_id", selectedCliente.id)
-          .eq("data_inicio", entradaDate)
-          .ilike("observacoes", "Entrada%")
-          .limit(1);
-
-        if (!existingEntrada || existingEntrada.length === 0) {
-          const { data: cob } = await supabase.from("cobrancas").insert({
-            cliente_id: selectedCliente.id,
-            cliente_nome: selectedCliente.nome,
-            valor_parcela: entrada,
-            data_inicio: entradaDate,
-            data_fim: entradaDate,
-            frequencia: "mes",
-            criado_por: user!.id,
-            observacoes: `Entrada da venda #${venda.id.slice(0, 8)}`,
-          }).select().single();
-
-          if (cob) {
-            await supabase.from("cobranca_pagamentos").insert({
-              cobranca_id: cob.id,
-              data_vencimento: entradaDate,
-              status: "pago",
-              pago_em: new Date().toISOString(),
-              pago_por: user!.id,
-              tipo_pagamento: "entrada",
-            });
-          }
-        }
-      }
+      // Cria/atualiza agenda (entrada + parcelas) vinculada à venda
+      const { rebuildVendaSchedule } = await import("@/lib/venda-sync");
+      await rebuildVendaSchedule({
+        vendaId: venda.id,
+        clienteId: selectedCliente.id,
+        clienteNome: selectedCliente.nome,
+        status: "concluida",
+        formaPagamento,
+        valorEntrada: temEntrada ? entrada : 0,
+        numParcelas: formaPagamento === "avista" ? 1 : numParcelas,
+        valorParcela: formaPagamento === "avista" ? total : valorParcela,
+        frequencia,
+        dataInicioPagamento: formaPagamento === "avista" ? null : (dataInicio || null),
+        dataEntrada: temEntrada ? dataEntrada : null,
+        criadoPor: user!.id,
+      });
     }
+    window.dispatchEvent(new CustomEvent("venda-updated", { detail: { id: venda.id } }));
 
       toast.success(status === "concluida" ? "Venda finalizada e enviada para o painel!" : "Simulação salva!");
       setDialogOpen(false);
