@@ -222,35 +222,57 @@ const VendasPage = () => {
   };
 
   const finalizarVenda = async (status: "simulacao" | "concluida") => {
+    if (submittingVenda) return; // anti duplo-clique
     if (!selectedCliente) { toast.error("Selecione um cliente"); return; }
     if (cart.length === 0) { toast.error("Adicione produtos"); return; }
     if (total <= 0) { toast.error("Valor total deve ser maior que R$ 0,00"); return; }
     if (formaPagamento === "parcelado" && valorParcela <= 0) { toast.error("Valor da parcela deve ser maior que R$ 0,00"); return; }
     if (temEntrada && entrada <= 0) { toast.error("Valor da entrada deve ser maior que R$ 0,00"); return; }
 
-    const { data: venda, error } = await supabase
-      .from("vendas")
-      .insert({
-        cliente_nome: selectedCliente.nome,
-        cliente_telefone: selectedCliente.telefone || null,
-        cliente_cpf: selectedCliente.cpf || null,
-        valor_total: total,
-        valor_entrada: temEntrada ? entrada : 0,
-        data_entrada: temEntrada ? dataEntrada : null,
-        num_parcelas: formaPagamento === "avista" ? 1 : numParcelas,
-        valor_parcela: formaPagamento === "avista" ? total : valorParcela,
-        desconto_percentual: desconto,
-        status,
-        vendedor_id: user!.id,
-        forma_pagamento: formaPagamento,
-        frequencia_parcela: formaPagamento === "avista" ? null : frequencia,
-        data_inicio_pagamento: formaPagamento === "avista" ? null : dataInicio || null,
-        observacoes: observacoes || null,
-      })
-      .select()
-      .single();
+    setSubmittingVenda(true);
+    try {
+      // ===== Dedup: bloqueia venda idêntica criada nos últimos 2 minutos =====
+      const doisMinAtras = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const { data: dupCheck } = await supabase
+        .from("vendas")
+        .select("id")
+        .eq("cliente_nome", selectedCliente.nome)
+        .eq("valor_total", total)
+        .eq("num_parcelas", formaPagamento === "avista" ? 1 : numParcelas)
+        .gte("created_at", doisMinAtras)
+        .limit(1);
 
-    if (error || !venda) { toast.error("Erro ao salvar venda"); return; }
+      if (dupCheck && dupCheck.length > 0) {
+        toast.error("Venda idêntica já registrada há instantes. Recarregando...");
+        await fetchVendas();
+        setDialogOpen(false);
+        resetForm();
+        return;
+      }
+
+      const { data: venda, error } = await supabase
+        .from("vendas")
+        .insert({
+          cliente_nome: selectedCliente.nome,
+          cliente_telefone: selectedCliente.telefone || null,
+          cliente_cpf: selectedCliente.cpf || null,
+          valor_total: total,
+          valor_entrada: temEntrada ? entrada : 0,
+          data_entrada: temEntrada ? dataEntrada : null,
+          num_parcelas: formaPagamento === "avista" ? 1 : numParcelas,
+          valor_parcela: formaPagamento === "avista" ? total : valorParcela,
+          desconto_percentual: desconto,
+          status,
+          vendedor_id: user!.id,
+          forma_pagamento: formaPagamento,
+          frequencia_parcela: formaPagamento === "avista" ? null : frequencia,
+          data_inicio_pagamento: formaPagamento === "avista" ? null : dataInicio || null,
+          observacoes: observacoes || null,
+        })
+        .select()
+        .single();
+
+      if (error || !venda) { toast.error("Erro ao salvar venda"); return; }
 
     const itens = cart.map((c) => ({
       venda_id: venda.id,
