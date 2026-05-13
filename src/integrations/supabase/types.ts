@@ -333,6 +333,7 @@ export type Database = {
           observacoes: string | null
           updated_at: string | null
           valor_parcela: number
+          venda_id: string | null
         }
         Insert: {
           cliente_id: string
@@ -346,6 +347,7 @@ export type Database = {
           observacoes?: string | null
           updated_at?: string | null
           valor_parcela: number
+          venda_id?: string | null
         }
         Update: {
           cliente_id?: string
@@ -359,6 +361,7 @@ export type Database = {
           observacoes?: string | null
           updated_at?: string | null
           valor_parcela?: number
+          venda_id?: string | null
         }
         Relationships: [
           {
