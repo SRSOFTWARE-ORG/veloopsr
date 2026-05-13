@@ -918,11 +918,11 @@ const VendasPage = () => {
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => finalizarVenda("simulacao")}>
-                  <Calculator className="w-4 h-4 mr-1" /> Simular
+                <Button variant="outline" disabled={submittingVenda} onClick={() => finalizarVenda("simulacao")}>
+                  <Calculator className="w-4 h-4 mr-1" /> {submittingVenda ? "Salvando..." : "Simular"}
                 </Button>
-                <Button onClick={() => finalizarVenda("concluida")}>
-                  <Check className="w-4 h-4 mr-1" /> Finalizar
+                <Button disabled={submittingVenda} onClick={() => finalizarVenda("concluida")}>
+                  <Check className="w-4 h-4 mr-1" /> {submittingVenda ? "Salvando..." : "Finalizar"}
                 </Button>
               </div>
             )}
