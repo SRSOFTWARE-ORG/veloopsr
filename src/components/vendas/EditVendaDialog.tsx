@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/masks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
   const [clienteTelefone, setClienteTelefone] = useState("");
   const [clienteCpf, setClienteCpf] = useState("");
   const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (venda) {
@@ -94,6 +96,7 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
     if (!clienteNome.trim()) { toast.error("Nome do cliente é obrigatório"); return; }
     setSaving(true);
     try {
+      const novaEntrada = formaPagamento === "parcelado" ? valorEntrada : 0;
       const { error } = await supabase
         .from("vendas")
         .update({
@@ -101,7 +104,7 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
           cliente_telefone: clienteTelefone || null,
           cliente_cpf: clienteCpf || null,
           valor_total: valorTotal,
-          valor_entrada: valorEntrada,
+          valor_entrada: novaEntrada,
           num_parcelas: formaPagamento === "avista" ? 1 : numParcelas,
           valor_parcela: formaPagamento === "avista" ? valorTotal : valorParcela,
           desconto_percentual: descontoPercentual,
@@ -115,11 +118,71 @@ const EditVendaDialog = ({ venda, open, onOpenChange, onSaved }: EditVendaDialog
 
       if (error) {
         toast.error("Erro ao salvar: " + error.message);
-      } else {
-        toast.success("Venda atualizada com sucesso!");
-        onOpenChange(false);
-        onSaved();
+        return;
       }
+
+      // ===== Sincroniza cobranças/pagamentos vinculados a esta venda =====
+      // 1) Apaga registros antigos da entrada (gerados automaticamente)
+      const tag = `Entrada da venda #${venda.id.slice(0, 8)}`;
+      const { data: cobrancasAntigas } = await supabase
+        .from("cobrancas")
+        .select("id")
+        .ilike("observacoes", `%${tag}%`);
+
+      const idsAntigos = (cobrancasAntigas || []).map((c) => c.id);
+      if (idsAntigos.length > 0) {
+        await supabase.from("cobranca_pagamentos").delete().in("cobranca_id", idsAntigos);
+        await supabase.from("cobrancas").delete().in("id", idsAntigos);
+      }
+
+      // 2) Recria a entrada com o valor novo (se houver)
+      if (novaEntrada > 0 && status === "concluida") {
+        const { data: { user } } = await supabase.auth.getUser();
+        const dataEntrada = new Date().toISOString().split("T")[0];
+
+        // Tenta achar cliente_id pelo nome/cpf
+        let clienteId: string | null = null;
+        if (clienteCpf) {
+          const { data: cli } = await supabase
+            .from("clientes").select("id").eq("cpf", clienteCpf).maybeSingle();
+          clienteId = cli?.id || null;
+        }
+        if (!clienteId) {
+          const { data: cli } = await supabase
+            .from("clientes").select("id").ilike("nome", clienteNome.trim()).limit(1).maybeSingle();
+          clienteId = cli?.id || null;
+        }
+
+        const { data: cob } = await supabase.from("cobrancas").insert({
+          cliente_id: clienteId || "00000000-0000-0000-0000-000000000000",
+          cliente_nome: clienteNome.trim(),
+          valor_parcela: novaEntrada,
+          data_inicio: dataEntrada,
+          data_fim: dataEntrada,
+          frequencia: "mes",
+          criado_por: user!.id,
+          observacoes: tag,
+        }).select().single();
+
+        if (cob) {
+          await supabase.from("cobranca_pagamentos").insert({
+            cobranca_id: cob.id,
+            data_vencimento: dataEntrada,
+            status: "pago",
+            pago_em: new Date().toISOString(),
+            pago_por: user!.id,
+            tipo_pagamento: "entrada",
+          });
+        }
+      }
+
+      // 3) Invalida caches e notifica todas as telas para recarregar
+      queryClient.invalidateQueries();
+      window.dispatchEvent(new CustomEvent("venda-updated", { detail: { id: venda.id } }));
+
+      toast.success("Venda atualizada — dados antigos substituídos");
+      onOpenChange(false);
+      onSaved();
     } catch (err: any) {
       toast.error(err.message || "Erro inesperado");
     } finally {
