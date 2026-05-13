@@ -333,11 +333,14 @@ const VendasPage = () => {
       }
     }
 
-    toast.success(status === "concluida" ? "Venda finalizada e enviada para o painel!" : "Simulação salva!");
-    setDialogOpen(false);
-    resetForm();
-    fetchVendas();
-    fetchProdutos();
+      toast.success(status === "concluida" ? "Venda finalizada e enviada para o painel!" : "Simulação salva!");
+      setDialogOpen(false);
+      resetForm();
+      fetchVendas();
+      fetchProdutos();
+    } finally {
+      setSubmittingVenda(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
