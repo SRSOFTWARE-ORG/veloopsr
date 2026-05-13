@@ -1,0 +1,2 @@
+DELETE FROM venda_itens WHERE venda_id IN ('4541297a-bb7d-4a84-a091-9513a4fdb757','07a83d97-7958-4e40-8f0a-7b864e3bbef6');
+DELETE FROM vendas WHERE id IN ('4541297a-bb7d-4a84-a091-9513a4fdb757','07a83d97-7958-4e40-8f0a-7b864e3bbef6');
