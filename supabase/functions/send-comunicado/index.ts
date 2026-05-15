@@ -7,8 +7,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function randomDelay(min: number, max: number): Promise<void> {
-  const ms = Math.floor(Math.random() * (max - min + 1) + min) * 1000;
+// Time budget per invocation. Edge Function wall time is ~150s; leave margin.
+const TIME_BUDGET_MS = 110_000;
+// Anti-ban delay between sends (per project memory: 15-30s)
+const DELAY_MIN_S = 15;
+const DELAY_MAX_S = 30;
+
+function randomDelay(minS: number, maxS: number): Promise<void> {
+  const ms = Math.floor(Math.random() * (maxS - minS + 1) + minS) * 1000;
   return new Promise((r) => setTimeout(r, ms));
 }
 
@@ -16,7 +22,6 @@ function sanitizePhone(phone: string): string | null {
   let cleaned = phone.replace(/\D/g, "");
   if (cleaned.startsWith("0")) cleaned = cleaned.slice(1);
   if (!cleaned.startsWith("55")) cleaned = "55" + cleaned;
-  // Must be 12-13 digits (55 + DDD + number)
   if (cleaned.length < 12 || cleaned.length > 13) return null;
   return cleaned;
 }
@@ -26,37 +31,45 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const START = Date.now();
 
+  try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify user
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Sessão inválida" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const serviceClient = createClient(supabaseUrl, serviceKey);
-
-    const body = await req.json();
-    const { comunicado_id, test_phone, test_name, filtro } = body;
+    const body = await req.json().catch(() => ({}));
+    const { comunicado_id, test_phone, test_name, filtro, _resume } = body;
 
     const isTest = !!test_phone;
+    const isResume = !!_resume;
+
+    const authHeader = req.headers.get("authorization");
+
+    // Service client always available
+    const serviceClient = createClient(supabaseUrl, serviceKey);
+
+    // Identify user (skipped on background resume calls authenticated with service role)
+    let userId: string | null = null;
+    if (!isResume) {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
+    }
 
     const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
@@ -70,7 +83,7 @@ Deno.serve(async (req) => {
 
     const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
 
-    // Test mode: send single message
+    // ===== TEST MODE =====
     if (isTest) {
       const phone = sanitizePhone(test_phone);
       if (!phone) {
@@ -112,7 +125,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Bulk mode
+    // ===== BULK MODE =====
     if (!comunicado_id) {
       return new Response(JSON.stringify({ error: "comunicado_id obrigatório" }), {
         status: 400,
@@ -134,151 +147,173 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all clients with phone (include extra fields for template variables)
-    const { data: clientes } = await serviceClient
-      .from("clientes")
-      .select("id, nome, telefone, cpf, email")
-      .not("telefone", "is", null);
+    // Check if destinatarios already exist (resume vs initial)
+    const { count: existingCount } = await serviceClient
+      .from("comunicado_destinatarios")
+      .select("id", { count: "exact", head: true })
+      .eq("comunicado_id", comunicado_id);
 
-    if (!clientes || clientes.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhum cliente com telefone cadastrado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const isInitial = (existingCount || 0) === 0;
 
-    // Apply payment status filter using projected dates (same logic as agenda)
-    let allowedClientIds: Set<string> | null = null;
-    if (filtro && filtro !== "todos") {
-      const { data: cobrancas } = await serviceClient.from("cobrancas").select("id, cliente_id, data_inicio, data_fim, frequencia");
-      const { data: pagamentos } = await serviceClient.from("cobranca_pagamentos").select("cobranca_id, status, data_vencimento");
+    // ===== INITIAL DISPATCH: build recipient list =====
+    if (isInitial) {
+      const { data: clientes } = await serviceClient
+        .from("clientes")
+        .select("id, nome, telefone, cpf, email")
+        .not("telefone", "is", null);
 
-      if (cobrancas) {
-        const hoje = new Date().toISOString().split("T")[0];
-        const DAY = 86400000;
+      if (!clientes || clientes.length === 0) {
+        return new Response(JSON.stringify({ error: "Nenhum cliente com telefone cadastrado" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-        const statusMap = new Map<string, string>();
-        for (const p of (pagamentos || [])) {
-          statusMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
-        }
+      // Apply payment status filter using projected dates
+      let allowedClientIds: Set<string> | null = null;
+      if (filtro && filtro !== "todos") {
+        const { data: cobrancas } = await serviceClient
+          .from("cobrancas").select("id, cliente_id, data_inicio, data_fim, frequencia");
+        const { data: pagamentos } = await serviceClient
+          .from("cobranca_pagamentos").select("cobranca_id, status, data_vencimento");
 
-        function addMonthsP(date: Date, months: number): Date {
-          const next = new Date(date);
-          const originalDay = next.getUTCDate();
-          next.setUTCDate(1);
-          next.setUTCMonth(next.getUTCMonth() + months);
-          const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
-          next.setUTCDate(Math.min(originalDay, lastDay));
-          return next;
-        }
-
-        function genDates(inicio: string, fim: string, freq: string): string[] {
-          const start = new Date(`${inicio}T00:00:00Z`);
-          const end = new Date(`${fim}T00:00:00Z`);
-          const dates: string[] = [];
-          let cur = new Date(start);
-          while (cur <= end) {
-            dates.push(cur.toISOString().slice(0, 10));
-            if (freq === "semana") cur = new Date(cur.getTime() + 7 * DAY);
-            else if (freq === "quinzena") cur = new Date(cur.getTime() + 15 * DAY);
-            else cur = addMonthsP(cur, 1);
+        if (cobrancas) {
+          const hoje = new Date().toISOString().split("T")[0];
+          const DAY = 86400000;
+          const statusMap = new Map<string, string>();
+          for (const p of (pagamentos || [])) {
+            statusMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
           }
-          return dates;
-        }
-
-        const clientesComPendente = new Set<string>();
-        const clientesComAtraso = new Set<string>();
-        const clientesComCobranca = new Set<string>();
-
-        for (const cob of cobrancas) {
-          const dates = genDates(cob.data_inicio, cob.data_fim, cob.frequencia);
-          for (const date of dates) {
-            const status = statusMap.get(`${cob.id}_${date}`) || "a_pagar";
-            if (status === "pago" || status === "isento") continue;
-            clientesComCobranca.add(cob.cliente_id);
-            clientesComPendente.add(cob.cliente_id);
-            if (date < hoje) {
-              clientesComAtraso.add(cob.cliente_id);
+          const addMonthsP = (date: Date, months: number): Date => {
+            const next = new Date(date);
+            const originalDay = next.getUTCDate();
+            next.setUTCDate(1);
+            next.setUTCMonth(next.getUTCMonth() + months);
+            const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+            next.setUTCDate(Math.min(originalDay, lastDay));
+            return next;
+          };
+          const genDates = (inicio: string, fim: string, freq: string): string[] => {
+            const start = new Date(`${inicio}T00:00:00Z`);
+            const end = new Date(`${fim}T00:00:00Z`);
+            const dates: string[] = [];
+            let cur = new Date(start);
+            while (cur <= end) {
+              dates.push(cur.toISOString().slice(0, 10));
+              if (freq === "semana") cur = new Date(cur.getTime() + 7 * DAY);
+              else if (freq === "quinzena") cur = new Date(cur.getTime() + 15 * DAY);
+              else cur = addMonthsP(cur, 1);
+            }
+            return dates;
+          };
+          const clientesComPendente = new Set<string>();
+          const clientesComAtraso = new Set<string>();
+          const clientesComCobranca = new Set<string>();
+          for (const cob of cobrancas) {
+            const dates = genDates(cob.data_inicio, cob.data_fim, cob.frequencia);
+            for (const date of dates) {
+              const status = statusMap.get(`${cob.id}_${date}`) || "a_pagar";
+              if (status === "pago" || status === "isento") continue;
+              clientesComCobranca.add(cob.cliente_id);
+              clientesComPendente.add(cob.cliente_id);
+              if (date < hoje) clientesComAtraso.add(cob.cliente_id);
             }
           }
+          allowedClientIds = new Set<string>();
+          if (filtro === "com_pendentes") clientesComPendente.forEach(id => allowedClientIds!.add(id));
+          else if (filtro === "com_atraso") clientesComAtraso.forEach(id => allowedClientIds!.add(id));
+          else if (filtro === "em_dia") clientesComCobranca.forEach(id => { if (!clientesComPendente.has(id)) allowedClientIds!.add(id); });
         }
+      }
 
-        allowedClientIds = new Set<string>();
-        if (filtro === "com_pendentes") {
-          clientesComPendente.forEach(id => allowedClientIds!.add(id));
-        } else if (filtro === "com_atraso") {
-          clientesComAtraso.forEach(id => allowedClientIds!.add(id));
-        } else if (filtro === "em_dia") {
-          clientesComCobranca.forEach(id => {
-            if (!clientesComPendente.has(id)) allowedClientIds!.add(id);
-          });
-        }
+      const { data: blacklist } = await serviceClient.from("whatsapp_blacklist").select("telefone");
+      const blackSet = new Set((blacklist || []).map((b: any) => sanitizePhone(b.telefone)).filter(Boolean));
+
+      const seen = new Set<string>();
+      const recipients: { id: string; nome: string; telefone: string; sanitized: string }[] = [];
+      for (const c of clientes) {
+        const sanitized = sanitizePhone(c.telefone || "");
+        if (!sanitized || seen.has(sanitized) || blackSet.has(sanitized)) continue;
+        if (allowedClientIds && !allowedClientIds.has(c.id)) continue;
+        seen.add(sanitized);
+        recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized });
+      }
+
+      await serviceClient.from("comunicados").update({
+        status: "enviando",
+        total_destinatarios: recipients.length,
+        total_enviados: 0,
+        total_falhas: 0,
+      }).eq("id", comunicado_id);
+
+      const destRows = recipients.map((r) => ({
+        comunicado_id,
+        cliente_id: r.id,
+        nome: r.nome,
+        telefone: r.telefone,
+        status: "pendente",
+      }));
+      for (let i = 0; i < destRows.length; i += 500) {
+        await serviceClient.from("comunicado_destinatarios").insert(destRows.slice(i, i + 500));
       }
     }
 
-    // Get blacklist
-    const { data: blacklist } = await serviceClient
-      .from("whatsapp_blacklist")
-      .select("telefone");
+    // ===== PROCESS PENDING (resume-friendly) =====
+    // Always re-load pending list from DB so we can resume anytime.
+    const { data: pendentesRaw } = await serviceClient
+      .from("comunicado_destinatarios")
+      .select("id, cliente_id, nome, telefone")
+      .eq("comunicado_id", comunicado_id)
+      .eq("status", "pendente");
 
-    const blackSet = new Set((blacklist || []).map((b: any) => sanitizePhone(b.telefone)).filter(Boolean));
+    const pendentes = pendentesRaw || [];
 
-    // Deduplicate by sanitized phone
-    const seen = new Set<string>();
-    const recipients: { id: string; nome: string; telefone: string; sanitized: string; cpf: string | null; email: string | null }[] = [];
-
-    for (const c of clientes) {
-      const sanitized = sanitizePhone(c.telefone || "");
-      if (!sanitized || seen.has(sanitized) || blackSet.has(sanitized)) continue;
-      if (allowedClientIds && !allowedClientIds.has(c.id)) continue;
-      seen.add(sanitized);
-      recipients.push({ id: c.id, nome: c.nome, telefone: c.telefone, sanitized, cpf: c.cpf || null, email: c.email || null });
+    // Pre-fetch cpf/email for template variables in one call
+    const clienteIds = Array.from(new Set(pendentes.map((p: any) => p.cliente_id).filter(Boolean)));
+    const cliMap = new Map<string, { cpf: string | null; email: string | null }>();
+    if (clienteIds.length) {
+      const { data: cliExtras } = await serviceClient
+        .from("clientes").select("id, cpf, email").in("id", clienteIds);
+      for (const c of (cliExtras || [])) cliMap.set(c.id, { cpf: c.cpf, email: c.email });
     }
 
-    // Update comunicado status
-    await serviceClient.from("comunicados").update({
-      status: "enviando",
-      total_destinatarios: recipients.length,
-      total_enviados: 0,
-      total_falhas: 0,
-    }).eq("id", comunicado_id);
+    let processedThisRun = 0;
+    let timedOut = false;
 
-    // Insert all recipients as pending
-    const destRows = recipients.map((r) => ({
-      comunicado_id,
-      cliente_id: r.id,
-      nome: r.nome,
-      telefone: r.telefone,
-      status: "pendente",
-    }));
+    for (let i = 0; i < pendentes.length; i++) {
+      // Stop before timeout — leave ~25s margin for one more send + final ops
+      if (Date.now() - START > TIME_BUDGET_MS) {
+        timedOut = true;
+        break;
+      }
 
-    // Insert in batches of 500
-    for (let i = 0; i < destRows.length; i += 500) {
-      await serviceClient.from("comunicado_destinatarios").insert(destRows.slice(i, i + 500));
-    }
+      const r: any = pendentes[i];
+      const sanitized = sanitizePhone(r.telefone || "");
+      if (!sanitized) {
+        await serviceClient
+          .from("comunicado_destinatarios")
+          .update({ status: "falha", erro: "Telefone inválido" })
+          .eq("id", r.id);
+        continue;
+      }
 
-    // Send messages one by one with random delay
-    let enviados = 0;
-    let falhas = 0;
-
-    for (const r of recipients) {
-      const firstName = r.nome.split(" ")[0];
+      const firstName = (r.nome || "Cliente").split(" ")[0];
+      const extras = cliMap.get(r.cliente_id) || { cpf: null, email: null };
       const finalMsg = comunicado.mensagem
         .replace(/\{\{nome\}\}/gi, firstName)
-        .replace(/\{\{nome_completo\}\}/gi, r.nome)
-        .replace(/\{\{cpf\}\}/gi, r.cpf || "")
+        .replace(/\{\{nome_completo\}\}/gi, r.nome || "Cliente")
+        .replace(/\{\{cpf\}\}/gi, extras.cpf || "")
         .replace(/\{\{telefone\}\}/gi, r.telefone || "")
-        .replace(/\{\{email\}\}/gi, r.email || "");
+        .replace(/\{\{email\}\}/gi, extras.email || "");
 
       let success = false;
       let erro = "";
-
       try {
         if (comunicado.formato === "midia" && comunicado.media_url) {
           const res = await fetch(`${apiUrl}/send/media`, {
             method: "POST",
             headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: r.sanitized, media: comunicado.media_url, caption: finalMsg, linkPreview: false }),
+            body: JSON.stringify({ number: sanitized, media: comunicado.media_url, caption: finalMsg, linkPreview: false }),
           });
           const result = await res.json();
           success = res.ok && !result.error;
@@ -287,7 +322,7 @@ Deno.serve(async (req) => {
           const res = await fetch(`${apiUrl}/send/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: r.sanitized, text: finalMsg, linkPreview: false }),
+            body: JSON.stringify({ number: sanitized, text: finalMsg, linkPreview: false }),
           });
           const result = await res.json();
           success = res.ok && !result.error;
@@ -297,10 +332,6 @@ Deno.serve(async (req) => {
         erro = e instanceof Error ? e.message : "Erro de conexão";
       }
 
-      if (success) enviados++;
-      else falhas++;
-
-      // Update individual recipient status
       await serviceClient
         .from("comunicado_destinatarios")
         .update({
@@ -308,68 +339,90 @@ Deno.serve(async (req) => {
           erro: erro || null,
           enviado_em: success ? new Date().toISOString() : null,
         })
-        .eq("comunicado_id", comunicado_id)
-        .eq("telefone", r.telefone);
+        .eq("id", r.id);
 
-      // Update comunicado counters
-      await serviceClient.from("comunicados").update({
-        total_enviados: enviados,
-        total_falhas: falhas,
-      }).eq("id", comunicado_id);
+      processedThisRun++;
 
-      // Random delay 15-30s between sends (anti-ban)
-      if (recipients.indexOf(r) < recipients.length - 1) {
-        await randomDelay(15, 30);
-      }
+      // Anti-ban delay (skip if last in this batch)
+      const hasMore = i < pendentes.length - 1 && (Date.now() - START) < TIME_BUDGET_MS;
+      if (hasMore) await randomDelay(DELAY_MIN_S, DELAY_MAX_S);
     }
 
-    // Final status
+    // Recompute totals from DB (source of truth)
+    const [{ count: enviadosCount }, { count: falhasCount }, { count: pendentesCount }] = await Promise.all([
+      serviceClient.from("comunicado_destinatarios").select("id", { count: "exact", head: true }).eq("comunicado_id", comunicado_id).eq("status", "enviado"),
+      serviceClient.from("comunicado_destinatarios").select("id", { count: "exact", head: true }).eq("comunicado_id", comunicado_id).eq("status", "falha"),
+      serviceClient.from("comunicado_destinatarios").select("id", { count: "exact", head: true }).eq("comunicado_id", comunicado_id).eq("status", "pendente"),
+    ]);
+
+    const enviados = enviadosCount || 0;
+    const falhas = falhasCount || 0;
+    const restantes = pendentesCount || 0;
+
+    if (restantes > 0) {
+      // Still work to do — keep status as 'enviando' and self-invoke to continue
+      await serviceClient.from("comunicados").update({
+        status: "enviando",
+        total_enviados: enviados,
+        total_falhas: falhas,
+        updated_at: new Date().toISOString(),
+      }).eq("id", comunicado_id);
+
+      // Fire-and-forget background continuation
+      const continueUrl = `${supabaseUrl}/functions/v1/send-comunicado`;
+      const continuePromise = fetch(continueUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({ comunicado_id, _resume: true }),
+      }).catch((e) => console.error("[send-comunicado] resume invoke failed:", e));
+
+      try {
+        // @ts-ignore
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(continuePromise);
+        }
+      } catch { /* noop */ }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          partial: true,
+          processedThisRun,
+          enviados,
+          falhas,
+          restantes,
+          message: "Lote processado, continuação agendada automaticamente",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Done
+    const totalDest = enviados + falhas;
     await serviceClient.from("comunicados").update({
-      status: falhas === recipients.length ? "falha" : "concluido",
+      status: totalDest > 0 && falhas === totalDest ? "falha" : "concluido",
       total_enviados: enviados,
       total_falhas: falhas,
       updated_at: new Date().toISOString(),
     }).eq("id", comunicado_id);
 
-    // Audit log
-    await serviceClient.from("audit_log").insert({
-      user_id: user.id,
-      tabela: "comunicados",
-      acao: "disparo_comunicado",
-      registro_id: comunicado_id,
-      detalhes: { total: recipients.length, enviados, falhas },
-    });
-
-    // Dispatch webhook to n8n with full campaign data
-    const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
-    if (n8nUrl) {
-      try {
-        const clientesList = recipients.map((r) => ({
-          nome: r.nome,
-          telefone: r.sanitized,
-        }));
-        await fetch(n8nUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event: "comunicado_enviado",
-            comunicado_id,
-            titulo: comunicado.titulo,
-            mensagem: comunicado.mensagem,
-            formato: comunicado.formato,
-            clientes: clientesList,
-            resultado: { total: recipients.length, enviados, falhas },
-            timestamp: new Date().toISOString(),
-            source: "veloop",
-          }),
-        });
-      } catch (e) {
-        console.error("[Webhook n8n] Error:", e);
-      }
+    if (userId) {
+      await serviceClient.from("audit_log").insert({
+        user_id: userId,
+        tabela: "comunicados",
+        acao: "disparo_comunicado",
+        registro_id: comunicado_id,
+        detalhes: { total: totalDest, enviados, falhas },
+      });
     }
 
     return new Response(
-      JSON.stringify({ success: true, total: recipients.length, enviados, falhas }),
+      JSON.stringify({ success: true, total: totalDest, enviados, falhas, processedThisRun }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
