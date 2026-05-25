@@ -544,8 +544,30 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
   }
 }
 
+
+async function _verifyAuth(req: Request) {
+  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+  if (!token) return null;
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
+  });
+  if (!r.ok) return null;
+  return await r.json();
+}
+async function _isAdmin(userId: string): Promise<boolean> {
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=id`, {
+    headers: { apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}` },
+  });
+  if (!r.ok) return false;
+  const d = await r.json();
+  return Array.isArray(d) && d.length > 0;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const _user = await _verifyAuth(req);
+  if (!_user?.id) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (!(await _isAdmin(_user.id))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
