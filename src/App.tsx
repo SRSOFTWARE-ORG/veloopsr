@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import IntroScreen from "@/components/IntroScreen";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useFirebaseInit } from "@/hooks/useFirebase";
 
 // Eager imports for critical pages — no lazy loading delay
@@ -224,7 +225,9 @@ const App = () => {
                       path="/configuracoes"
                       element={
                         <ProtectedRoute>
-                          <ConfiguracoesPage />
+                          <ErrorBoundary label="ConfiguracoesPage">
+                            <ConfiguracoesPage />
+                          </ErrorBoundary>
                         </ProtectedRoute>
                       }
                     />

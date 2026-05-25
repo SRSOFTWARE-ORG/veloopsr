@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import RecebidosDetalhes from "./RecebidosDetalhes";
 import PendentesDetalhes from "./PendentesDetalhes";
+import CustomPeriodPicker from "./CustomPeriodPicker";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
@@ -40,17 +41,21 @@ const COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)"];
 
 const CobrancaResumo = () => {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
+  const [custom, setCustom] = useState<{ start: string; end: string } | null>(null);
   const [recebido, setRecebido] = useState(0);
   const [pendente, setPendente] = useState(0);
   const [recebidosOpen, setRecebidosOpen] = useState(false);
   const [pendentesOpen, setPendentesOpen] = useState(false);
 
+  const range = useMemo(() => custom ?? getDateRange(periodo), [custom, periodo]);
+
   useEffect(() => {
     fetchData();
-  }, [periodo]);
+  }, [range.start, range.end]);
+
 
   const fetchData = async () => {
-    const { start, end } = getDateRange(periodo);
+    const { start, end } = range;
 
     let totalRecebido = 0;
     let totalPendente = 0;
@@ -167,13 +172,13 @@ const CobrancaResumo = () => {
             Cobranças
           </CardTitle>
         </div>
-        <div className="flex gap-1.5 mt-2 flex-wrap">
+        <div className="flex gap-1.5 mt-2 flex-wrap items-center">
           {(Object.keys(periodoLabels) as Periodo[]).map((p) => (
             <button
               key={p}
-              onClick={() => setPeriodo(p)}
+              onClick={() => { setCustom(null); setPeriodo(p); }}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                periodo === p
+                !custom && periodo === p
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
@@ -181,6 +186,13 @@ const CobrancaResumo = () => {
               {periodoLabels[p]}
             </button>
           ))}
+          <CustomPeriodPicker
+            start={range.start}
+            end={range.end}
+            active={!!custom}
+            onChange={(s, e) => setCustom({ start: s, end: e })}
+            onClear={() => setCustom(null)}
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -255,14 +267,14 @@ const CobrancaResumo = () => {
     <RecebidosDetalhes
       open={recebidosOpen}
       onOpenChange={setRecebidosOpen}
-      start={getDateRange(periodo).start}
-      end={getDateRange(periodo).end}
+      start={range.start}
+      end={range.end}
     />
     <PendentesDetalhes
       open={pendentesOpen}
       onOpenChange={setPendentesOpen}
-      start={getDateRange(periodo).start}
-      end={getDateRange(periodo).end}
+      start={range.start}
+      end={range.end}
     />
     </>
   );

@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, XCircle, AlertCircle, Plug, ChevronDown, ChevronUp, Play } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Plug, ChevronDown, ChevronUp, Play, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface LogEntry {
@@ -77,6 +78,36 @@ export default function IntegrationStatusPanel() {
   const [running, setRunning] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const intervalRef = useRef<number | null>(null);
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [reconnectLoading, setReconnectLoading] = useState(false);
+  const [reconnectQr, setReconnectQr] = useState<string | null>(null);
+  const [reconnectMsg, setReconnectMsg] = useState<string>("");
+
+  const handleReconnectWhatsApp = async () => {
+    setReconnectOpen(true);
+    setReconnectLoading(true);
+    setReconnectQr(null);
+    setReconnectMsg("");
+    try {
+      const { data, error } = await supabase.functions.invoke("uazapi-reconnect", { body: {} });
+      if (error) throw error;
+      if (data?.qrcode) {
+        const qr = data.qrcode.startsWith("data:") ? data.qrcode : `data:image/png;base64,${data.qrcode}`;
+        setReconnectQr(qr);
+        setReconnectMsg("Escaneie o QR code com o WhatsApp do número conectado.");
+      } else if (data?.status === "connected") {
+        setReconnectMsg("✅ Instância já está conectada!");
+        runCheck();
+      } else {
+        setReconnectMsg(`Status: ${data?.status || "desconhecido"}. ${data?.raw?.message || data?.error || "Sem QR retornado."}`);
+      }
+    } catch (e: any) {
+      setReconnectMsg(`Erro: ${e?.message || String(e)}`);
+    } finally {
+      setReconnectLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     runCheck();
@@ -280,6 +311,12 @@ export default function IntegrationStatusPanel() {
               </button>
               {isOpen && (
                 <div className="px-3 pb-3 pt-1 border-t border-border/50 bg-background/40">
+                  {int.key === "wa" && int.status === "offline" && (
+                    <Button size="sm" variant="default" className="w-full mb-2 mt-2 gap-1.5" onClick={handleReconnectWhatsApp}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Reconectar WhatsApp (QR Code)
+                    </Button>
+                  )}
                   {int.logs.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground py-2">Sem logs ainda.</p>
                   ) : (
@@ -309,6 +346,34 @@ export default function IntegrationStatusPanel() {
             : `Auto-verificação a cada 8h • Retry com backoff (até ${MAX_ATTEMPTS}x)`}
         </p>
       </CardContent>
+
+      <Dialog open={reconnectOpen} onOpenChange={setReconnectOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reconectar WhatsApp</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-center">
+            {reconnectLoading && (
+              <div className="flex flex-col items-center gap-2 py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Obtendo QR code da UAZAPI...</p>
+              </div>
+            )}
+            {reconnectQr && (
+              <div className="flex flex-col items-center gap-2">
+                <img src={reconnectQr} alt="QR Code UAZAPI" className="w-56 h-56 border rounded" />
+                <p className="text-xs text-muted-foreground">{reconnectMsg}</p>
+                <Button size="sm" variant="outline" onClick={handleReconnectWhatsApp} className="gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> Gerar novo QR
+                </Button>
+              </div>
+            )}
+            {!reconnectLoading && !reconnectQr && reconnectMsg && (
+              <p className="text-sm py-4">{reconnectMsg}</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
