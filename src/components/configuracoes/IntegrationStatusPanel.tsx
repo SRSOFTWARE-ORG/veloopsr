@@ -346,6 +346,34 @@ export default function IntegrationStatusPanel() {
             : `Auto-verificação a cada 8h • Retry com backoff (até ${MAX_ATTEMPTS}x)`}
         </p>
       </CardContent>
+
+      <Dialog open={reconnectOpen} onOpenChange={setReconnectOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reconectar WhatsApp</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-center">
+            {reconnectLoading && (
+              <div className="flex flex-col items-center gap-2 py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Obtendo QR code da UAZAPI...</p>
+              </div>
+            )}
+            {reconnectQr && (
+              <div className="flex flex-col items-center gap-2">
+                <img src={reconnectQr} alt="QR Code UAZAPI" className="w-56 h-56 border rounded" />
+                <p className="text-xs text-muted-foreground">{reconnectMsg}</p>
+                <Button size="sm" variant="outline" onClick={handleReconnectWhatsApp} className="gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> Gerar novo QR
+                </Button>
+              </div>
+            )}
+            {!reconnectLoading && !reconnectQr && reconnectMsg && (
+              <p className="text-sm py-4">{reconnectMsg}</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
