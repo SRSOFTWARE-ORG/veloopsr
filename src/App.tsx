@@ -224,7 +224,9 @@ const App = () => {
                       path="/configuracoes"
                       element={
                         <ProtectedRoute>
-                          <ConfiguracoesPage />
+                          <ErrorBoundary label="ConfiguracoesPage">
+                            <ConfiguracoesPage />
+                          </ErrorBoundary>
                         </ProtectedRoute>
                       }
                     />
