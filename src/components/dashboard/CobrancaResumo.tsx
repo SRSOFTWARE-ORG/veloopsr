@@ -267,14 +267,14 @@ const CobrancaResumo = () => {
     <RecebidosDetalhes
       open={recebidosOpen}
       onOpenChange={setRecebidosOpen}
-      start={getDateRange(periodo).start}
-      end={getDateRange(periodo).end}
+      start={range.start}
+      end={range.end}
     />
     <PendentesDetalhes
       open={pendentesOpen}
       onOpenChange={setPendentesOpen}
-      start={getDateRange(periodo).start}
-      end={getDateRange(periodo).end}
+      start={range.start}
+      end={range.end}
     />
     </>
   );
