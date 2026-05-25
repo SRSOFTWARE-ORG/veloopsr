@@ -55,7 +55,7 @@ const CobrancaResumo = () => {
 
 
   const fetchData = async () => {
-    const { start, end } = getDateRange(periodo);
+    const { start, end } = range;
 
     let totalRecebido = 0;
     let totalPendente = 0;
