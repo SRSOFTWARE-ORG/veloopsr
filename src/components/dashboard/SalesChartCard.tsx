@@ -101,13 +101,13 @@ const SalesChartCard = () => {
             Vendas
           </CardTitle>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap gap-1.5 items-center">
           {(Object.keys(periodoLabels) as Periodo[]).map((periodo) => (
             <button
               key={periodo}
-              onClick={() => setChartPeriodo(periodo)}
+              onClick={() => { setCustom(null); setChartPeriodo(periodo); }}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                chartPeriodo === periodo
+                !custom && chartPeriodo === periodo
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
@@ -115,6 +115,13 @@ const SalesChartCard = () => {
               {periodoLabels[periodo]}
             </button>
           ))}
+          <CustomPeriodPicker
+            start={range.start}
+            end={range.end}
+            active={!!custom}
+            onChange={(s, e) => setCustom({ start: s, end: e })}
+            onClear={() => setCustom(null)}
+          />
         </div>
       </CardHeader>
       <CardContent>
