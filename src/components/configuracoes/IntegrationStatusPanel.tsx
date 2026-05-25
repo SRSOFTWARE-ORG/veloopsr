@@ -311,6 +311,12 @@ export default function IntegrationStatusPanel() {
               </button>
               {isOpen && (
                 <div className="px-3 pb-3 pt-1 border-t border-border/50 bg-background/40">
+                  {int.key === "wa" && int.status === "offline" && (
+                    <Button size="sm" variant="default" className="w-full mb-2 mt-2 gap-1.5" onClick={handleReconnectWhatsApp}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Reconectar WhatsApp (QR Code)
+                    </Button>
+                  )}
                   {int.logs.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground py-2">Sem logs ainda.</p>
                   ) : (
