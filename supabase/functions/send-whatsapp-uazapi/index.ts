@@ -55,16 +55,15 @@ Deno.serve(async (req) => {
           headers: { "token": token }
         });
         const data = await res.json();
-        const isOnline = res.ok && data?.status === "connected";
-        
-        // Se estava offline e agora está online, poderíamos disparar o reprocessamento aqui
-        // mas é melhor deixar isso para o painel ou um cron job dedicado para evitar recursão
-        
+        const statusStr = data?.instance?.status || data?.status || "unknown";
+        const connectedFlag = data?.status?.connected === true || data?.instance?.status === "connected" || statusStr === "connected";
+        const isOnline = res.ok && connectedFlag;
+
         return new Response(
-          JSON.stringify({ 
-            ok: isOnline, 
-            configured: true, 
-            status: data?.status || "unknown" 
+          JSON.stringify({
+            ok: isOnline,
+            configured: true,
+            status: statusStr,
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
