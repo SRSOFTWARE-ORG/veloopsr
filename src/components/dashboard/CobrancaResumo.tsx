@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import RecebidosDetalhes from "./RecebidosDetalhes";
 import PendentesDetalhes from "./PendentesDetalhes";
+import CustomPeriodPicker from "./CustomPeriodPicker";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
@@ -40,14 +41,18 @@ const COLORS = ["hsl(142, 71%, 45%)", "hsl(0, 84%, 60%)"];
 
 const CobrancaResumo = () => {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
+  const [custom, setCustom] = useState<{ start: string; end: string } | null>(null);
   const [recebido, setRecebido] = useState(0);
   const [pendente, setPendente] = useState(0);
   const [recebidosOpen, setRecebidosOpen] = useState(false);
   const [pendentesOpen, setPendentesOpen] = useState(false);
 
+  const range = useMemo(() => custom ?? getDateRange(periodo), [custom, periodo]);
+
   useEffect(() => {
     fetchData();
-  }, [periodo]);
+  }, [range.start, range.end]);
+
 
   const fetchData = async () => {
     const { start, end } = getDateRange(periodo);
