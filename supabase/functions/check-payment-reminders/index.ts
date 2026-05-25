@@ -428,7 +428,7 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem: `WhatsApp ${entry.tipo} — ${valorFormatado}`,
+          mensagem: mensagemWpp,
           enviado_com_sucesso: enviado,
         });
         cpfsJaEnviados.add(cpf);
