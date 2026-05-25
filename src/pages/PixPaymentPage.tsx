@@ -25,15 +25,15 @@ export default function PixPaymentPage() {
   const parcela = searchParams.get("parcela") || "";
   const clienteId = searchParams.get("cliente_id") || "";
 
-  // Calculate interest: R$2/day after 2 days late
+  // Calculate interest: R$2/day starting on day 1 of overdue
   const jurosInfo = useMemo(() => {
-    if (!dataVencimento) return { diasAtraso: 0, juros: 0, valorFinal: valorBase };
+    if (!dataVencimento) return { diasAtraso: 0, diasComJuros: 0, juros: 0, valorFinal: valorBase };
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(`${dataVencimento}T00:00:00`);
     const diffMs = hoje.getTime() - venc.getTime();
     const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-    const diasComJuros = Math.max(0, diasAtraso - 2); // starts after 2 days
+    const diasComJuros = diasAtraso; // juros desde o 1º dia de atraso
     const juros = diasComJuros * 2; // R$2 per day
     return { diasAtraso, diasComJuros, juros, valorFinal: valorBase + juros };
   }, [dataVencimento, valorBase]);
