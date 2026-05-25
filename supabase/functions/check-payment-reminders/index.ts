@@ -355,12 +355,12 @@ Deno.serve(async (req) => {
           ``,
           `⚠️ *ATENÇÃO — JUROS POR ATRASO* ⚠️`,
           ``,
-          `Após *2 (dois) dias de atraso*, será cobrado`,
+          `A partir do *1º dia de atraso*, será cobrado`,
           `*R$ 2,00 (dois reais) por dia* de atraso`,
           `sobre o valor da fatura.`,
           ``,
-          `📌 *Exemplo:* 5 dias de atraso = R$ 6,00`,
-          `de juros (3 dias × R$ 2,00)`,
+          `📌 *Exemplo:* 5 dias de atraso = R$ 10,00`,
+          `de juros (5 dias × R$ 2,00)`,
           ``,
           `🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨`,
         ] : [];
@@ -428,7 +428,7 @@ Deno.serve(async (req) => {
           data_envio: todayStr,
           tipo_envio: entry.tipo,
           status_fatura: statusAtual,
-          mensagem: `WhatsApp ${entry.tipo} — ${valorFormatado}`,
+          mensagem: mensagemWpp,
           enviado_com_sucesso: enviado,
         });
         cpfsJaEnviados.add(cpf);
