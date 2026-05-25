@@ -83,68 +83,89 @@ const CobrancaResumo = () => {
       .gte("pago_em", `${start}T00:00:00`)
       .lte("pago_em", `${end}T23:59:59`);
 
-    // 1b) Parcelas em aberto — não cortar por período para não esconder clientes pendentes
-    const { data: pendentesPeriodo } = await supabase
+    // 1b) PENDENTES = parcelas virtuais com vencimento < hoje, dentro do período,
+    //     e que NÃO estejam pagas/isentas. Igual à lógica da agenda.
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { data: allCobrancas } = await supabase
+      .from("cobrancas")
+      .select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, observacoes");
+    const { data: allPagamentos } = await supabase
       .from("cobranca_pagamentos")
-      .select("cobranca_id, data_vencimento, status")
-      .neq("status", "pago")
-      .neq("status", "isento");
+      .select("cobranca_id, data_vencimento, status");
 
-    // Buscar valores das cobranças envolvidas
-    const allCobrancaIds = [
-      ...new Set([
-        ...(pagosPeriodo || []).map((p) => p.cobranca_id),
-        ...(pendentesPeriodo || []).map((p) => p.cobranca_id),
-      ]),
-    ];
+    const pagMap = new Map<string, string>();
+    (allPagamentos || []).forEach((p) => {
+      pagMap.set(`${p.cobranca_id}_${p.data_vencimento}`, p.status);
+    });
 
-    if (allCobrancaIds.length > 0) {
-      const { data: cobrancas } = await supabase
-        .from("cobrancas")
-        .select("id, valor_parcela")
-        .in("id", allCobrancaIds);
+    const entradaByClient = new Map<string, any>();
+    (allCobrancas || []).forEach((c: any) => {
+      if (c.observacoes?.toLowerCase().startsWith("entrada")) {
+        entradaByClient.set(c.cliente_nome.trim().toUpperCase(), c);
+      }
+    });
+    const merged = (allCobrancas || []).filter((c: any) => {
+      if (!c.observacoes?.toLowerCase().startsWith("entrada")) return true;
+      const key = c.cliente_nome.trim().toUpperCase();
+      return !(allCobrancas || []).some(
+        (o: any) => o.id !== c.id && o.cliente_nome.trim().toUpperCase() === key && !o.observacoes?.toLowerCase().startsWith("entrada")
+      );
+    });
 
-      const valorMap: Record<string, number> = {};
-      cobrancas?.forEach((c) => {
-        valorMap[c.id] = Number(c.valor_parcela);
+    merged.forEach((c: any) => {
+      const dates = generateDates(c.data_inicio, c.data_fim, c.frequencia);
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const entrada = entradaByClient.get(clientKey);
+      let entradaDate: string | null = null;
+      if (entrada && !c.observacoes?.toLowerCase().startsWith("entrada")) {
+        entradaDate = format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+        if (!dates.includes(entradaDate)) dates.unshift(entradaDate);
+      }
+      dates.forEach((d) => {
+        if (d >= today) return; // só atrasado conta como pendente
+        if (d < start || d > end) return; // filtro do período
+        const statusCobId = entradaDate && d === entradaDate ? entrada.id : c.id;
+        const st = pagMap.get(`${statusCobId}_${d}`);
+        if (st === "pago" || st === "isento") return;
+        const valor = entradaDate && d === entradaDate ? Number(entrada.valor_parcela) : Number(c.valor_parcela);
+        totalPendente += valor;
       });
+    });
 
-      pagosPeriodo?.forEach((p) => {
-        totalRecebido += valorMap[p.cobranca_id] || 0;
-      });
+    // RECEBIDOS — parcelas pagas no período (por pago_em)
+    const { data: pagosPeriodo } = await supabase
+      .from("cobranca_pagamentos")
+      .select("cobranca_id, pago_em")
+      .eq("status", "pago")
+      .gte("pago_em", `${start}T00:00:00`)
+      .lte("pago_em", `${end}T23:59:59`);
 
-      pendentesPeriodo?.forEach((p) => {
-        totalPendente += valorMap[p.cobranca_id] || 0;
+    if (pagosPeriodo && pagosPeriodo.length > 0) {
+      const valorMap = new Map<string, number>();
+      (allCobrancas || []).forEach((c: any) => valorMap.set(c.id, Number(c.valor_parcela)));
+      pagosPeriodo.forEach((p) => {
+        totalRecebido += valorMap.get(p.cobranca_id) || 0;
       });
     }
 
-    // 2) Vendas concluídas — entradas (valor_entrada)
-    // SÓ conta se NÃO existir registro em cobranca_pagamentos tipo='entrada'
-    // para o mesmo cliente/data, evitando DUPLICAÇÃO
+    // Entradas de venda no período (deduplicadas)
     const { data: vendas } = await supabase
       .from("vendas")
       .select("id, cliente_nome, valor_entrada, created_at, data_entrada")
       .eq("status", "concluida");
 
-    // Build dedup set from paid entradas already counted above
     const entradaTracked = new Set<string>();
-    if (pagosPeriodo && allCobrancaIds.length > 0) {
-      const { data: pagosEntrada } = await supabase
-        .from("cobranca_pagamentos")
-        .select("cobranca_id, data_vencimento, tipo_pagamento")
-        .eq("tipo_pagamento", "entrada")
-        .eq("status", "pago");
+    const { data: pagosEntrada } = await supabase
+      .from("cobranca_pagamentos")
+      .select("cobranca_id, data_vencimento")
+      .eq("tipo_pagamento", "entrada")
+      .eq("status", "pago");
 
-      const { data: cobNomes } = await supabase
-        .from("cobrancas")
-        .select("id, cliente_nome")
-        .in("id", [...new Set((pagosEntrada || []).map((p) => p.cobranca_id))]);
-
-      const nomeMap: Record<string, string> = {};
-      cobNomes?.forEach((c) => { nomeMap[c.id] = c.cliente_nome.trim().toUpperCase(); });
-
-      pagosEntrada?.forEach((p) => {
-        const nome = nomeMap[p.cobranca_id];
+    if (pagosEntrada && pagosEntrada.length > 0) {
+      const nomeMap = new Map<string, string>();
+      (allCobrancas || []).forEach((c: any) => nomeMap.set(c.id, c.cliente_nome.trim().toUpperCase()));
+      pagosEntrada.forEach((p) => {
+        const nome = nomeMap.get(p.cobranca_id);
         if (nome) entradaTracked.add(`${nome}_${p.data_vencimento}`);
       });
     }
