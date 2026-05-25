@@ -303,6 +303,8 @@ const CobrancaResumo = () => {
     <PendentesDetalhes
       open={pendentesOpen}
       onOpenChange={setPendentesOpen}
+      start={range.start}
+      end={range.end}
     />
     </>
   );
