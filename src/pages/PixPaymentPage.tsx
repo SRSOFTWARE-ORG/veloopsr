@@ -239,7 +239,7 @@ export default function PixPaymentPage() {
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-2 mt-2">
                   <p className="text-xs text-red-600 font-medium text-center">
-                    ⚠️ Juros de R$2,00/dia aplicados após 2 dias de atraso
+                    ⚠️ Juros de R$2,00/dia aplicados desde o 1º dia de atraso
                   </p>
                 </div>
               </>
