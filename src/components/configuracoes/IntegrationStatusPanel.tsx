@@ -78,6 +78,36 @@ export default function IntegrationStatusPanel() {
   const [running, setRunning] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const intervalRef = useRef<number | null>(null);
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [reconnectLoading, setReconnectLoading] = useState(false);
+  const [reconnectQr, setReconnectQr] = useState<string | null>(null);
+  const [reconnectMsg, setReconnectMsg] = useState<string>("");
+
+  const handleReconnectWhatsApp = async () => {
+    setReconnectOpen(true);
+    setReconnectLoading(true);
+    setReconnectQr(null);
+    setReconnectMsg("");
+    try {
+      const { data, error } = await supabase.functions.invoke("uazapi-reconnect", { body: {} });
+      if (error) throw error;
+      if (data?.qrcode) {
+        const qr = data.qrcode.startsWith("data:") ? data.qrcode : `data:image/png;base64,${data.qrcode}`;
+        setReconnectQr(qr);
+        setReconnectMsg("Escaneie o QR code com o WhatsApp do número conectado.");
+      } else if (data?.status === "connected") {
+        setReconnectMsg("✅ Instância já está conectada!");
+        runCheck();
+      } else {
+        setReconnectMsg(`Status: ${data?.status || "desconhecido"}. ${data?.raw?.message || data?.error || "Sem QR retornado."}`);
+      }
+    } catch (e: any) {
+      setReconnectMsg(`Erro: ${e?.message || String(e)}`);
+    } finally {
+      setReconnectLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     runCheck();
