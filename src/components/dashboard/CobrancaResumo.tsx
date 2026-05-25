@@ -75,13 +75,9 @@ const CobrancaResumo = () => {
     let totalRecebido = 0;
     let totalPendente = 0;
 
-    // 1a) Parcelas PAGAS no período — filtrar por pago_em (data real do pagamento)
-    const { data: pagosPeriodo } = await supabase
-      .from("cobranca_pagamentos")
-      .select("cobranca_id, pago_em")
-      .eq("status", "pago")
-      .gte("pago_em", `${start}T00:00:00`)
-      .lte("pago_em", `${end}T23:59:59`);
+    // (RECEBIDOS é calculado mais abaixo)
+
+
 
     // 1b) PENDENTES = parcelas virtuais com vencimento < hoje, dentro do período,
     //     e que NÃO estejam pagas/isentas. Igual à lógica da agenda.
