@@ -54,12 +54,12 @@ const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhes
     setLoading(true);
     const result: PendenteItem[] = [];
 
+    // Mostra TODOS os pendentes (inclui atrasados de períodos anteriores até a data final)
     const { data: pendentes } = await supabase
       .from("cobranca_pagamentos")
       .select("id, cobranca_id, data_vencimento, status")
       .neq("status", "pago")
       .neq("status", "isento")
-      .gte("data_vencimento", start)
       .lte("data_vencimento", end);
 
     if (pendentes && pendentes.length > 0) {
