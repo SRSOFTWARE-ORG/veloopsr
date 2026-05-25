@@ -3,11 +3,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { format, parseISO, addWeeks, addDays, addMonths, isAfter } from "date-fns";
 import RecebidosDetalhes from "./RecebidosDetalhes";
 import PendentesDetalhes from "./PendentesDetalhes";
 import CustomPeriodPicker from "./CustomPeriodPicker";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
+
+function generateDates(dataInicio: string, dataFim: string, frequencia: string): string[] {
+  const start = parseISO(dataInicio);
+  const end = parseISO(dataFim);
+  const out: string[] = [];
+  let cur = start;
+  while (!isAfter(cur, end)) {
+    out.push(format(cur, "yyyy-MM-dd"));
+    if (frequencia === "semana") cur = addWeeks(cur, 1);
+    else if (frequencia === "quinzena") cur = addDays(cur, 15);
+    else cur = addMonths(cur, 1);
+  }
+  return out;
+}
 
 const periodoLabels: Record<Periodo, string> = {
   semana: "Semanal",
