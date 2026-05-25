@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import CustomPeriodPicker from "./CustomPeriodPicker";
 
 type Periodo = "semana" | "quinzena" | "mes" | "ano";
 
@@ -18,38 +19,53 @@ const periodoLabels: Record<Periodo, string> = {
   ano: "Anual",
 };
 
+function rangeFromPeriodo(p: Periodo): { start: string; end: string } {
+  const end = new Date().toISOString().split("T")[0];
+  const d = new Date();
+  const days = p === "semana" ? 7 : p === "quinzena" ? 15 : p === "mes" ? 30 : 365;
+  d.setDate(d.getDate() - (days - 1));
+  return { start: d.toISOString().split("T")[0], end };
+}
+
 const SalesChartCard = () => {
   const [chartPeriodo, setChartPeriodo] = useState<Periodo>("semana");
+  const [custom, setCustom] = useState<{ start: string; end: string } | null>(null);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
-  useEffect(() => {
-    void fetchChartData(chartPeriodo);
-  }, [chartPeriodo]);
+  const range = useMemo(() => custom ?? rangeFromPeriodo(chartPeriodo), [custom, chartPeriodo]);
 
-  const fetchChartData = async (periodo: Periodo) => {
-    const numDays = periodo === "semana" ? 7 : periodo === "quinzena" ? 15 : periodo === "mes" ? 30 : 365;
+  useEffect(() => {
+    void fetchChartData();
+  }, [range.start, range.end]);
+
+  const fetchChartData = async () => {
+    const start = new Date(range.start + "T00:00:00");
+    const end = new Date(range.end + "T23:59:59");
+    const diffDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    const useMonthly = diffDays > 60;
     const days: string[] = [];
 
-    for (let i = numDays - 1; i >= 0; i -= 1) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      days.push(date.toISOString().split("T")[0]);
+    if (!useMonthly) {
+      for (let i = 0; i < diffDays; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        days.push(d.toISOString().split("T")[0]);
+      }
     }
 
     const { data } = await supabase
       .from("vendas")
       .select("valor_total, created_at")
       .eq("status", "concluida")
-      .gte("created_at", days[0]);
+      .gte("created_at", range.start)
+      .lte("created_at", `${range.end}T23:59:59`);
 
-    if (periodo === "ano") {
+    if (useMonthly) {
       const months: Record<string, number> = {};
-
       data?.forEach((venda) => {
         const month = venda.created_at?.substring(0, 7) || "";
         months[month] = (months[month] || 0) + Number(venda.valor_total);
       });
-
       const sortedMonths = Object.keys(months).sort();
       setChartData(
         sortedMonths.map((month) => ({
@@ -61,19 +77,13 @@ const SalesChartCard = () => {
     }
 
     const mappedData = days.map((day) => {
-      const dia =
-        periodo === "mes" || periodo === "quinzena"
-          ? new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-          : new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short" });
-
-      const vendas =
-        data
-          ?.filter((venda) => venda.created_at?.startsWith(day))
-          .reduce((sum, venda) => sum + Number(venda.valor_total), 0) || 0;
-
+      const dia = diffDays > 7
+        ? new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        : new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short" });
+      const vendas = data?.filter((v) => v.created_at?.startsWith(day))
+        .reduce((sum, v) => sum + Number(v.valor_total), 0) || 0;
       return { dia, vendas };
     });
-
     setChartData(mappedData);
   };
 
