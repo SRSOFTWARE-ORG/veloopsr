@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Pencil, Plus, Clock, Check } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO, addWeeks, addDays, addMonths, isAfter } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -22,18 +22,34 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 interface PendentesDetalhesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  start?: string;
+  end?: string;
 }
 
 interface PendenteItem {
-  id: string;
+  id: string; // virtual id = cobranca_id_data
+  pagamento_id: string | null;
   cliente_nome: string;
   valor: number;
   data_vencimento: string;
   cobranca_id: string;
-  status: string;
 }
 
-const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
+function generateDates(dataInicio: string, dataFim: string, frequencia: string): string[] {
+  const start = parseISO(dataInicio);
+  const end = parseISO(dataFim);
+  const out: string[] = [];
+  let cur = start;
+  while (!isAfter(cur, end)) {
+    out.push(format(cur, "yyyy-MM-dd"));
+    if (frequencia === "semana") cur = addWeeks(cur, 1);
+    else if (frequencia === "quinzena") cur = addDays(cur, 15);
+    else cur = addMonths(cur, 1);
+  }
+  return out;
+}
+
+const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhesProps) => {
   const [items, setItems] = useState<PendenteItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editItem, setEditItem] = useState<PendenteItem | null>(null);
@@ -46,45 +62,81 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
 
   useEffect(() => {
     if (open) fetchData();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, start, end]);
 
   const fetchData = async () => {
     setLoading(true);
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const [cobRes, pagRes] = await Promise.all([
+      supabase.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, observacoes"),
+      supabase.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status"),
+    ]);
+
+    const cobrancas = cobRes.data || [];
+    const pagamentos = pagRes.data || [];
+
+    // Mapa de status por (cobranca_id_data)
+    const pagMap = new Map<string, { id: string; status: string }>();
+    pagamentos.forEach((p) => {
+      pagMap.set(`${p.cobranca_id}_${p.data_vencimento}`, { id: p.id, status: p.status });
+    });
+
+    // Detecta entradas (mesmo cliente que também tem carnê) para evitar duplicação
+    const entradaByClient = new Map<string, any>();
+    cobrancas.forEach((c: any) => {
+      if (c.observacoes?.toLowerCase().startsWith("entrada")) {
+        entradaByClient.set(c.cliente_nome.trim().toUpperCase(), c);
+      }
+    });
+    const merged = cobrancas.filter((c: any) => {
+      if (!c.observacoes?.toLowerCase().startsWith("entrada")) return true;
+      const key = c.cliente_nome.trim().toUpperCase();
+      const hasCarne = cobrancas.some(
+        (o: any) => o.id !== c.id && o.cliente_nome.trim().toUpperCase() === key && !o.observacoes?.toLowerCase().startsWith("entrada")
+      );
+      return !hasCarne;
+    });
+
     const result: PendenteItem[] = [];
+    merged.forEach((c: any) => {
+      const dates = generateDates(c.data_inicio, c.data_fim, c.frequencia);
+      // Adiciona data da entrada se houver carnê correspondente
+      const clientKey = c.cliente_nome.trim().toUpperCase();
+      const entrada = entradaByClient.get(clientKey);
+      if (entrada && !c.observacoes?.toLowerCase().startsWith("entrada")) {
+        const ed = format(parseISO(entrada.data_inicio), "yyyy-MM-dd");
+        if (!dates.includes(ed)) dates.unshift(ed);
+      }
 
-    // Mostra TODOS os títulos em aberto, sem cortar por período/mês.
-    const { data: pendentes } = await supabase
-      .from("cobranca_pagamentos")
-      .select("id, cobranca_id, data_vencimento, status")
-      .neq("status", "pago")
-      .neq("status", "isento");
+      dates.forEach((d) => {
+        // Só conta como PENDENTE se vencimento < hoje (atrasado)
+        if (d >= today) return;
+        // Filtro de período
+        if (start && d < start) return;
+        if (end && d > end) return;
+        // Determina qual cobrança usar para status (entrada vs carnê)
+        const statusCobId = entrada && !c.observacoes?.toLowerCase().startsWith("entrada") && d === format(parseISO(entrada.data_inicio), "yyyy-MM-dd")
+          ? entrada.id
+          : c.id;
+        const pag = pagMap.get(`${statusCobId}_${d}`);
+        if (pag?.status === "pago" || pag?.status === "isento") return;
 
-    if (pendentes && pendentes.length > 0) {
-      const cobrancaIds = [...new Set(pendentes.map((p) => p.cobranca_id))];
-      const { data: cobrancas } = await supabase
-        .from("cobrancas")
-        .select("id, cliente_nome, valor_parcela")
-        .in("id", cobrancaIds);
+        const valor = entrada && d === format(parseISO(entrada.data_inicio), "yyyy-MM-dd")
+          ? Number(entrada.valor_parcela)
+          : Number(c.valor_parcela);
 
-      const cobMap: Record<string, { nome: string; valor: number }> = {};
-      cobrancas?.forEach((c) => {
-        cobMap[c.id] = { nome: c.cliente_nome, valor: Number(c.valor_parcela) };
+        result.push({
+          id: `${statusCobId}_${d}`,
+          pagamento_id: pag?.id || null,
+          cliente_nome: c.cliente_nome,
+          valor,
+          data_vencimento: d,
+          cobranca_id: statusCobId,
+        });
       });
-
-      pendentes.forEach((p) => {
-        const cob = cobMap[p.cobranca_id];
-        if (cob) {
-          result.push({
-            id: p.id,
-            cliente_nome: cob.nome,
-            valor: cob.valor,
-            data_vencimento: p.data_vencimento,
-            cobranca_id: p.cobranca_id,
-            status: p.status,
-          });
-        }
-      });
-    }
+    });
 
     result.sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
     setItems(result);
@@ -93,11 +145,22 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
 
   const marcarPago = async (item: PendenteItem) => {
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("cobranca_pagamentos").update({
-      status: "pago",
-      pago_em: new Date().toISOString(),
-      pago_por: user?.id,
-    }).eq("id", item.id);
+    if (item.pagamento_id) {
+      await supabase.from("cobranca_pagamentos").update({
+        status: "pago",
+        pago_em: new Date().toISOString(),
+        pago_por: user?.id,
+      }).eq("id", item.pagamento_id);
+    } else {
+      await supabase.from("cobranca_pagamentos").insert({
+        cobranca_id: item.cobranca_id,
+        data_vencimento: item.data_vencimento,
+        status: "pago",
+        pago_em: new Date().toISOString(),
+        pago_por: user?.id,
+        tipo_pagamento: "carne",
+      });
+    }
     toast.success(`Pagamento de ${item.cliente_nome} marcado como pago!`);
     fetchData();
   };
@@ -110,9 +173,12 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
 
   const saveEdit = async () => {
     if (!editItem) return;
-    await supabase.from("cobranca_pagamentos").update({
-      data_vencimento: editData ? format(editData, "yyyy-MM-dd") : editItem.data_vencimento,
-    }).eq("id", editItem.id);
+    const novaData = editData ? format(editData, "yyyy-MM-dd") : editItem.data_vencimento;
+    if (editItem.pagamento_id) {
+      await supabase.from("cobranca_pagamentos").update({
+        data_vencimento: novaData,
+      }).eq("id", editItem.pagamento_id);
+    }
     await supabase.from("cobrancas").update({
       valor_parcela: editValor,
     }).eq("id", editItem.cobranca_id);
@@ -166,11 +232,10 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
   };
 
   const totalPendente = items.reduce((s, i) => s + i.valor, 0);
-  const today = new Date().toISOString().split("T")[0];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-destructive" />
@@ -181,6 +246,7 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm text-muted-foreground">
             Total: <span className="font-bold text-destructive">{formatCurrency(totalPendente)}</span>
+            <span className="ml-2 text-[10px]">({items.length} parcela{items.length !== 1 ? "s" : ""})</span>
           </p>
           <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
             <Plus className="w-4 h-4 mr-1" /> Adicionar
@@ -201,14 +267,8 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
                     <span className="text-xs font-bold tabular-nums text-destructive">
                       {formatCurrency(item.valor)}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px]",
-                        item.data_vencimento < today && "border-destructive text-destructive"
-                      )}
-                    >
-                      {item.data_vencimento < today ? "Atrasado" : "A Pagar"}
+                    <Badge variant="outline" className="text-[10px] border-destructive text-destructive">
+                      Atrasado
                     </Badge>
                   </div>
                 </div>
@@ -232,7 +292,7 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
 
         {/* Edit Modal */}
         <Dialog open={!!editItem} onOpenChange={(o) => !o && setEditItem(null)}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
             <DialogHeader>
               <DialogTitle>Editar Pendência</DialogTitle>
             </DialogHeader>
@@ -266,7 +326,7 @@ const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
 
         {/* Add Modal */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
             <DialogHeader>
               <DialogTitle>Nova Pendência</DialogTitle>
             </DialogHeader>
