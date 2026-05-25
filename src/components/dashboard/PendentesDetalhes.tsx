@@ -22,8 +22,6 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 interface PendentesDetalhesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  start: string;
-  end: string;
 }
 
 interface PendenteItem {
@@ -35,7 +33,7 @@ interface PendenteItem {
   status: string;
 }
 
-const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhesProps) => {
+const PendentesDetalhes = ({ open, onOpenChange }: PendentesDetalhesProps) => {
   const [items, setItems] = useState<PendenteItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editItem, setEditItem] = useState<PendenteItem | null>(null);
@@ -48,19 +46,18 @@ const PendentesDetalhes = ({ open, onOpenChange, start, end }: PendentesDetalhes
 
   useEffect(() => {
     if (open) fetchData();
-  }, [open, start, end]);
+  }, [open]);
 
   const fetchData = async () => {
     setLoading(true);
     const result: PendenteItem[] = [];
 
-    // Mostra TODOS os pendentes (inclui atrasados de períodos anteriores até a data final)
+    // Mostra TODOS os títulos em aberto, sem cortar por período/mês.
     const { data: pendentes } = await supabase
       .from("cobranca_pagamentos")
       .select("id, cobranca_id, data_vencimento, status")
       .neq("status", "pago")
-      .neq("status", "isento")
-      .lte("data_vencimento", end);
+      .neq("status", "isento");
 
     if (pendentes && pendentes.length > 0) {
       const cobrancaIds = [...new Set(pendentes.map((p) => p.cobranca_id))];
