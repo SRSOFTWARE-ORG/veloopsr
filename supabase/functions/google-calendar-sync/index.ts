@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { action, user_id } = body;
-    if (!user_id) throw new Error("user_id required");
+    const { action } = body;
+    const user_id = _user.id;
 
     const calendarApi = "https://www.googleapis.com/calendar/v3";
 
