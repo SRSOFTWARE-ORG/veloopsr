@@ -93,8 +93,29 @@ function buildEvent(clienteNome: string, valor: number, cobrancaId: string, date
   };
 }
 
+
+async function _verifyAuth(req: Request) {
+  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+  if (!token) return null;
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
+  });
+  if (!r.ok) return null;
+  return await r.json();
+}
+async function _isAdmin(userId: string): Promise<boolean> {
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=id`, {
+    headers: { apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}` },
+  });
+  if (!r.ok) return false;
+  const d = await r.json();
+  return Array.isArray(d) && d.length > 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
+  const _user = await _verifyAuth(req);
+  if (!_user?.id) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response("ok", { headers: corsHeaders });
   }
 
@@ -104,8 +125,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { action, user_id } = body;
-    if (!user_id) throw new Error("user_id required");
+    const { action } = body;
+    const user_id = _user.id;
 
     const calendarApi = "https://www.googleapis.com/calendar/v3";
 

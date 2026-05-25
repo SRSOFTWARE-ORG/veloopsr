@@ -240,6 +240,20 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Auth: allow service role (internal webhooks) OR authenticated users
+  const _authToken = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
+  const _serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  if (_authToken !== _serviceKey) {
+    const _r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${_authToken}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
+    });
+    if (!_r.ok) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

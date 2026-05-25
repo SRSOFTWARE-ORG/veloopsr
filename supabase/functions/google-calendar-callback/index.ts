@@ -17,9 +17,22 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { code, redirect_uri, user_id } = await req.json();
-    if (!code || !redirect_uri || !user_id) {
-      throw new Error("code, redirect_uri, and user_id required");
+    // Verify caller via JWT; derive user_id from token, NEVER from body
+    const token = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
+    const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
+    });
+    if (!userRes.ok) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const authedUser = await userRes.json();
+    const user_id = authedUser.id;
+
+    const { code, redirect_uri } = await req.json();
+    if (!code || !redirect_uri) {
+      throw new Error("code and redirect_uri required");
     }
 
     // Exchange code for tokens
