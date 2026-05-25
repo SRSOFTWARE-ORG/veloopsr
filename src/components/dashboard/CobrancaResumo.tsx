@@ -68,14 +68,12 @@ const CobrancaResumo = () => {
       .gte("pago_em", `${start}T00:00:00`)
       .lte("pago_em", `${end}T23:59:59`);
 
-    // 1b) Parcelas PENDENTES no período — filtrar por data_vencimento
+    // 1b) Parcelas em aberto — não cortar por período para não esconder clientes pendentes
     const { data: pendentesPeriodo } = await supabase
       .from("cobranca_pagamentos")
       .select("cobranca_id, data_vencimento, status")
       .neq("status", "pago")
-      .neq("status", "isento")
-      .gte("data_vencimento", start)
-      .lte("data_vencimento", end);
+      .neq("status", "isento");
 
     // Buscar valores das cobranças envolvidas
     const allCobrancaIds = [
@@ -273,8 +271,6 @@ const CobrancaResumo = () => {
     <PendentesDetalhes
       open={pendentesOpen}
       onOpenChange={setPendentesOpen}
-      start={range.start}
-      end={range.end}
     />
     </>
   );
