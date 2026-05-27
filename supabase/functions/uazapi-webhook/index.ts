@@ -433,6 +433,16 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // ── Anti-spoofing: UAZAPI inclui o token da instância no payload ──
+    const expectedToken = Deno.env.get("UAZAPI_TOKEN");
+    const receivedToken = body?.token || req.headers.get("token") || req.headers.get("x-uazapi-token");
+    if (expectedToken && receivedToken !== expectedToken) {
+      console.warn("[Webhook] Token inválido — request rejeitado");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
 
     const rawEvent = body.event || body.type || body.action || body.EventType || body.eventType || body.data?.event || body.body?.event || "unknown";

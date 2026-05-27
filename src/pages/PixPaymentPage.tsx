@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, Check, QrCode, Loader2, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -92,18 +93,17 @@ export default function PixPaymentPage() {
     createPayment();
   }, [cobrancaId, dataVencimento, valor, clienteNome, clienteId]);
 
-  // Poll for payment status
+  // Poll for payment status (via secure RPC — no longer expõe a tabela inteira)
   useEffect(() => {
-    if (paid || !pixData?.mp_copia_cola) return;
+    if (paid || !pixData?.mp_copia_cola || !cobrancaId || !dataVencimento) return;
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pix_payments?cobranca_id=eq.${cobrancaId}&data_vencimento=eq.${dataVencimento}&select=status&order=created_at.desc&limit=1`,
-          { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
-        );
-        const data = await res.json();
-        if (data?.[0]?.status === "approved") {
+        const { data, error: rpcError } = await supabase.rpc("get_pix_payment_status" as any, {
+          _cobranca_id: cobrancaId,
+          _data_vencimento: dataVencimento,
+        });
+        if (!rpcError && data === "approved") {
           setPaid(true);
           clearInterval(interval);
         }

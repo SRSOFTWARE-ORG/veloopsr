@@ -37,6 +37,42 @@ async function sendWhatsAppText(phone: string, message: string): Promise<boolean
   }
 }
 
+async function verifyMercadoPagoSignature(req: Request, paymentId: string, secret: string): Promise<boolean> {
+  // MP envia: x-signature: ts=TIMESTAMP,v1=HEXHMAC ; x-request-id: REQ_ID
+  // Manifest: id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+  const xSignature = req.headers.get("x-signature");
+  const xRequestId = req.headers.get("x-request-id");
+  if (!xSignature || !xRequestId) return false;
+
+  const parts = Object.fromEntries(
+    xSignature.split(",").map((kv) => {
+      const [k, v] = kv.trim().split("=");
+      return [k, v];
+    })
+  );
+  const ts = parts["ts"];
+  const v1 = parts["v1"];
+  if (!ts || !v1) return false;
+
+  // Anti-replay: rejeitar timestamps muito antigos (>5min)
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > 5 * 60 * 1000) return false;
+
+  const manifest = `id:${paymentId};request-id:${xRequestId};ts:${ts};`;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(manifest));
+  const hex = Array.from(new Uint8Array(sigBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  // Timing-safe compare
+  if (hex.length !== v1.length) return false;
+  let diff = 0;
+  for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ v1.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -64,6 +100,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No payment ID" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ── Signature verification (anti-spoofing) ──
+    const WEBHOOK_SECRET = Deno.env.get("MERCADOPAGO_WEBHOOK_SECRET");
+    if (WEBHOOK_SECRET) {
+      const valid = await verifyMercadoPagoSignature(req, String(paymentId), WEBHOOK_SECRET);
+      if (!valid) {
+        console.warn("[MP Webhook] Invalid signature for payment", paymentId);
+        return new Response(JSON.stringify({ error: "Invalid signature" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.warn("[MP Webhook] MERCADOPAGO_WEBHOOK_SECRET not set — accepting unsigned (configure to enforce)");
     }
 
     // Fetch payment details from MP
