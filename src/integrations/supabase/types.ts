@@ -1281,6 +1281,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_pix_payment_status: {
+        Args: { _cobranca_id: string; _data_vencimento: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
