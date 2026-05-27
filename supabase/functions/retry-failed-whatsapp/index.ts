@@ -15,56 +15,63 @@ function buildFullMessage(opts: {
   status: string;
   cobrancaId: string;
 }) {
-  const { tipo, nomeCompleto, cpf, dataVencimento, valor, status, cobrancaId } = opts;
+  // Formato humano, anti-banimento (sem links lovable.app, sem separadores ASCII, sem excesso de emojis)
+  const { tipo, nomeCompleto, dataVencimento, valor, status } = opts;
   const valorFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
   const dataFormatada = dataVencimento.split("-").reverse().join("/");
-  const cpfMascarado = (cpf || "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4") || "—";
-  const statusLabel = status === "pendente" ? "⚠️ PENDENTE (em atraso)" : status === "a_pagar" ? "📋 A PAGAR" : `📋 ${(status || "").toUpperCase()}`;
-  const saudacao = tipo === "D-3" ? "vence em *3 dias*" : tipo === "D-1" ? "vence *amanhã*" : tipo === "D+1" ? "venceu *ontem*" : "vence *hoje*";
-  const appUrl = "https://veloopsr.lovable.app";
-  const pixLink = `${appUrl}/pagar/${cobrancaId}/${dataVencimento}?valor=${valor}&cliente=${encodeURIComponent(nomeCompleto)}&parcela=${encodeURIComponent(dataFormatada)}`;
-  const showPixLink = tipo === "D0" || tipo === "D-1" || tipo === "D+1";
+  const primeiroNome = (nomeCompleto || "Cliente").split(" ")[0];
+  const saudacoes = ["Oi", "Olá", "Bom dia"];
+  const saudacao = saudacoes[Math.floor(Math.random() * saudacoes.length)];
 
-  const interestWarning = (tipo === "D0" || tipo === "D+1") ? [
-    ``,
-    `🚨 *ATENÇÃO — JUROS POR ATRASO* 🚨`,
-    ``,
-    `A partir do *1º dia de atraso*, é cobrado`,
-    `*R$ 2,00 por dia* sobre o valor da fatura.`,
-    ``,
-  ] : [];
-
-  return [
-    `Olá, *${nomeCompleto}*! 👋`,
-    ``,
-    `Segue o lembrete da sua fatura que ${saudacao}:`,
-    ``,
-    `━━━━━━━━━━━━━━━━━━`,
-    `📄 *DADOS DA FATURA*`,
-    `━━━━━━━━━━━━━━━━━━`,
-    `👤 *Cliente:* ${nomeCompleto}`,
-    `🆔 *CPF:* ${cpfMascarado}`,
-    `📅 *Vencimento:* ${dataFormatada}`,
-    `💰 *Valor:* ${valorFormatado}`,
-    `📊 *Status:* ${statusLabel}`,
-    `━━━━━━━━━━━━━━━━━━`,
-    ...interestWarning,
-    ...(showPixLink ? [
-      `💳 *Pague agora via PIX:*`,
-      pixLink,
+  if (tipo === "D-3") {
+    return [
+      `${saudacao}, ${primeiroNome}!`,
       ``,
-    ] : []),
-    status === "pendente"
-      ? `⚠️ Esta fatura está *em atraso*. Regularize o quanto antes.`
-      : `Por favor, efetue o pagamento até a data de vencimento.`,
+      `Passando para lembrar que sua parcela de ${valorFormatado} vence em 3 dias (${dataFormatada}).`,
+      ``,
+      `Qualquer dúvida é só responder por aqui.`,
+      ``,
+      `SR Software`,
+    ].join("\n");
+  }
+  if (tipo === "D-1") {
+    return [
+      `${saudacao}, ${primeiroNome}!`,
+      ``,
+      `Lembrando que sua parcela de ${valorFormatado} vence amanhã (${dataFormatada}).`,
+      ``,
+      `Para receber o PIX, basta responder "pagar".`,
+      ``,
+      `SR Software`,
+    ].join("\n");
+  }
+  if (tipo === "D+1") {
+    return [
+      `${saudacao}, ${primeiroNome}, tudo bem?`,
+      ``,
+      `Notamos que sua parcela de ${valorFormatado}, com vencimento em ${dataFormatada}, ainda não foi identificada como paga.`,
+      ``,
+      `Se já pagou, nos envie o comprovante. Se precisar de novo prazo, é só responder.`,
+      ``,
+      `SR Software`,
+    ].join("\n");
+  }
+  // D0
+  const linhaJuros = status === "pendente" ? `\nA partir de hoje, há cobrança de R$ 2,00 por dia de atraso.` : ``;
+  return [
+    `${saudacao}, ${primeiroNome}!`,
     ``,
-    `💡 _Deseja pagar antecipadamente? Responda *pagar*._`,
+    `Sua parcela de ${valorFormatado} vence hoje (${dataFormatada}).${linhaJuros}`,
     ``,
-    `Em caso de dúvidas, responda esta mensagem.`,
+    `Para receber o PIX, basta responder "pagar".`,
     ``,
-    `Atenciosamente,`,
-    `*SR Software — Veloop* 🟢`,
+    `SR Software`,
   ].join("\n");
+}
+
+function randomDelay(minSec: number, maxSec: number) {
+  const ms = Math.floor(Math.random() * (maxSec - minSec + 1) + minSec) * 1000;
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 
@@ -176,7 +183,7 @@ Deno.serve(async (req) => {
         failCount++;
         results.push({ id: envio.id, status: "error", error: err instanceof Error ? err.message : String(err) });
       }
-      await new Promise(r => setTimeout(r, 1500));
+      await randomDelay(15, 30); // anti-ban: delay aleatório 15-30s
     }
 
     return new Response(JSON.stringify({

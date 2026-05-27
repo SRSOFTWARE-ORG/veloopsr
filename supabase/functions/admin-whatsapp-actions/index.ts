@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
           } else {
             await supabase.from("whatsapp_resend_logs").insert({ envio_id: msg.id, status: "falha", erro: data.error || res.statusText });
           }
-          await new Promise(r => setTimeout(r, 1000));
+          // anti-ban: delay aleatório 15-30s entre envios
+          await new Promise(r => setTimeout(r, (15 + Math.floor(Math.random() * 16)) * 1000));
         } catch (e) {
           console.error("Resend error for msg", msg.id, e);
         }
