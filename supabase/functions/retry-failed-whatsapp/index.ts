@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         failCount++;
         results.push({ id: envio.id, status: "error", error: err instanceof Error ? err.message : String(err) });
       }
-      await new Promise(r => setTimeout(r, 1500));
+      await randomDelay(15, 30); // anti-ban: delay aleatório 15-30s
     }
 
     return new Response(JSON.stringify({
