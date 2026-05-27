@@ -299,105 +299,64 @@ Deno.serve(async (req) => {
       const valorFormatado = formatValor(entry.valorParcela);
       const statusAtual = statusMap.get(`${entry.cobrancaId}_${entry.date}`) || "a_pagar";
 
-      // ── Construir mensagem por tipo ──
+      // ── Construir mensagem (formato humano, anti-ban) ──
+      // Regras anti-banimento WhatsApp:
+      //  - Sem separadores ASCII (━━━), sem emojis em excesso
+      //  - Sem links de domínios genéricos (lovable.app é flag automático)
+      //  - Sem múltiplos "*negrito*" (pattern de broadcast)
+      //  - Texto curto, conversacional, variação de saudação
+      const dataFormatada = entry.date.split("-").reverse().join("/");
+      const primeiroNome = (nomeCompleto || "").split(" ")[0] || nomeCompleto;
+      const saudacoes = ["Oi", "Olá", "Bom dia"];
+      const saudacao = saudacoes[Math.floor(Math.random() * saudacoes.length)];
+
       let mensagemWpp: string;
 
       if (entry.tipo === "D+1") {
-        // Mensagem de regularização — 1º dia após vencimento
         mensagemWpp = [
-          `📢 Comunicado de Regularização de Pagamento`,
+          `${saudacao}, ${primeiroNome}, tudo bem?`,
           ``,
-          `Assunto: Transparência e Comunicação – Atualização de sua Parcela`,
+          `Aqui é a SR Software. Notamos que sua parcela de ${valorFormatado}, com vencimento em ${dataFormatada}, ainda não foi identificada como paga.`,
           ``,
-          `Olá, ${nomeCompleto},`,
-          ``,
-          `Receba as saudações da equipe SR SOFTWARE!`,
-          ``,
-          `Entendemos que imprevistos podem acontecer no dia a dia e que, por vezes, os planos financeiros precisam de ajustes. No entanto, acreditamos que a base de uma boa parceria é a comunicação.`,
-          ``,
-          `Identificamos que a sua parcela vinculada ao documento de CPF ${cpf} ainda não consta como liquidada em nosso sistema.`,
-          ``,
-          `Gostaríamos de reforçar que estamos aqui para ajudar. Se você está enfrentando alguma dificuldade técnica ou imprevisto pessoal, entre em contato conosco respondendo a esta mensagem.`,
-          ``,
-          `💡 Como podemos resolver?`,
-          ``,
-          `Já efetuou o pagamento? Envie o comprovante por aqui para atualizarmos seu status imediatamente.`,
-          ``,
-          `Precisa de um novo prazo ou boleto? Fale com nossa equipe para avaliarmos a melhor forma de regularizar sua situação.`,
-          ``,
-          `Teve um imprevisto? Nos dê um parecer para que possamos entender seu caso e evitar suspensões de serviços.`,
-          ``,
-          `Nosso objetivo é garantir que você continue usufruindo de todos os nossos serviços e produtos sem interrupções.`,
-          ``,
-          `No aguardo do seu retorno,`,
+          `Se já pagou, por favor nos envie o comprovante por aqui.`,
+          `Se precisar de mais alguns dias ou de um novo acordo, é só responder esta mensagem que conversamos.`,
           ``,
           `Atenciosamente,`,
+          `SR Software`,
+        ].join("\n");
+      } else if (entry.tipo === "D-3") {
+        mensagemWpp = [
+          `${saudacao}, ${primeiroNome}!`,
           ``,
-          `Equipe de COMUNICAÇÕES.`,
+          `Passando para lembrar que sua parcela de ${valorFormatado} vence em 3 dias (${dataFormatada}).`,
           ``,
-          `SR SOFTWARE | VELOOP`,
+          `Qualquer dúvida é só responder por aqui.`,
+          ``,
+          `SR Software`,
+        ].join("\n");
+      } else if (entry.tipo === "D-1") {
+        mensagemWpp = [
+          `${saudacao}, ${primeiroNome}!`,
+          ``,
+          `Lembrando que sua parcela de ${valorFormatado} vence amanhã (${dataFormatada}).`,
+          ``,
+          `Para receber o PIX, basta responder "pagar".`,
+          ``,
+          `SR Software`,
         ].join("\n");
       } else {
-        // Mensagens padrão D-3, D-1, D0
-        const dataFormatada = entry.date.split("-").reverse().join("/");
-        const cpfMascarado = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
-        const statusLabel = statusAtual === "pendente" ? "⚠️ PENDENTE (em atraso)"
-          : statusAtual === "a_pagar" ? "📋 A PAGAR" : `📋 ${statusAtual.toUpperCase()}`;
-        const saudacao = entry.tipo === "D-3" ? "vence em *3 dias*" : entry.tipo === "D-1" ? "vence *amanhã*" : "vence *hoje*";
-
-        const appUrl = "https://veloopsr.lovable.app";
-        const pixLink = `${appUrl}/pagar/${entry.cobrancaId}/${entry.date}?valor=${entry.valorParcela}&cliente=${encodeURIComponent(nomeCompleto)}&parcela=${encodeURIComponent(dataFormatada)}`;
-        const showPixLink = entry.tipo === "D0" || entry.tipo === "D-1";
-
-        const interestWarning = entry.tipo === "D0" ? [
-          ``,
-          `🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨`,
-          ``,
-          `⚠️ *ATENÇÃO — JUROS POR ATRASO* ⚠️`,
-          ``,
-          `A partir do *1º dia de atraso*, será cobrado`,
-          `*R$ 2,00 (dois reais) por dia* de atraso`,
-          `sobre o valor da fatura.`,
-          ``,
-          `📌 *Exemplo:* 5 dias de atraso = R$ 10,00`,
-          `de juros (5 dias × R$ 2,00)`,
-          ``,
-          `🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨`,
-        ] : [];
-
+        // D0
+        const linhaJuros = statusAtual === "pendente"
+          ? `\nA partir de hoje, há cobrança de R$ 2,00 por dia de atraso.`
+          : ``;
         mensagemWpp = [
-          `Olá, *${nomeCompleto}*! 👋`,
+          `${saudacao}, ${primeiroNome}!`,
           ``,
-          `Segue o lembrete da sua fatura que ${saudacao}:`,
+          `Sua parcela de ${valorFormatado} vence hoje (${dataFormatada}).${linhaJuros}`,
           ``,
-          `━━━━━━━━━━━━━━━━━━`,
-          `📄 *DADOS DA FATURA*`,
-          `━━━━━━━━━━━━━━━━━━`,
-          `👤 *Cliente:* ${nomeCompleto}`,
-          `🆔 *CPF:* ${cpfMascarado}`,
-          `📅 *Vencimento:* ${dataFormatada}`,
-          `💰 *Valor:* ${valorFormatado}`,
-          `📊 *Status:* ${statusLabel}`,
-          `━━━━━━━━━━━━━━━━━━`,
-          ...interestWarning,
+          `Para receber o PIX, basta responder "pagar".`,
           ``,
-          ...(showPixLink ? [
-            `💳 *Pague agora via PIX:*`,
-            pixLink,
-            ``,
-            `Escaneie o QR Code ou copie o código PIX no link acima.`,
-            ``,
-          ] : []),
-          statusAtual === "pendente"
-            ? `⚠️ Esta fatura encontra-se *em atraso*. Por favor, regularize o quanto antes para evitar transtornos.`
-            : `Por favor, efetue o pagamento até a data de vencimento.`,
-          ``,
-          `💡 _Deseja pagar antecipadamente? Responda *pagar* e nosso assistente te ajuda!_`,
-          ``,
-          `Em caso de dúvidas, responda esta mensagem.`,
-          ``,
-          `Atenciosamente,`,
-          `*SR Software — Veloop* 🟢`,
+          `SR Software`,
         ].join("\n");
       }
 
