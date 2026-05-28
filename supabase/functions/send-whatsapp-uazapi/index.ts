@@ -48,18 +48,12 @@ Deno.serve(async (req) => {
         );
       }
       const state = await evoConnectionState();
-      const url = (Deno.env.get("EVOLUTION_API_URL") || "").replace(/\/+$/, "");
-      const instance = Deno.env.get("EVOLUTION_INSTANCE") || "";
       return new Response(
-        JSON.stringify({
-          ok: state.connected,
-          configured: true,
-          status: state.state,
-          debug: { url_host: (() => { try { return new URL(url).host; } catch { return url; } })(), instance, raw: state.raw },
-        }),
+        JSON.stringify({ ok: state.connected, configured: true, status: state.state }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
 
 
     const { telefone, mensagem, nome_cliente, valor_transacao, data_vencimento, tipo, cobranca_id, cliente_id, cpf, status_parcela } = body;
