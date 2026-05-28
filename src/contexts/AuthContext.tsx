@@ -58,9 +58,9 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<{ nome: string; is_ceo?: boolean } | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ nome: string } | null>(null);
+  const [profile, setProfile] = useState<{ nome: string; is_ceo?: boolean } | null>(null);
   const [role, setRole] = useState<UserRole>("vendedor");
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
   const sessionRef = useRef<Session | null>(null);
