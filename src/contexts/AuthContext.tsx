@@ -75,9 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserData = useCallback(async (userId: string) => {
     const requestId = ++activeFetchRef.current;
-
     const [profileRes, roleRes, permRes] = await Promise.all([
-      supabase.from("profiles").select("nome").eq("id", userId).maybeSingle(),
+      supabase.from("profiles").select("nome, is_ceo").eq("id", userId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("permissions").select("*").eq("user_id", userId).maybeSingle(),
     ]);
@@ -86,6 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    setProfile(profileRes.data ? { nome: profileRes.data.nome, is_ceo: (profileRes.data as any).is_ceo ?? false } : null);
+    setRole((roleRes.data?.role as UserRole) ?? "vendedor");
     setProfile(profileRes.data ? { nome: profileRes.data.nome } : null);
     setRole((roleRes.data?.role as UserRole) ?? "vendedor");
 
