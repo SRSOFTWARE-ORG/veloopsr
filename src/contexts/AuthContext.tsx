@@ -175,8 +175,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         permissions,
         isAdmin: role === "admin",
-        isPrimaryAdmin: role === "admin" && user?.email === PRIMARY_ADMIN_EMAIL,
-        isReadOnly: role === "admin" && user?.email !== PRIMARY_ADMIN_EMAIL,
+        isPrimaryAdmin: role === "admin" && (user?.email === FOUNDER_EMAIL || !!profile?.is_ceo),
+        isFounder: user?.email === FOUNDER_EMAIL,
+        isReadOnly: role === "admin" && user?.email !== FOUNDER_EMAIL && !profile?.is_ceo,
         signOut,
       }}
     >
