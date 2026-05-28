@@ -85,17 +85,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    setProfile(profileRes.data ? { nome: profileRes.data.nome, is_ceo: (profileRes.data as any).is_ceo ?? false } : null);
-    setRole((roleRes.data?.role as UserRole) ?? "vendedor");
-    setProfile(profileRes.data ? { nome: profileRes.data.nome } : null);
-    setRole((roleRes.data?.role as UserRole) ?? "vendedor");
+    const isCeo = (profileRes.data as any)?.is_ceo ?? false;
+    setProfile(profileRes.data ? { nome: profileRes.data.nome, is_ceo: isCeo } : null);
+    setRole(isCeo ? "admin" : ((roleRes.data?.role as UserRole) ?? "vendedor"));
 
     if (!permRes.data) {
-      setPermissions(defaultPermissions);
+      setPermissions(isCeo ? {
+        pode_editar_preco: true,
+        pode_excluir_venda: true,
+        pode_dar_desconto: true,
+        limite_desconto: 100,
+        pode_ver_faturamento: true,
+        tipo_comissao: "percentual",
+        valor_comissao: 0,
+      } : defaultPermissions);
       return;
     }
 
-    setPermissions({
+    setPermissions(isCeo ? {
+      pode_editar_preco: true,
+      pode_excluir_venda: true,
+      pode_dar_desconto: true,
+      limite_desconto: 100,
+      pode_ver_faturamento: true,
+      tipo_comissao: (permRes.data as any).tipo_comissao || "percentual",
+      valor_comissao: Number((permRes.data as any).valor_comissao) || 0,
+    } : {
       pode_editar_preco: permRes.data.pode_editar_preco ?? false,
       pode_excluir_venda: permRes.data.pode_excluir_venda ?? false,
       pode_dar_desconto: permRes.data.pode_dar_desconto ?? false,
@@ -165,6 +180,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
+  const isFounder = user?.email?.toLowerCase() === FOUNDER_EMAIL;
+  const isCeo = !!profile?.is_ceo;
+
   return (
     <AuthContext.Provider
       value={{
@@ -174,10 +192,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         role,
         permissions,
-        isAdmin: role === "admin",
-        isPrimaryAdmin: role === "admin" && (user?.email === FOUNDER_EMAIL || !!profile?.is_ceo),
-        isFounder: user?.email === FOUNDER_EMAIL,
-        isReadOnly: role === "admin" && user?.email !== FOUNDER_EMAIL && !profile?.is_ceo,
+        isAdmin: role === "admin" || isCeo || isFounder,
+        isPrimaryAdmin: isFounder || isCeo,
+        isFounder,
+        isReadOnly: role === "admin" && !isFounder && !isCeo,
         signOut,
       }}
     >
