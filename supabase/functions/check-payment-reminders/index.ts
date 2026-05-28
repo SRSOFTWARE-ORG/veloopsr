@@ -46,38 +46,14 @@ const diasSemana: Record<number, string> = {
   0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb",
 };
 
-// ── Enviar WhatsApp via UAZAPI ──
+// ── Enviar WhatsApp via Evolution API ──
+import { evoSendText } from "../_shared/evolution.ts";
 async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
-  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-
-  if (!UAZAPI_URL || !UAZAPI_TOKEN) {
-    console.warn("[UAZAPI] Credenciais não configuradas");
-    return false;
-  }
-
-  let cleanPhone = phone.replace(/\D/g, "");
-  if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
-  if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
-
-  try {
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const res = await fetch(`${apiUrl}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-      body: JSON.stringify({ number: cleanPhone, text: message, linkPreview: false }),
-    });
-    const result = await res.json();
-    if (!res.ok || result.error) {
-      console.error("[UAZAPI] Falha:", res.status, result.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("[UAZAPI] Network error:", err);
-    return false;
-  }
+  const r = await evoSendText(phone, message);
+  if (!r.ok) console.error("[Evolution] Falha envio:", r.status, r.error);
+  return r.ok;
 }
+
 
 // ── Webhook para n8n (complementar) ──
 async function sendWebhook(payload: Record<string, unknown>): Promise<boolean> {
