@@ -191,6 +191,16 @@ const ConfiguracoesPage = () => {
     fetchUsers();
   };
 
+  const toggleCeo = async (userId: string, makeCeo: boolean) => {
+    const { error } = await supabase.rpc("set_user_ceo", { _target_user_id: userId, _is_ceo: makeCeo });
+    if (error) {
+      toast.error(error.message || "Erro ao atualizar CEO");
+      return;
+    }
+    toast.success(makeCeo ? "Usuário promovido a CEO!" : "Cargo de CEO removido.");
+    fetchUsers();
+  };
+
   if (loading) {
     return (
       <div className="page-container text-center py-20">
