@@ -37,7 +37,7 @@ const PermissionsManager = () => {
       <div className="space-y-1.5">
         {permissions.map((perm) => {
           const PermIcon = iconMap[perm.icon] || Bell;
-          const { label, color, Icon: StatusIcon } = stateConfig[perm.state];
+          const { label, color, Icon: StatusIcon } = stateConfig[perm.state] || stateConfig.unsupported;
 
           return (
             <div
