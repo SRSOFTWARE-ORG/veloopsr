@@ -137,7 +137,6 @@ Deno.serve(async (req) => {
     const cliMap = new Map((clisRes.data || []).map((c: any) => [c.id, c]));
 
     for (const envio of enviosFalhos) {
-    for (const envio of enviosFalhos) {
       try {
         // Sempre reconstrói a mensagem completa (corrige stubs antigos "WhatsApp D-1 — R$ X")
         const cob: any = envio.cobranca_id ? cobMap.get(envio.cobranca_id) : null;
@@ -167,13 +166,14 @@ Deno.serve(async (req) => {
         } else {
           failCount++;
           results.push({ id: envio.id, status: "fail", error: r.error || `HTTP ${r.status}` });
-
+        }
       } catch (err) {
         failCount++;
         results.push({ id: envio.id, status: "error", error: err instanceof Error ? err.message : String(err) });
       }
       await randomDelay(15, 30); // anti-ban: delay aleatório 15-30s
     }
+
 
     return new Response(JSON.stringify({
       success: true, total: enviosFalhos.length, reenviados: successCount, falhas: failCount, detalhes: results,
