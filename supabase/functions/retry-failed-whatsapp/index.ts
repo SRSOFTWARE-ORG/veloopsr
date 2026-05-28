@@ -118,10 +118,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) throw new Error("UAZAPI não configurada");
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+    const { evoSendText, evolutionConfigured } = await import("../_shared/evolution.ts");
+    if (!evolutionConfigured()) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
+
 
     let successCount = 0;
     let failCount = 0;
