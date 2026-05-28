@@ -39,9 +39,12 @@ import IntegrationStatusPanel from "@/components/configuracoes/IntegrationStatus
 
 interface UserWithPermissions {
   id: string;
+interface UserWithPermissions {
+  id: string;
   nome: string;
   email?: string;
   role: string;
+  is_ceo: boolean;
   permissions: {
     pode_editar_preco: boolean;
     pode_excluir_venda: boolean;
@@ -53,7 +56,7 @@ interface UserWithPermissions {
   };
 }
 
-const ConfiguracoesPage = () => {
+const FOUNDER_EMAIL = "srcj9975@gmail.com";
   const { isAdmin, isPrimaryAdmin, user, loading } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
