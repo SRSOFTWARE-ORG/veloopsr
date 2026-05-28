@@ -102,22 +102,13 @@ Deno.serve(async (req) => {
 
       let success = false;
       if (formato === "midia" && media_url) {
-        const res = await fetch(`${apiUrl}/send/media`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-          body: JSON.stringify({ number: phone, media: media_url, caption: finalMsg, linkPreview: false }),
-        });
-        const r = await res.json();
-        success = res.ok && !r.error;
+        const r = await evoSendMedia({ phone, mediatype: "image", media: media_url, caption: finalMsg });
+        success = r.ok;
       } else {
-        const res = await fetch(`${apiUrl}/send/text`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-          body: JSON.stringify({ number: phone, text: finalMsg, linkPreview: false }),
-        });
-        const r = await res.json();
-        success = res.ok && !r.error;
+        const r = await evoSendText(phone, finalMsg);
+        success = r.ok;
       }
+
 
       return new Response(JSON.stringify({ success, test: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
