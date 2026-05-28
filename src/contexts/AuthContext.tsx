@@ -49,6 +49,7 @@ const AuthContext = createContext<AuthContextType>({
   permissions: defaultPermissions,
   isAdmin: false,
   isPrimaryAdmin: false,
+  isFounder: false,
   isReadOnly: true,
   signOut: async () => {},
 });
