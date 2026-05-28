@@ -42,6 +42,7 @@ interface UserWithPermissions {
   nome: string;
   email?: string;
   role: string;
+  is_ceo: boolean;
   permissions: {
     pode_editar_preco: boolean;
     pode_excluir_venda: boolean;
@@ -53,8 +54,10 @@ interface UserWithPermissions {
   };
 }
 
+const FOUNDER_EMAIL = "srcj9975@gmail.com";
+
 const ConfiguracoesPage = () => {
-  const { isAdmin, isPrimaryAdmin, user, loading } = useAuth();
+  const { isAdmin, isPrimaryAdmin, isFounder, user, loading } = useAuth();
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -98,6 +101,7 @@ const ConfiguracoesPage = () => {
           nome: p.nome,
           email: emailMap[p.id] || "",
           role: role?.role || "vendedor",
+          is_ceo: (p as any).is_ceo ?? false,
           permissions: {
             pode_editar_preco: perm?.pode_editar_preco ?? false,
             pode_excluir_venda: perm?.pode_excluir_venda ?? false,
@@ -187,6 +191,16 @@ const ConfiguracoesPage = () => {
     fetchUsers();
   };
 
+  const toggleCeo = async (userId: string, makeCeo: boolean) => {
+    const { error } = await supabase.rpc("set_user_ceo", { _target_user_id: userId, _is_ceo: makeCeo });
+    if (error) {
+      toast.error(error.message || "Erro ao atualizar CEO");
+      return;
+    }
+    toast.success(makeCeo ? "Usuário promovido a CEO!" : "Cargo de CEO removido.");
+    fetchUsers();
+  };
+
   if (loading) {
     return (
       <div className="page-container text-center py-20">
@@ -243,7 +257,6 @@ const ConfiguracoesPage = () => {
           </DialogContent>
         </Dialog>
       </div>
-
       <div className="space-y-4">
         {users.map((u, i) => (
           <Card key={u.id} className={`slide-up delay-${Math.min(i + 1, 6)}`}>
@@ -255,30 +268,43 @@ const ConfiguracoesPage = () => {
                   </div>
                   <div>
                     <span className="block">{u.nome}</span>
-                    {u.email === "srcj9975@gmail.com" && (
-                      <span className="text-[10px] font-semibold text-primary">Gerente & CEO</span>
+                    {u.email === FOUNDER_EMAIL && (
+                      <span className="text-[10px] font-semibold text-primary">CEO Fundador</span>
+                    )}
+                    {u.is_ceo && u.email !== FOUNDER_EMAIL && (
+                      <span className="text-[10px] font-semibold text-amber-600">CEO</span>
                     )}
                     <span className="text-xs font-normal text-muted-foreground block">{u.email}</span>
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  {u.id !== user?.id && (
+                  {(u.email !== FOUNDER_EMAIL || isFounder) && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  {u.id !== user?.id && u.email !== FOUNDER_EMAIL && (
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteUserId(u.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
-                  <select
-                    value={u.role}
-                    onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
-                    className="text-xs border rounded-md px-2 py-1 bg-background"
-                  >
-                    <option value="vendedor">Vendedor</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  {isFounder && u.email !== FOUNDER_EMAIL && (
+                    <label className="flex items-center gap-1 text-[11px] font-medium border rounded-md px-2 py-1 cursor-pointer bg-background">
+                      <Switch checked={u.is_ceo} onCheckedChange={(v) => toggleCeo(u.id, v)} />
+                      CEO
+                    </label>
+                  )}
+                  {u.email !== FOUNDER_EMAIL && !u.is_ceo && (
+                    <select
+                      value={u.role}
+                      onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
+                      className="text-xs border rounded-md px-2 py-1 bg-background"
+                    >
+                      <option value="vendedor">Vendedor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  )}
                 </div>
               </CardTitle>
             </CardHeader>

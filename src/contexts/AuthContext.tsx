@@ -14,17 +14,18 @@ interface UserPermissions {
   valor_comissao: number;
 }
 
-const PRIMARY_ADMIN_EMAIL = "srcj9975@gmail.com";
+export const FOUNDER_EMAIL = "srcj9975@gmail.com";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  profile: { nome: string } | null;
+  profile: { nome: string; is_ceo?: boolean } | null;
   role: UserRole;
   permissions: UserPermissions;
   isAdmin: boolean;
   isPrimaryAdmin: boolean;
+  isFounder: boolean;
   isReadOnly: boolean;
   signOut: () => Promise<void>;
 }
@@ -48,6 +49,7 @@ const AuthContext = createContext<AuthContextType>({
   permissions: defaultPermissions,
   isAdmin: false,
   isPrimaryAdmin: false,
+  isFounder: false,
   isReadOnly: true,
   signOut: async () => {},
 });
@@ -58,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ nome: string } | null>(null);
+  const [profile, setProfile] = useState<{ nome: string; is_ceo?: boolean } | null>(null);
   const [role, setRole] = useState<UserRole>("vendedor");
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
   const sessionRef = useRef<Session | null>(null);
@@ -73,9 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserData = useCallback(async (userId: string) => {
     const requestId = ++activeFetchRef.current;
-
     const [profileRes, roleRes, permRes] = await Promise.all([
-      supabase.from("profiles").select("nome").eq("id", userId).maybeSingle(),
+      supabase.from("profiles").select("nome, is_ceo").eq("id", userId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("permissions").select("*").eq("user_id", userId).maybeSingle(),
     ]);
@@ -84,6 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    setProfile(profileRes.data ? { nome: profileRes.data.nome, is_ceo: (profileRes.data as any).is_ceo ?? false } : null);
+    setRole((roleRes.data?.role as UserRole) ?? "vendedor");
     setProfile(profileRes.data ? { nome: profileRes.data.nome } : null);
     setRole((roleRes.data?.role as UserRole) ?? "vendedor");
 
@@ -172,8 +175,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         permissions,
         isAdmin: role === "admin",
-        isPrimaryAdmin: role === "admin" && user?.email === PRIMARY_ADMIN_EMAIL,
-        isReadOnly: role === "admin" && user?.email !== PRIMARY_ADMIN_EMAIL,
+        isPrimaryAdmin: role === "admin" && (user?.email === FOUNDER_EMAIL || !!profile?.is_ceo),
+        isFounder: user?.email === FOUNDER_EMAIL,
+        isReadOnly: role === "admin" && user?.email !== FOUNDER_EMAIL && !profile?.is_ceo,
         signOut,
       }}
     >

@@ -62,6 +62,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Protect the founder from deletion
+    const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    if (targetUser?.user?.email === "srcj9975@gmail.com") {
+      return new Response(JSON.stringify({ error: "O CEO fundador não pode ser excluído" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Reassign vendas, assistencias, cobrancas, saidas to the admin before deleting
     await supabaseAdmin.from("vendas").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);
     await supabaseAdmin.from("assistencias").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);

@@ -984,18 +984,21 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_ceo: boolean
           nome: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           id: string
+          is_ceo?: boolean
           nome: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
+          is_ceo?: boolean
           nome?: string
           updated_at?: string | null
         }
@@ -1291,6 +1294,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      set_user_ceo: {
+        Args: { _is_ceo: boolean; _target_user_id: string }
+        Returns: undefined
       }
     }
     Enums: {
