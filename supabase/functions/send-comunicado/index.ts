@@ -300,27 +300,18 @@ Deno.serve(async (req) => {
       let erro = "";
       try {
         if (comunicado.formato === "midia" && comunicado.media_url) {
-          const res = await fetch(`${apiUrl}/send/media`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: sanitized, media: comunicado.media_url, caption: finalMsg, linkPreview: false }),
-          });
-          const result = await res.json();
-          success = res.ok && !result.error;
-          if (!success) erro = result.error || `HTTP ${res.status}`;
+          const rr = await evoSendMedia({ phone: sanitized, mediatype: "image", media: comunicado.media_url, caption: finalMsg });
+          success = rr.ok;
+          if (!success) erro = rr.error || `HTTP ${rr.status}`;
         } else {
-          const res = await fetch(`${apiUrl}/send/text`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: sanitized, text: finalMsg, linkPreview: false }),
-          });
-          const result = await res.json();
-          success = res.ok && !result.error;
-          if (!success) erro = result.error || `HTTP ${res.status}`;
+          const rr = await evoSendText(sanitized, finalMsg);
+          success = rr.ok;
+          if (!success) erro = rr.error || `HTTP ${rr.status}`;
         }
       } catch (e) {
         erro = e instanceof Error ? e.message : "Erro de conexão";
       }
+
 
       await serviceClient
         .from("comunicado_destinatarios")
