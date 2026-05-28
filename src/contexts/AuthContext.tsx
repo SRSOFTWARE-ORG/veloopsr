@@ -14,17 +14,18 @@ interface UserPermissions {
   valor_comissao: number;
 }
 
-const PRIMARY_ADMIN_EMAIL = "srcj9975@gmail.com";
+export const FOUNDER_EMAIL = "srcj9975@gmail.com";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  profile: { nome: string } | null;
+  profile: { nome: string; is_ceo?: boolean } | null;
   role: UserRole;
   permissions: UserPermissions;
   isAdmin: boolean;
   isPrimaryAdmin: boolean;
+  isFounder: boolean;
   isReadOnly: boolean;
   signOut: () => Promise<void>;
 }
