@@ -101,6 +101,7 @@ const ConfiguracoesPage = () => {
           nome: p.nome,
           email: emailMap[p.id] || "",
           role: role?.role || "vendedor",
+          is_ceo: (p as any).is_ceo ?? false,
           permissions: {
             pode_editar_preco: perm?.pode_editar_preco ?? false,
             pode_excluir_venda: perm?.pode_excluir_venda ?? false,
