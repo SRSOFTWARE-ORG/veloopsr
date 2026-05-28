@@ -53,7 +53,7 @@ export function normalizeBrPhone(phone: string): string {
 export type EvoResult = { ok: boolean; status: number; data?: any; error?: string };
 
 export async function evoSendText(phone: string, text: string): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) {
     return { ok: false, status: 500, error: "Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" };
   }
@@ -81,7 +81,7 @@ export async function evoSendMedia(opts: {
   caption?: string;
   mimetype?: string;
 }): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
   try {
     const res = await fetch(`${url}/message/sendMedia/${encodeURIComponent(instance)}`, {
@@ -107,7 +107,7 @@ export async function evoSendMedia(opts: {
 }
 
 export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
   try {
     const res = await fetch(`${url}/message/sendWhatsAppAudio/${encodeURIComponent(instance)}`, {
@@ -126,7 +126,7 @@ export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Pro
 }
 
 export async function evoConnectionState(): Promise<{ ok: boolean; connected: boolean; state: string; raw?: any }> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, connected: false, state: "not_configured" };
   try {
     const res = await fetch(`${url}/instance/connectionState/${encodeURIComponent(instance)}`, {
@@ -142,7 +142,7 @@ export async function evoConnectionState(): Promise<{ ok: boolean; connected: bo
 }
 
 export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcode?: string | null; state?: string; raw?: any }> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500 };
   try {
     const res = await fetch(`${url}/instance/connect/${encodeURIComponent(instance)}`, {
@@ -160,7 +160,7 @@ export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcod
 }
 
 export async function evoDownloadMediaBase64(messagePayload: any): Promise<string | null> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return null;
   try {
     const res = await fetch(`${url}/chat/getBase64FromMediaMessage/${encodeURIComponent(instance)}`, {
