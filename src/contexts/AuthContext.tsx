@@ -90,7 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRole(isCeo ? "admin" : ((roleRes.data?.role as UserRole) ?? "vendedor"));
 
     if (!permRes.data) {
-      setPermissions(defaultPermissions);
+      setPermissions(isCeo ? {
+        pode_editar_preco: true,
+        pode_excluir_venda: true,
+        pode_dar_desconto: true,
+        limite_desconto: 100,
+        pode_ver_faturamento: true,
+        tipo_comissao: "percentual",
+        valor_comissao: 0,
+      } : defaultPermissions);
       return;
     }
 
