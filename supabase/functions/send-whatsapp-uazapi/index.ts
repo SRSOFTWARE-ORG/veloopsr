@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { evoSendText, evoConnectionState, evolutionConfigured } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,42 +38,19 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
-    // Healthcheck mode: report config status without sending anything
+    // Healthcheck mode
     if (body?.health === true) {
-      const url = Deno.env.get("UAZAPI_URL");
-      const token = Deno.env.get("UAZAPI_TOKEN");
-      
-      if (!url || !token) {
+      if (!evolutionConfigured()) {
         return new Response(
-          JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes" }),
+          JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      try {
-        const apiUrl = url.replace(/\/+$/, "");
-        const res = await fetch(`${apiUrl}/instance/status`, {
-          headers: { "token": token }
-        });
-        const data = await res.json();
-        const statusStr = data?.instance?.status || data?.status || "unknown";
-        const connectedFlag = data?.status?.connected === true || data?.instance?.status === "connected" || statusStr === "connected";
-        const isOnline = res.ok && connectedFlag;
-
-        return new Response(
-          JSON.stringify({
-            ok: isOnline,
-            configured: true,
-            status: statusStr,
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (e) {
-        return new Response(
-          JSON.stringify({ ok: false, configured: true, error: "Falha na comunicação com UAZAPI" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      const state = await evoConnectionState();
+      return new Response(
+        JSON.stringify({ ok: state.connected, configured: true, status: state.state }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const { telefone, mensagem, nome_cliente, valor_transacao, data_vencimento, tipo, cobranca_id, cliente_id, cpf, status_parcela } = body;
@@ -84,71 +62,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
+    if (!evolutionConfigured()) {
       return new Response(
-        JSON.stringify({ success: false, error: "UAZAPI não configurada. Adicione UAZAPI_URL e UAZAPI_TOKEN." }),
+        JSON.stringify({ success: false, error: "Evolution API não configurada. Adicione EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Normalize phone: remove non-digits, ensure country code
-    let phone = telefone.replace(/\D/g, "");
-    if (phone.startsWith("0")) phone = phone.slice(1);
-    if (!phone.startsWith("55")) phone = "55" + phone;
-
-    // Send text message via UAZAPI
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const response = await fetch(`${apiUrl}/send/text`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "token": UAZAPI_TOKEN,
-      },
-      body: JSON.stringify({
-        number: phone,
-        text: mensagem,
-        linkPreview: false,
-      }),
-    });
-
-    const result = await response.json();
-    const success = response.ok && !result.error;
+    const r = await evoSendText(telefone, mensagem);
+    const success = r.ok;
 
     // Audit log
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     await serviceClient.from("audit_log").insert({
       user_id: user.id,
-      tabela: "whatsapp_uazapi",
+      tabela: "whatsapp_evolution",
       acao: success ? "envio_sucesso" : "envio_falha",
       detalhes: {
         telefone: telefone.replace(/\d(?=\d{4})/g, "*"),
         tipo: tipo || "manual",
         sucesso: success,
-        erro: success ? null : (result.error || `HTTP ${response.status}`),
+        erro: success ? null : (r.error || `HTTP ${r.status}`),
         cobranca_id: cobranca_id || null,
         cliente_id: cliente_id || null,
       },
     });
 
-    // Also send to n8n webhook if configured (parallel notification)
+    // Webhook n8n complementar (fire-and-forget)
     const webhookUrl = Deno.env.get("N8N_WEBHOOK_URL");
     if (webhookUrl) {
       fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nome_cliente,
-          telefone,
-          valor_transacao,
-          data_vencimento,
-          tipo,
-          cobranca_id,
-          cliente_id,
-          cpf,
-          status_parcela,
+          nome_cliente, telefone, valor_transacao, data_vencimento, tipo,
+          cobranca_id, cliente_id, cpf, status_parcela,
           whatsapp_enviado: success,
           timestamp: new Date().toISOString(),
           source: "veloop",
@@ -158,17 +106,17 @@ Deno.serve(async (req) => {
 
     if (!success) {
       return new Response(
-        JSON.stringify({ success: false, error: result.error || "Erro ao enviar via UAZAPI" }),
+        JSON.stringify({ success: false, error: r.error || "Erro ao enviar via Evolution API" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, messageId: result.key?.id || null }),
+      JSON.stringify({ success: true, messageId: r.data?.key?.id || null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("send-whatsapp-uazapi error:", error);
+    console.error("send-whatsapp-evolution error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Erro interno" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
