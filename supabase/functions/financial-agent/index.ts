@@ -47,66 +47,16 @@ function randomDelay(min: number, max: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+import { evoSendText } from "../_shared/evolution.ts";
 async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppSendResult> {
-  const url = Deno.env.get("UAZAPI_URL");
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) {
-    return { ok: false, status: 500, error: "UAZAPI_URL ou UAZAPI_TOKEN não configurados" };
+  const r = await evoSendText(phone, message);
+  if (!r.ok) {
+    console.error("[financial-agent] sendWhatsApp failed:", { status: r.status, error: r.error, body: r.data });
+    return { ok: false, status: r.status, error: r.error };
   }
-
-  try {
-    const res = await fetch(`${url.replace(/\/+$/, "")}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: normalizePhone(phone), text: message, linkPreview: false }),
-    });
-
-    const rawBody = await res.text();
-    let parsedBody: any = null;
-    try {
-      parsedBody = rawBody ? JSON.parse(rawBody) : null;
-    } catch {
-      parsedBody = rawBody;
-    }
-
-    const statusValue = parsedBody?.status;
-    const hasExplicitError =
-      parsedBody?.error &&
-      parsedBody?.error !== false &&
-      parsedBody?.error !== "false";
-
-    const errorMessage = !res.ok
-      ? parsedBody?.error || parsedBody?.message || rawBody || `HTTP ${res.status}`
-      : hasExplicitError
-      ? String(parsedBody.error)
-      : statusValue === false || statusValue === "error" || statusValue === "ERROR"
-      ? parsedBody?.message || rawBody || "Erro ao enviar WhatsApp"
-      : undefined;
-
-    if (!res.ok || errorMessage) {
-      console.error("[financial-agent] sendWhatsApp failed:", {
-        status: res.status,
-        error: errorMessage,
-        body: parsedBody,
-      });
-
-      return {
-        ok: false,
-        status: res.status,
-        error: errorMessage,
-      };
-    }
-
-    return { ok: true, status: res.status };
-  } catch (e) {
-    console.error("[financial-agent] sendWhatsApp error:", e);
-    return {
-      ok: false,
-      status: 500,
-      error: e instanceof Error ? e.message : "Erro desconhecido ao enviar WhatsApp",
-    };
-  }
+  return { ok: true, status: r.status };
 }
+
 
 async function notifyN8nHandover(status: string, phone: string, context: Record<string, unknown>) {
   void status;

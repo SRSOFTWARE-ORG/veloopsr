@@ -159,66 +159,21 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
   } catch (e) { console.error("[Gemini] exception:", e); return "Desculpe, ocorreu um erro. Tente novamente."; }
 }
 
-// ─── UAZAPI send ───
+// ─── Evolution send ───
+import { evoSendText, evoDownloadMediaBase64, evoSendAudio } from "../_shared/evolution.ts";
 
 async function sendWhatsApp(phone: string, message: string) {
-  const url = Deno.env.get("UAZAPI_URL");
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) return false;
-  try {
-    const res = await fetch(`${url.replace(/\/+$/, "")}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: phone, text: message, linkPreview: false }),
-    });
-    const rawBody = await res.text();
-    let parsedBody: any = null;
-    try {
-      parsedBody = rawBody ? JSON.parse(rawBody) : null;
-    } catch {
-      parsedBody = rawBody;
-    }
-
-    const statusValue = parsedBody?.status;
-    const hasExplicitError =
-      parsedBody?.error &&
-      parsedBody?.error !== false &&
-      parsedBody?.error !== "false";
-
-    const failed =
-      !res.ok ||
-      hasExplicitError ||
-      statusValue === false ||
-      statusValue === "error" ||
-      statusValue === "ERROR";
-
-    if (failed) {
-      console.error("sendWhatsApp failed:", { status: res.status, body: parsedBody });
-      return false;
-    }
-
-    return true;
-  } catch (e) { console.error("sendWhatsApp error:", e); return false; }
+  const r = await evoSendText(phone, message);
+  if (!r.ok) console.error("sendWhatsApp failed:", { status: r.status, error: r.error });
+  return r.ok;
 }
 
-// ─── Download media from UAZAPI ───
-
+// ─── Download media from Evolution ───
 async function downloadMediaBase64(messageBody: any): Promise<string | null> {
-  const url = Deno.env.get("UAZAPI_URL");
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) return null;
-  try {
-    const payload = messageBody.data || messageBody.body || messageBody;
-    const res = await fetch(`${url.replace(/\/+$/, "")}/chat/getBase64FromMediaMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ message: payload }),
-    });
-    if (!res.ok) { console.error("[downloadMedia] status:", res.status); return null; }
-    const data = await res.json();
-    return data.base64 || data.data || null;
-  } catch (e) { console.error("downloadMedia error:", e); return null; }
+  const payload = messageBody?.data || messageBody?.body || messageBody;
+  return await evoDownloadMediaBase64(payload);
 }
+
 
 // ─── Transcribe audio with Gemini ───
 
@@ -266,22 +221,13 @@ async function textToSpeechBase64(text: string): Promise<string | null> {
   } catch (e) { console.error("textToSpeech error:", e); return null; }
 }
 
-// ─── Send audio via UAZAPI (PTT voice message) ───
-
+// ─── Send audio via Evolution (PTT voice message) ───
 async function sendWhatsAppAudio(phone: string, audioBase64: string): Promise<boolean> {
-  const url = Deno.env.get("UAZAPI_URL");
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) return false;
-  try {
-    const res = await fetch(`${url.replace(/\/+$/, "")}/send/audio`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: phone, audio: `data:audio/mp3;base64,${audioBase64}`, ptt: true }),
-    });
-    if (!res.ok) console.error("[sendAudio] status:", res.status, await res.text());
-    return res.ok;
-  } catch (e) { console.error("sendWhatsAppAudio error:", e); return false; }
+  const r = await evoSendAudio(phone, `data:audio/mp3;base64,${audioBase64}`);
+  if (!r.ok) console.error("[sendAudio] status:", r.status, r.error);
+  return r.ok;
 }
+
 
 // ─── Conversation DB helpers ───
 
@@ -433,15 +379,20 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // ── Anti-spoofing: UAZAPI inclui o token da instância no payload ──
-    const expectedToken = Deno.env.get("UAZAPI_TOKEN");
-    const receivedToken = body?.token || req.headers.get("token") || req.headers.get("x-uazapi-token");
-    if (expectedToken && receivedToken !== expectedToken) {
-      console.warn("[Webhook] Token inválido — request rejeitado");
+    // ── Anti-spoofing: Evolution envia o apikey global em header `apikey` ──
+    const expectedKey = Deno.env.get("EVOLUTION_API_KEY");
+    const receivedKey =
+      req.headers.get("apikey") ||
+      req.headers.get("x-evolution-apikey") ||
+      body?.apikey ||
+      body?.token;
+    if (expectedKey && receivedKey !== expectedKey) {
+      console.warn("[Webhook] apikey inválida — request rejeitado");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     console.log("[Webhook] RAW BODY:", JSON.stringify(body).slice(0, 2000));
 

@@ -71,17 +71,16 @@ Deno.serve(async (req) => {
       userId = user.id;
     }
 
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+    const { evoSendText, evoSendMedia, evolutionConfigured } = await import("../_shared/evolution.ts");
 
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
-      return new Response(JSON.stringify({ error: "UAZAPI não configurada" }), {
+    if (!evolutionConfigured()) {
+      return new Response(JSON.stringify({ error: "Evolution API não configurada" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+
 
     // ===== TEST MODE =====
     if (isTest) {
@@ -103,22 +102,13 @@ Deno.serve(async (req) => {
 
       let success = false;
       if (formato === "midia" && media_url) {
-        const res = await fetch(`${apiUrl}/send/media`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-          body: JSON.stringify({ number: phone, media: media_url, caption: finalMsg, linkPreview: false }),
-        });
-        const r = await res.json();
-        success = res.ok && !r.error;
+        const r = await evoSendMedia({ phone, mediatype: "image", media: media_url, caption: finalMsg });
+        success = r.ok;
       } else {
-        const res = await fetch(`${apiUrl}/send/text`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-          body: JSON.stringify({ number: phone, text: finalMsg, linkPreview: false }),
-        });
-        const r = await res.json();
-        success = res.ok && !r.error;
+        const r = await evoSendText(phone, finalMsg);
+        success = r.ok;
       }
+
 
       return new Response(JSON.stringify({ success, test: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -310,27 +300,18 @@ Deno.serve(async (req) => {
       let erro = "";
       try {
         if (comunicado.formato === "midia" && comunicado.media_url) {
-          const res = await fetch(`${apiUrl}/send/media`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: sanitized, media: comunicado.media_url, caption: finalMsg, linkPreview: false }),
-          });
-          const result = await res.json();
-          success = res.ok && !result.error;
-          if (!success) erro = result.error || `HTTP ${res.status}`;
+          const rr = await evoSendMedia({ phone: sanitized, mediatype: "image", media: comunicado.media_url, caption: finalMsg });
+          success = rr.ok;
+          if (!success) erro = rr.error || `HTTP ${rr.status}`;
         } else {
-          const res = await fetch(`${apiUrl}/send/text`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-            body: JSON.stringify({ number: sanitized, text: finalMsg, linkPreview: false }),
-          });
-          const result = await res.json();
-          success = res.ok && !result.error;
-          if (!success) erro = result.error || `HTTP ${res.status}`;
+          const rr = await evoSendText(sanitized, finalMsg);
+          success = rr.ok;
+          if (!success) erro = rr.error || `HTTP ${rr.status}`;
         }
       } catch (e) {
         erro = e instanceof Error ? e.message : "Erro de conexão";
       }
+
 
       await serviceClient
         .from("comunicado_destinatarios")

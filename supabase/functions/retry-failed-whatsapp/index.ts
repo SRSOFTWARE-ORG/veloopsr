@@ -118,10 +118,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) throw new Error("UAZAPI não configurada");
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
+    const { evoSendText, evolutionConfigured } = await import("../_shared/evolution.ts");
+    if (!evolutionConfigured()) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
+
 
     let successCount = 0;
     let failCount = 0;
@@ -138,11 +137,8 @@ Deno.serve(async (req) => {
     const cliMap = new Map((clisRes.data || []).map((c: any) => [c.id, c]));
 
     for (const envio of enviosFalhos) {
+    for (const envio of enviosFalhos) {
       try {
-        let phone = envio.telefone.replace(/\D/g, "");
-        if (phone.startsWith("0")) phone = phone.slice(1);
-        if (!phone.startsWith("55")) phone = "55" + phone;
-
         // Sempre reconstrói a mensagem completa (corrige stubs antigos "WhatsApp D-1 — R$ X")
         const cob: any = envio.cobranca_id ? cobMap.get(envio.cobranca_id) : null;
         const cli: any = envio.cliente_id ? cliMap.get(envio.cliente_id) : null;
@@ -163,22 +159,15 @@ Deno.serve(async (req) => {
               cobrancaId: envio.cobranca_id || "",
             });
 
-        const response = await fetch(`${apiUrl}/send/text`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-          body: JSON.stringify({ number: phone, text: mensagem, linkPreview: false }),
-        });
-        const result = await response.json().catch(() => ({}));
-        const success = response.ok && !result.error;
-
-        if (success) {
+        const r = await evoSendText(envio.telefone, mensagem);
+        if (r.ok) {
           await supabase.from("envio_cobranca").update({ enviado_com_sucesso: true, mensagem }).eq("id", envio.id);
           successCount++;
           results.push({ id: envio.id, status: "success" });
         } else {
           failCount++;
-          results.push({ id: envio.id, status: "fail", error: result.error || response.statusText });
-        }
+          results.push({ id: envio.id, status: "fail", error: r.error || `HTTP ${r.status}` });
+
       } catch (err) {
         failCount++;
         results.push({ id: envio.id, status: "error", error: err instanceof Error ? err.message : String(err) });

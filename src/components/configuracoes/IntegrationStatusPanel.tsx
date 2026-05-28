@@ -70,7 +70,7 @@ async function withRetry<T>(
 export default function IntegrationStatusPanel() {
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([
     { key: "mp", name: "Mercado Pago", description: "Pagamentos PIX", status: "checking", logs: [] },
-    { key: "wa", name: "WhatsApp (UAZAPI)", description: "Envio de mensagens", status: "checking", logs: [] },
+    { key: "wa", name: "WhatsApp (Evolution)", description: "Envio de mensagens", status: "checking", logs: [] },
     { key: "gc", name: "Google Calendar", description: "Sincronização de agenda", status: "checking", logs: [] },
     { key: "ai", name: "Lovable AI / Gemini", description: "Escaneamento de documentos", status: "checking", logs: [] },
   ]);
@@ -178,10 +178,10 @@ export default function IntegrationStatusPanel() {
         if (isOnline && !wasOnline && waInt?.status !== 'checking') {
           toast.success("WhatsApp reconectado! Iniciando reprocessamento automático...", { duration: 5000 });
           supabase.functions.invoke("admin-whatsapp-actions", { body: { action: "resend_all" } });
-          notifyAdmins("✅ WhatsApp Reconectado", "A instância da UAZAPI voltou a ficar online. Iniciando reprocessamento da fila de mensagens falhas.");
+          notifyAdmins("✅ WhatsApp Reconectado", "A instância do Evolution voltou a ficar online. Iniciando reprocessamento da fila de mensagens falhas.");
         } else if (!isOnline && wasOnline) {
           toast.error("WhatsApp desconectado!", { duration: 5000 });
-          notifyAdmins("⚠️ WhatsApp Desconectado", "A instância da UAZAPI foi detectada como offline. Verifique a conexão.");
+          notifyAdmins("⚠️ WhatsApp Desconectado", "A instância do Evolution foi detectada como offline. Verifique a conexão.");
         }
 
         if (isOnline) return { value: { status: "online", detail: "URL e token configurados" }, ok: true, status: 200 };
@@ -203,7 +203,7 @@ export default function IntegrationStatusPanel() {
           user_id: adminId,
           titulo,
           mensagem,
-          tipo: "integracao_uazapi_erro",
+          tipo: "integracao_evolution_erro",
           dados: { timestamp: new Date().toISOString() },
         });
       }
@@ -356,12 +356,12 @@ export default function IntegrationStatusPanel() {
             {reconnectLoading && (
               <div className="flex flex-col items-center gap-2 py-6">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Obtendo QR code da UAZAPI...</p>
+                <p className="text-sm text-muted-foreground">Obtendo QR code do Evolution...</p>
               </div>
             )}
             {reconnectQr && (
               <div className="flex flex-col items-center gap-2">
-                <img src={reconnectQr} alt="QR Code UAZAPI" className="w-56 h-56 border rounded" />
+                <img src={reconnectQr} alt="QR Code Evolution" className="w-56 h-56 border rounded" />
                 <p className="text-xs text-muted-foreground">{reconnectMsg}</p>
                 <Button size="sm" variant="outline" onClick={handleReconnectWhatsApp} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" /> Gerar novo QR
