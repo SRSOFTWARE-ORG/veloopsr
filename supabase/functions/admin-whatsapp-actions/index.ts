@@ -69,30 +69,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      const UAZAPI_URL = Deno.env.get("UAZAPI_URL")!;
-      const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN")!;
-      const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-
       let successCount = 0;
       for (const msg of pending) {
         try {
-          let phone = msg.telefone.replace(/\D/g, "");
-          if (phone.startsWith("0")) phone = phone.slice(1);
-          if (!phone.startsWith("55")) phone = "55" + phone;
-
-          const res = await fetch(`${apiUrl}/send/text`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "token": UAZAPI_TOKEN },
-            body: JSON.stringify({ number: phone, text: msg.mensagem, linkPreview: false }),
-          });
-
-          const data = await res.json();
-          if (res.ok && !data.error) {
+          const r = await evoSendText(msg.telefone, msg.mensagem);
+          if (r.ok) {
             await supabase.from("envio_cobranca").update({ enviado_com_sucesso: true }).eq("id", msg.id);
             await supabase.from("whatsapp_resend_logs").insert({ envio_id: msg.id, status: "sucesso" });
             successCount++;
           } else {
-            await supabase.from("whatsapp_resend_logs").insert({ envio_id: msg.id, status: "falha", erro: data.error || res.statusText });
+            await supabase.from("whatsapp_resend_logs").insert({ envio_id: msg.id, status: "falha", erro: r.error || `HTTP ${r.status}` });
           }
           // anti-ban: delay aleatório 15-30s entre envios
           await new Promise(r => setTimeout(r, (15 + Math.floor(Math.random() * 16)) * 1000));
@@ -100,6 +86,7 @@ Deno.serve(async (req) => {
           console.error("Resend error for msg", msg.id, e);
         }
       }
+
 
       return new Response(JSON.stringify({ success: true, count: successCount }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
