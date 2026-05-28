@@ -1,17 +1,47 @@
 // Helpers para Evolution API (substitui UAZAPI)
 // Requer secrets: EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE
 
-function getCfg() {
+let _autoInstanceCache: { name: string; at: number } | null = null;
+const AUTO_INSTANCE_TTL_MS = 5 * 60 * 1000; // 5 min
+
+async function _autoDetectInstance(url: string, key: string): Promise<string | null> {
+  if (_autoInstanceCache && Date.now() - _autoInstanceCache.at < AUTO_INSTANCE_TTL_MS) {
+    return _autoInstanceCache.name;
+  }
+  try {
+    const res = await fetch(`${url}/instance/fetchInstances`, { headers: { apikey: key } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data)) return null;
+    // Prefer "open" instance; fallback to first
+    const open = data.find((i: any) => i?.connectionStatus === "open");
+    const pick = open || data[0];
+    const name = pick?.name || null;
+    if (name) _autoInstanceCache = { name, at: Date.now() };
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+async function getCfg(autoResolve = true) {
   const url = (Deno.env.get("EVOLUTION_API_URL") || "").replace(/\/+$/, "");
   const key = Deno.env.get("EVOLUTION_API_KEY") || "";
-  const instance = Deno.env.get("EVOLUTION_INSTANCE") || "";
+  let instance = Deno.env.get("EVOLUTION_INSTANCE") || "";
+  // If the configured instance looks like a token (long hex with dashes), auto-detect by name
+  const looksLikeToken = /^[0-9A-Fa-f]{8,}-[0-9A-Fa-f-]{8,}/.test(instance);
+  if (autoResolve && url && key && (!instance || looksLikeToken)) {
+    const detected = await _autoDetectInstance(url, key);
+    if (detected) instance = detected;
+  }
   return { url, key, instance };
 }
 
-export function evolutionConfigured(): boolean {
-  const { url, key, instance } = getCfg();
+export async function evolutionConfigured(): Promise<boolean> {
+  const { url, key, instance } = await getCfg();
   return !!url && !!key && !!instance;
 }
+
 
 export function normalizeBrPhone(phone: string): string {
   let p = String(phone || "").replace(/\D/g, "");
@@ -23,7 +53,7 @@ export function normalizeBrPhone(phone: string): string {
 export type EvoResult = { ok: boolean; status: number; data?: any; error?: string };
 
 export async function evoSendText(phone: string, text: string): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) {
     return { ok: false, status: 500, error: "Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" };
   }
@@ -51,7 +81,7 @@ export async function evoSendMedia(opts: {
   caption?: string;
   mimetype?: string;
 }): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
   try {
     const res = await fetch(`${url}/message/sendMedia/${encodeURIComponent(instance)}`, {
@@ -77,7 +107,7 @@ export async function evoSendMedia(opts: {
 }
 
 export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Promise<EvoResult> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
   try {
     const res = await fetch(`${url}/message/sendWhatsAppAudio/${encodeURIComponent(instance)}`, {
@@ -96,7 +126,7 @@ export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Pro
 }
 
 export async function evoConnectionState(): Promise<{ ok: boolean; connected: boolean; state: string; raw?: any }> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, connected: false, state: "not_configured" };
   try {
     const res = await fetch(`${url}/instance/connectionState/${encodeURIComponent(instance)}`, {
@@ -112,7 +142,7 @@ export async function evoConnectionState(): Promise<{ ok: boolean; connected: bo
 }
 
 export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcode?: string | null; state?: string; raw?: any }> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500 };
   try {
     const res = await fetch(`${url}/instance/connect/${encodeURIComponent(instance)}`, {
@@ -130,7 +160,7 @@ export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcod
 }
 
 export async function evoDownloadMediaBase64(messagePayload: any): Promise<string | null> {
-  const { url, key, instance } = getCfg();
+  const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return null;
   try {
     const res = await fetch(`${url}/chat/getBase64FromMediaMessage/${encodeURIComponent(instance)}`, {

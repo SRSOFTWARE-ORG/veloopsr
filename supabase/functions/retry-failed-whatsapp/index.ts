@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     }
 
     const { evoSendText, evolutionConfigured } = await import("../_shared/evolution.ts");
-    if (!evolutionConfigured()) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
+    if (!(await evolutionConfigured())) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
 
 
     let successCount = 0;
@@ -136,7 +136,6 @@ Deno.serve(async (req) => {
     const cobMap = new Map((cobsRes.data || []).map((c: any) => [c.id, c]));
     const cliMap = new Map((clisRes.data || []).map((c: any) => [c.id, c]));
 
-    for (const envio of enviosFalhos) {
     for (const envio of enviosFalhos) {
       try {
         // Sempre reconstrói a mensagem completa (corrige stubs antigos "WhatsApp D-1 — R$ X")
@@ -167,13 +166,14 @@ Deno.serve(async (req) => {
         } else {
           failCount++;
           results.push({ id: envio.id, status: "fail", error: r.error || `HTTP ${r.status}` });
-
+        }
       } catch (err) {
         failCount++;
         results.push({ id: envio.id, status: "error", error: err instanceof Error ? err.message : String(err) });
       }
       await randomDelay(15, 30); // anti-ban: delay aleatório 15-30s
     }
+
 
     return new Response(JSON.stringify({
       success: true, total: enviosFalhos.length, reenviados: successCount, falhas: failCount, detalhes: results,

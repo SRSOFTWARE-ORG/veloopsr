@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
 
     const { evoSendText, evoSendMedia, evolutionConfigured } = await import("../_shared/evolution.ts");
 
-    if (!evolutionConfigured()) {
+    if (!(await evolutionConfigured())) {
       return new Response(JSON.stringify({ error: "Evolution API não configurada" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
