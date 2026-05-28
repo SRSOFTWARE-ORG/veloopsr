@@ -180,6 +180,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
+  const isFounder = user?.email?.toLowerCase() === FOUNDER_EMAIL;
+  const isCeo = !!profile?.is_ceo;
+
   return (
     <AuthContext.Provider
       value={{
@@ -189,10 +192,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         role,
         permissions,
-        isAdmin: role === "admin",
-        isPrimaryAdmin: role === "admin" && (user?.email === FOUNDER_EMAIL || !!profile?.is_ceo),
-        isFounder: user?.email === FOUNDER_EMAIL,
-        isReadOnly: role === "admin" && user?.email !== FOUNDER_EMAIL && !profile?.is_ceo,
+        isAdmin: role === "admin" || isCeo || isFounder,
+        isPrimaryAdmin: isFounder || isCeo,
+        isFounder,
+        isReadOnly: role === "admin" && !isFounder && !isCeo,
         signOut,
       }}
     >
