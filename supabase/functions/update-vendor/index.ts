@@ -27,14 +27,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Only primary admin can update vendors
+    const FOUNDER_EMAIL = "srcj9975@gmail.com";
+
+    // Caller must be admin AND (founder OR have profiles.is_ceo = true)
     const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: caller.id,
       _role: "admin",
     });
 
-    if (!isAdmin || caller.email !== "srcj9975@gmail.com") {
-      return new Response(JSON.stringify({ error: "Apenas o administrador principal pode alterar dados" }), {
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles").select("is_ceo").eq("id", caller.id).maybeSingle();
+    const callerIsCeo = !!callerProfile?.is_ceo || caller.email === FOUNDER_EMAIL;
+
+    if (!isAdmin || !callerIsCeo) {
+      return new Response(JSON.stringify({ error: "Apenas CEOs podem alterar dados de usuários" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -45,6 +51,15 @@ Deno.serve(async (req) => {
     if (!user_id) {
       return new Response(JSON.stringify({ error: "ID do usuário é obrigatório" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Protect the founder: only the founder may edit their own data
+    const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    if (targetUser?.user?.email === FOUNDER_EMAIL && caller.email !== FOUNDER_EMAIL) {
+      return new Response(JSON.stringify({ error: "O CEO fundador não pode ser editado por outro usuário" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
