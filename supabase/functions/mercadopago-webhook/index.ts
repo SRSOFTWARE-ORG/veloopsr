@@ -16,26 +16,13 @@ function formatDate(d: string): string {
   return d.split("-").reverse().join("/");
 }
 
+import { evoSendText } from "../_shared/evolution.ts";
 async function sendWhatsAppText(phone: string, message: string): Promise<boolean> {
-  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
-  let cleanPhone = phone.replace(/\D/g, "");
-  if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
-  if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
-  try {
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const res = await fetch(`${apiUrl}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-      body: JSON.stringify({ number: cleanPhone, text: message, linkPreview: false }),
-    });
-    return res.ok;
-  } catch (err) {
-    console.error("[UAZAPI] Text send error:", err);
-    return false;
-  }
+  const r = await evoSendText(phone, message);
+  if (!r.ok) console.error("[Evolution] Text send error:", r.status, r.error);
+  return r.ok;
 }
+
 
 async function verifyMercadoPagoSignature(req: Request, paymentId: string, secret: string): Promise<boolean> {
   // MP envia: x-signature: ts=TIMESTAMP,v1=HEXHMAC ; x-request-id: REQ_ID
