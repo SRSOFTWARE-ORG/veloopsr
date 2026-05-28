@@ -221,22 +221,13 @@ async function textToSpeechBase64(text: string): Promise<string | null> {
   } catch (e) { console.error("textToSpeech error:", e); return null; }
 }
 
-// ─── Send audio via UAZAPI (PTT voice message) ───
-
+// ─── Send audio via Evolution (PTT voice message) ───
 async function sendWhatsAppAudio(phone: string, audioBase64: string): Promise<boolean> {
-  const url = Deno.env.get("UAZAPI_URL");
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!url || !token) return false;
-  try {
-    const res = await fetch(`${url.replace(/\/+$/, "")}/send/audio`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: phone, audio: `data:audio/mp3;base64,${audioBase64}`, ptt: true }),
-    });
-    if (!res.ok) console.error("[sendAudio] status:", res.status, await res.text());
-    return res.ok;
-  } catch (e) { console.error("sendWhatsAppAudio error:", e); return false; }
+  const r = await evoSendAudio(phone, `data:audio/mp3;base64,${audioBase64}`);
+  if (!r.ok) console.error("[sendAudio] status:", r.status, r.error);
+  return r.ok;
 }
+
 
 // ─── Conversation DB helpers ───
 
