@@ -26,43 +26,28 @@ function placeholder(val: string | null | undefined, fallback = "* * *"): string
   return val && val.trim() ? val.trim() : fallback;
 }
 
+import { evoSendMedia, evoSendText } from "../_shared/evolution.ts";
 async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string, docName: string): Promise<boolean> {
-  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
-  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
-  let cleanPhone = phone.replace(/\D/g, "");
-  if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
-  if (!cleanPhone.startsWith("55")) cleanPhone = "55" + cleanPhone;
   try {
-    const apiUrl = UAZAPI_URL.replace(/\/+$/, "");
-    // UAZAPI V2: POST /send/media with type "document"
-    const res = await fetch(`${apiUrl}/send/media`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-      body: JSON.stringify({
-        number: cleanPhone,
-        type: "document",
-        file: pdfUrl,
-        docName: docName,
-        text: caption,
-        mimetype: "application/pdf",
-      }),
+    const r = await evoSendMedia({
+      phone,
+      mediatype: "document",
+      media: pdfUrl,
+      fileName: docName,
+      caption,
+      mimetype: "application/pdf",
     });
-    if (res.ok) return true;
-    // Fallback: send as text with link
-    console.warn("[UAZAPI] /send/media failed, fallback to text:", res.status);
+    if (r.ok) return true;
+    console.warn("[Evolution] sendMedia falhou, fallback texto:", r.status, r.error);
     const textMsg = `${caption}\n\n🔗 Baixe o comprovante PDF:\n${pdfUrl}`;
-    const r2 = await fetch(`${apiUrl}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
-      body: JSON.stringify({ number: cleanPhone, text: textMsg, linkPreview: true }),
-    });
+    const r2 = await evoSendText(phone, textMsg);
     return r2.ok;
   } catch (err) {
-    console.error("[UAZAPI] PDF send error:", err);
+    console.error("[Evolution] PDF send error:", err);
     return false;
   }
 }
+
 
 async function fetchLogoBytes(): Promise<Uint8Array | null> {
   try {
