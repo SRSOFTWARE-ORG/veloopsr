@@ -258,42 +258,54 @@ const ConfiguracoesPage = () => {
         </Dialog>
       </div>
 
-      <div className="space-y-4">
-        {users.map((u, i) => (
-          <Card key={u.id} className={`slide-up delay-${Math.min(i + 1, 6)}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-base">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                    {u.nome.charAt(0).toUpperCase()}
-                  </div>
                   <div>
                     <span className="block">{u.nome}</span>
-                    {u.email === "srcj9975@gmail.com" && (
-                      <span className="text-[10px] font-semibold text-primary">Gerente & CEO</span>
+                    {u.email === FOUNDER_EMAIL && (
+                      <span className="text-[10px] font-semibold text-primary">CEO Fundador</span>
+                    )}
+                    {u.is_ceo && u.email !== FOUNDER_EMAIL && (
+                      <span className="text-[10px] font-semibold text-amber-600">CEO</span>
                     )}
                     <span className="text-xs font-normal text-muted-foreground block">{u.email}</span>
                     <span className="text-xs font-normal text-muted-foreground capitalize">{u.role}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  {u.id !== user?.id && (
+                  {/* Founder pode ser editado apenas por si mesmo */}
+                  {(u.email !== FOUNDER_EMAIL || isFounder) && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditVendedor({ id: u.id, nome: u.nome, email: (u as any).email }); setEditDialogOpen(true); }}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  {/* Founder nunca pode ser excluído; também não pode excluir a si mesmo */}
+                  {u.id !== user?.id && u.email !== FOUNDER_EMAIL && (
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteUserId(u.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
-                  <select
-                    value={u.role}
-                    onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
-                    className="text-xs border rounded-md px-2 py-1 bg-background"
-                  >
-                    <option value="vendedor">Vendedor</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  {/* Apenas o fundador pode promover/rebaixar CEO (e nunca em si mesmo) */}
+                  {isFounder && u.email !== FOUNDER_EMAIL && (
+                    <label className="flex items-center gap-1 text-[11px] font-medium border rounded-md px-2 py-1 cursor-pointer bg-background">
+                      <Switch checked={u.is_ceo} onCheckedChange={(v) => toggleCeo(u.id, v)} />
+                      CEO
+                    </label>
+                  )}
+                  {/* Seleção de cargo: bloqueada para o fundador (e para o próprio CEO se não for fundador) */}
+                  {u.email !== FOUNDER_EMAIL && !u.is_ceo && (
+                    <select
+                      value={u.role}
+                      onChange={(e) => updateRole(u.id, e.target.value as "admin" | "vendedor")}
+                      className="text-xs border rounded-md px-2 py-1 bg-background"
+                    >
+                      <option value="vendedor">Vendedor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  )}
                 </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-2">
+              {u.role === "vendedor" && (
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 pt-2">
