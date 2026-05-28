@@ -172,7 +172,7 @@ const actionTools = [
     type: "function",
     function: {
       name: "send_whatsapp",
-      description: "Enviar mensagem WhatsApp para um cliente via UAZAPI. Busca automaticamente o telefone do cliente se não informado.",
+      description: "Enviar mensagem WhatsApp para um cliente via Evolution API. Busca automaticamente o telefone do cliente se não informado.",
       parameters: {
         type: "object",
         properties: {
@@ -413,7 +413,7 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
 
       if (!telefone) return "❌ Telefone não informado e nenhum cliente_id fornecido";
 
-      // Send via UAZAPI edge function
+      // Send via Evolution edge function
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-uazapi`, {

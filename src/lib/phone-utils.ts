@@ -1,5 +1,5 @@
 /**
- * Normaliza telefone BR para envio via UAZAPI.
+ * Normaliza telefone BR para envio via Evolution API.
  * Retorna apenas dígitos com DDI 55. Retorna null se inválido.
  * Aceita 10 ou 11 dígitos locais (com ou sem 55 na frente).
  */
