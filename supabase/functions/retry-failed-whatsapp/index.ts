@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     }
 
     const { evoSendText, evolutionConfigured } = await import("../_shared/evolution.ts");
-    if (!evolutionConfigured()) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
+    if (!(await evolutionConfigured())) throw new Error("Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)");
 
 
     let successCount = 0;

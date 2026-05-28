@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     // Healthcheck mode
     // Healthcheck mode
     if (body?.health === true) {
-      if (!evolutionConfigured()) {
+      if (!(await evolutionConfigured())) {
         return new Response(
           JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!evolutionConfigured()) {
+    if (!(await evolutionConfigured())) {
       return new Response(
         JSON.stringify({ success: false, error: "Evolution API não configurada. Adicione EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

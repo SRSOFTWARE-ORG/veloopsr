@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
   if (!(await _isAdmin(_user.id))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
-    if (!evolutionConfigured()) {
+    if (!(await evolutionConfigured())) {
       return new Response(JSON.stringify({ ok: false, error: "Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
