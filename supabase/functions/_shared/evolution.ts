@@ -59,6 +59,11 @@ export async function evoSendText(phone: string, text: string): Promise<EvoResul
   if (!url || !key || !instance) {
     return { ok: false, status: 500, error: "Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" };
   }
+  const block = _assertInstanceAllowed(instance);
+  if (block) {
+    console.error("[evolution] BLOQUEADO:", block);
+    return { ok: false, status: 403, error: block };
+  }
   try {
     const res = await fetch(`${url}/message/sendText/${encodeURIComponent(instance)}`, {
       method: "POST",
