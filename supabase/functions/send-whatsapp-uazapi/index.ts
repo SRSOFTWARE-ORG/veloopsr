@@ -41,15 +41,24 @@ Deno.serve(async (req) => {
     // Healthcheck mode
     // Healthcheck mode
     if (body?.health === true) {
+      const hasUrl = !!Deno.env.get("EVOLUTION_API_URL");
+      const hasKey = !!Deno.env.get("EVOLUTION_API_KEY");
+      const instanceVal = (Deno.env.get("EVOLUTION_INSTANCE") || "").trim();
+      const hasInstance = !!instanceVal;
       if (!(await evolutionConfigured())) {
         return new Response(
-          JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }),
+          JSON.stringify({
+            ok: false,
+            configured: false,
+            error: "Credenciais ausentes ou instância bloqueada",
+            debug: { hasUrl, hasKey, hasInstance, instancePreview: instanceVal ? `${instanceVal.slice(0,3)}***(${instanceVal.length} chars)` : null },
+          }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const state = await evoConnectionState();
       return new Response(
-        JSON.stringify({ ok: state.connected, configured: true, status: state.state }),
+        JSON.stringify({ ok: state.connected, configured: true, status: state.state, instancePreview: `${instanceVal.slice(0,3)}***` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
