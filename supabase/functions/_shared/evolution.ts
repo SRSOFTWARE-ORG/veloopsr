@@ -6,11 +6,12 @@
 // - Bloquear nomes de instância que não pertencem ao SR SOFTWARE (ex: BARBEARIA DO JEFFÃO).
 // - Se a instância configurada cair na blocklist, falhamos a chamada imediatamente.
 
+// Blocklist: instâncias que NUNCA podem enviar mensagens por este app.
+// (a barbearia do JEFFÃO compartilha o mesmo servidor Evolution, então bloqueamos
+//  qualquer nome que contenha estas substrings).
 const INSTANCE_BLOCKLIST = [
-  "jeffao", "jeffão", "barbearia", "barbearia do jeffao", "barbearia do jeffão",
+  "jeffao", "jeffão", "barbearia",
 ];
-
-const ALLOWED_INSTANCES = ["veloop", "sr software", "srsoftware", "sr-software"];
 
 function _isBlocked(instance: string): boolean {
   const n = instance.trim().toLowerCase();
@@ -28,12 +29,7 @@ async function getCfg() {
 function _assertInstanceAllowed(instance: string): string | null {
   if (!instance) return "EVOLUTION_INSTANCE não configurada";
   if (_isBlocked(instance)) {
-    return `Instância "${instance}" bloqueada (não pertence ao SR SOFTWARE). Ajuste EVOLUTION_INSTANCE para 'Veloop'.`;
-  }
-  const n = instance.toLowerCase();
-  const allowed = ALLOWED_INSTANCES.some((a) => n.includes(a));
-  if (!allowed) {
-    return `Instância "${instance}" não está na allowlist do SR SOFTWARE. Use 'Veloop'.`;
+    return `Instância "${instance}" bloqueada (pertence à Barbearia do Jeffão). Configure EVOLUTION_INSTANCE com a instância do SR SOFTWARE.`;
   }
   return null;
 }
