@@ -1,45 +1,47 @@
 // Helpers para Evolution API (substitui UAZAPI)
 // Requer secrets: EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE
+//
+// ISOLAMENTO MULTI-TENANT (CRÍTICO):
+// - NUNCA auto-detectar instância. Usar EXATAMENTE o valor de EVOLUTION_INSTANCE.
+// - Bloquear nomes de instância que não pertencem ao SR SOFTWARE (ex: BARBEARIA DO JEFFÃO).
+// - Se a instância configurada cair na blocklist, falhamos a chamada imediatamente.
 
-let _autoInstanceCache: { name: string; at: number } | null = null;
-const AUTO_INSTANCE_TTL_MS = 5 * 60 * 1000; // 5 min
+const INSTANCE_BLOCKLIST = [
+  "jeffao", "jeffão", "barbearia", "barbearia do jeffao", "barbearia do jeffão",
+];
 
-async function _autoDetectInstance(url: string, key: string): Promise<string | null> {
-  if (_autoInstanceCache && Date.now() - _autoInstanceCache.at < AUTO_INSTANCE_TTL_MS) {
-    return _autoInstanceCache.name;
-  }
-  try {
-    const res = await fetch(`${url}/instance/fetchInstances`, { headers: { apikey: key } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data)) return null;
-    // Prefer "open" instance; fallback to first
-    const open = data.find((i: any) => i?.connectionStatus === "open");
-    const pick = open || data[0];
-    const name = pick?.name || null;
-    if (name) _autoInstanceCache = { name, at: Date.now() };
-    return name;
-  } catch {
-    return null;
-  }
+const ALLOWED_INSTANCES = ["veloop", "sr software", "srsoftware", "sr-software"];
+
+function _isBlocked(instance: string): boolean {
+  const n = instance.trim().toLowerCase();
+  if (!n) return false;
+  return INSTANCE_BLOCKLIST.some((b) => n.includes(b));
 }
 
-async function getCfg(autoResolve = true) {
+async function getCfg() {
   const url = (Deno.env.get("EVOLUTION_API_URL") || "").replace(/\/+$/, "");
   const key = Deno.env.get("EVOLUTION_API_KEY") || "";
-  let instance = Deno.env.get("EVOLUTION_INSTANCE") || "";
-  // If the configured instance looks like a token (long hex with dashes), auto-detect by name
-  const looksLikeToken = /^[0-9A-Fa-f]{8,}-[0-9A-Fa-f-]{8,}/.test(instance);
-  if (autoResolve && url && key && (!instance || looksLikeToken)) {
-    const detected = await _autoDetectInstance(url, key);
-    if (detected) instance = detected;
-  }
+  const instance = (Deno.env.get("EVOLUTION_INSTANCE") || "").trim();
   return { url, key, instance };
+}
+
+function _assertInstanceAllowed(instance: string): string | null {
+  if (!instance) return "EVOLUTION_INSTANCE não configurada";
+  if (_isBlocked(instance)) {
+    return `Instância "${instance}" bloqueada (não pertence ao SR SOFTWARE). Ajuste EVOLUTION_INSTANCE para 'Veloop'.`;
+  }
+  const n = instance.toLowerCase();
+  const allowed = ALLOWED_INSTANCES.some((a) => n.includes(a));
+  if (!allowed) {
+    return `Instância "${instance}" não está na allowlist do SR SOFTWARE. Use 'Veloop'.`;
+  }
+  return null;
 }
 
 export async function evolutionConfigured(): Promise<boolean> {
   const { url, key, instance } = await getCfg();
-  return !!url && !!key && !!instance;
+  if (!url || !key || !instance) return false;
+  return _assertInstanceAllowed(instance) === null;
 }
 
 
@@ -56,6 +58,11 @@ export async function evoSendText(phone: string, text: string): Promise<EvoResul
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) {
     return { ok: false, status: 500, error: "Evolution API não configurada (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" };
+  }
+  const block = _assertInstanceAllowed(instance);
+  if (block) {
+    console.error("[evolution] BLOQUEADO:", block);
+    return { ok: false, status: 403, error: block };
   }
   try {
     const res = await fetch(`${url}/message/sendText/${encodeURIComponent(instance)}`, {
@@ -83,6 +90,8 @@ export async function evoSendMedia(opts: {
 }): Promise<EvoResult> {
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
+  const block = _assertInstanceAllowed(instance);
+  if (block) { console.error("[evolution] BLOQUEADO:", block); return { ok: false, status: 403, error: block }; }
   try {
     const res = await fetch(`${url}/message/sendMedia/${encodeURIComponent(instance)}`, {
       method: "POST",
@@ -109,6 +118,8 @@ export async function evoSendMedia(opts: {
 export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Promise<EvoResult> {
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
+  const block = _assertInstanceAllowed(instance);
+  if (block) { console.error("[evolution] BLOQUEADO:", block); return { ok: false, status: 403, error: block }; }
   try {
     const res = await fetch(`${url}/message/sendWhatsAppAudio/${encodeURIComponent(instance)}`, {
       method: "POST",
@@ -144,6 +155,8 @@ export async function evoConnectionState(): Promise<{ ok: boolean; connected: bo
 export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcode?: string | null; state?: string; raw?: any }> {
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500 };
+  const block = _assertInstanceAllowed(instance);
+  if (block) { console.error("[evolution] BLOQUEADO:", block); return { ok: false, status: 403, raw: { error: block } }; }
   try {
     const res = await fetch(`${url}/instance/connect/${encodeURIComponent(instance)}`, {
       headers: { apikey: key },
