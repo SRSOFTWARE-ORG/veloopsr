@@ -90,6 +90,8 @@ export async function evoSendMedia(opts: {
 }): Promise<EvoResult> {
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500, error: "Evolution API não configurada" };
+  const block = _assertInstanceAllowed(instance);
+  if (block) { console.error("[evolution] BLOQUEADO:", block); return { ok: false, status: 403, error: block }; }
   try {
     const res = await fetch(`${url}/message/sendMedia/${encodeURIComponent(instance)}`, {
       method: "POST",
