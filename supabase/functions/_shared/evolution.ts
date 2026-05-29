@@ -155,6 +155,8 @@ export async function evoConnectionState(): Promise<{ ok: boolean; connected: bo
 export async function evoConnect(): Promise<{ ok: boolean; status: number; qrcode?: string | null; state?: string; raw?: any }> {
   const { url, key, instance } = await getCfg();
   if (!url || !key || !instance) return { ok: false, status: 500 };
+  const block = _assertInstanceAllowed(instance);
+  if (block) { console.error("[evolution] BLOQUEADO:", block); return { ok: false, status: 403, raw: { error: block } }; }
   try {
     const res = await fetch(`${url}/instance/connect/${encodeURIComponent(instance)}`, {
       headers: { apikey: key },
