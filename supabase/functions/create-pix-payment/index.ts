@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
         cobranca_id,
         data_vencimento,
         cliente_id: cliente_id || null,
-        valor: parseFloat(valor),
+        valor,
         mp_payment_id: String(mpData.id),
         mp_qr_code_base64: qrCodeBase64,
         mp_copia_cola: copiaCola,
@@ -150,12 +150,11 @@ Deno.serve(async (req) => {
       .single();
 
     if (dbError) {
-      // Fallback: insert without upsert
       await supabase.from("pix_payments").insert({
         cobranca_id,
         data_vencimento,
         cliente_id: cliente_id || null,
-        valor: parseFloat(valor),
+        valor,
         mp_payment_id: String(mpData.id),
         mp_qr_code_base64: qrCodeBase64,
         mp_copia_cola: copiaCola,
@@ -169,10 +168,11 @@ Deno.serve(async (req) => {
         mp_qr_code_base64: qrCodeBase64,
         mp_copia_cola: copiaCola,
         status: mpData.status,
-        valor: parseFloat(valor),
+        valor,
       },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
+
     });
   } catch (error) {
     console.error("Error:", error);
