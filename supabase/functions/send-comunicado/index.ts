@@ -51,7 +51,16 @@ Deno.serve(async (req) => {
 
     // Identify user (skipped on background resume calls authenticated with service role)
     let userId: string | null = null;
-    if (!isResume) {
+    if (isResume) {
+      // Resume só pode ser disparado pela própria função usando service role.
+      const auth = (authHeader || "").replace(/^Bearer\s+/i, "");
+      if (auth !== serviceKey) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
       if (!authHeader) {
         return new Response(JSON.stringify({ error: "Não autorizado" }), {
           status: 401,
@@ -70,6 +79,7 @@ Deno.serve(async (req) => {
       }
       userId = user.id;
     }
+
 
     const { evoSendText, evoSendMedia, evolutionConfigured } = await import("../_shared/evolution.ts");
 
