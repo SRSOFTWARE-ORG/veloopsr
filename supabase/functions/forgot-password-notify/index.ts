@@ -18,16 +18,41 @@ Deno.serve(async (req) => {
 
     const { email } = await req.json();
 
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email é obrigatório" }), {
-        status: 400,
+    if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // ── ANTI-ABUSO: máximo 5 solicitações por email por hora ──
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: recentCount } = await supabaseAdmin
+      .from("audit_log")
+      .select("id", { count: "exact", head: true })
+      .eq("tabela", "forgot_password")
+      .gte("created_at", oneHourAgo)
+      .contains("detalhes", { email: normalizedEmail });
+
+    if ((recentCount || 0) >= 5) {
+      // Sempre responder 200 para não vazar info, mas não notificar admins.
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await supabaseAdmin.from("audit_log").insert({
+      tabela: "forgot_password",
+      acao: "request",
+      detalhes: { email: normalizedEmail, ip: req.headers.get("x-forwarded-for") || "" },
+    });
+
     // Find user by email
     const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
-    const user = users?.find((u: any) => u.email === email);
+    const user = users?.find((u: any) => (u.email || "").toLowerCase() === normalizedEmail);
 
     if (!user) {
       // Don't reveal if user exists or not
@@ -36,6 +61,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     // Get user profile name
     const { data: profile } = await supabaseAdmin
