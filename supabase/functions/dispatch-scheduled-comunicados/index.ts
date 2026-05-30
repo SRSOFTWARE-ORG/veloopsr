@@ -16,7 +16,18 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // ── AUTH GUARD: somente cron interno (service role) ou CRON_SECRET ──
+    const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    if (auth !== serviceKey && (!cronSecret || auth !== cronSecret)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const serviceClient = createClient(supabaseUrl, serviceKey);
+
 
     // Find comunicados scheduled for now or past that are still "agendado"
     const now = new Date().toISOString();
