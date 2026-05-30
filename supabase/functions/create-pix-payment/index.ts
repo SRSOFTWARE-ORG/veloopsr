@@ -103,17 +103,18 @@ Deno.serve(async (req) => {
         "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify({
-        transaction_amount: parseFloat(valor),
+        transaction_amount: valor,
         description,
         payment_method_id: "pix",
         payer: {
           email: "cliente@email.com",
-          first_name: cliente_nome || "Cliente",
+          first_name: nomeCliente,
         },
         notification_url: `${supabaseUrl}/functions/v1/mercadopago-webhook`,
         external_reference: `${cobranca_id}|${data_vencimento}`,
       }),
     });
+
 
     const mpData = await mpResponse.json();
 
