@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     }
 
     // ── SEGURANÇA: nunca confiar no valor enviado pelo cliente. ──
-    // Buscar o valor real da cobrança no banco e calcular juros (R$2/dia desde o 1º dia de atraso).
+    // Buscar o valor real da cobrança no banco e calcular juros (R$3/dia desde o 1º dia de atraso).
     const { data: cobranca, error: cobErr } = await supabase
       .from("cobrancas")
       .select("valor_parcela, cliente_nome")
@@ -59,12 +59,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Juros R$2/dia desde o 1º dia de atraso (alinhado com o front)
+    // Juros R$3/dia desde o 1º dia de atraso (alinhado com o front)
     const hoje = new Date();
     hoje.setUTCHours(0, 0, 0, 0);
     const venc = new Date(`${data_vencimento}T00:00:00Z`);
     const diasAtraso = Math.max(0, Math.floor((hoje.getTime() - venc.getTime()) / 86400000));
-    const juros = diasAtraso * 2;
+    const juros = diasAtraso * 3;
     const valor = +(valorBase + juros).toFixed(2);
 
     const nomeCliente = cliente_nome || cobranca.cliente_nome || "Cliente";
