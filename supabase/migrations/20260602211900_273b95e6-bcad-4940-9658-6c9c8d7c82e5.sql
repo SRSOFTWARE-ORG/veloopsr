@@ -1,0 +1,2 @@
+ALTER TABLE public.envio_cobranca DROP CONSTRAINT IF EXISTS envio_cobranca_tipo_envio_check;
+ALTER TABLE public.envio_cobranca ADD CONSTRAINT envio_cobranca_tipo_envio_check CHECK (tipo_envio = ANY (ARRAY['D-3'::text, 'D-1'::text, 'D0'::text, 'D+1'::text]));
