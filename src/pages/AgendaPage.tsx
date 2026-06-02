@@ -302,22 +302,33 @@ const AgendaPage = () => {
     toast.success(labels[newStatus] || "Status atualizado!");
     fetchAll();
 
-    // Fire-and-forget: generate receipt PDF + WhatsApp in background (no await)
+    // Gera comprovante PDF + envia via Evolution (WhatsApp) usando invoke (auth automática)
     if (newStatus === "pago") {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      fetch(
-        `https://${projectId}.supabase.co/functions/v1/generate-payment-receipt`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cobranca_id: cobrancaId, data_vencimento: dateKey }),
-        }
-      ).then(r => r.json()).then(result => {
-        if (result.success) {
-          toast.success(result.whatsapp_sent ? "Comprovante enviado via WhatsApp!" : "Comprovante gerado!");
-        }
-      }).catch(err => console.error("Receipt error:", err));
       toast.info("Gerando comprovante...");
+      supabase.functions
+        .invoke("generate-payment-receipt", {
+          body: { cobranca_id: cobrancaId, data_vencimento: dateKey },
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Receipt error:", error);
+            toast.error("Falha ao gerar comprovante: " + (error.message || "erro desconhecido"));
+            return;
+          }
+          if (data?.success) {
+            toast.success(
+              data.whatsapp_sent
+                ? "Comprovante enviado via WhatsApp!"
+                : "Comprovante gerado (WhatsApp não enviado — verifique telefone/Evolution)."
+            );
+          } else {
+            toast.error("Falha ao gerar comprovante: " + (data?.error || "erro desconhecido"));
+          }
+        })
+        .catch((err) => {
+          console.error("Receipt invoke error:", err);
+          toast.error("Falha ao chamar gerador de comprovante");
+        });
     }
   };
 
