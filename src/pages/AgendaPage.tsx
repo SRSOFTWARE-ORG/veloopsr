@@ -25,7 +25,9 @@ import {
   MessageCircle,
   Send,
   Loader2,
+  Wallet,
 } from "lucide-react";
+import PartialPaymentDialog from "@/components/agenda/PartialPaymentDialog";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +83,19 @@ interface Pagamento {
   pago_por: string | null;
   pago_em: string | null;
   tipo_pagamento?: string;
+}
+
+interface SubParcela {
+  id: string;
+  cobranca_id: string;
+  parent_data_vencimento: string | null;
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  status: string;
+  valor_pago: number | null;
+  origem: string;
+  rolado_para_data: string | null;
 }
 
 interface Cliente {
@@ -165,6 +180,9 @@ const AgendaPage = () => {
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
+  const [subParcelas, setSubParcelas] = useState<SubParcela[]>([]);
+  const [partialOpen, setPartialOpen] = useState(false);
+  const [partialTarget, setPartialTarget] = useState<{ cobrancaId: string; data: string; valor: number; cliente: string; subParcelaId?: string | null } | null>(null);
 
   const [form, setForm] = useState({
     cliente_id: "",
@@ -184,14 +202,16 @@ const AgendaPage = () => {
   });
 
   const fetchAll = useCallback(async () => {
-    const [cobRes, pagRes, cliRes] = await Promise.all([
+    const [cobRes, pagRes, cliRes, subRes] = await Promise.all([
       supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
       supabase.from("cobranca_pagamentos").select("*"),
       supabase.from("clientes").select("id, nome, telefone, cpf").order("nome"),
+      supabase.from("cobranca_sub_parcelas").select("*").order("data_vencimento", { ascending: true }),
     ]);
     if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
     if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
     if (cliRes.data) setClientes(cliRes.data);
+    if (subRes.data) setSubParcelas(subRes.data as SubParcela[]);
   }, []);
 
   useEffect(() => {
@@ -885,6 +905,24 @@ const AgendaPage = () => {
                             <ShieldOff className="w-3 h-3" />
                             Isentar
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-purple-600 border-purple-500/30 hover:bg-purple-500/10"
+                            onClick={() => {
+                              const valorBase = isEntradaDate && entrada ? entrada.valor_parcela : c.valor_parcela;
+                              setPartialTarget({
+                                cobrancaId: statusCobrancaId,
+                                data: selectedDateKey!,
+                                valor: valorBase,
+                                cliente: c.cliente_nome,
+                              });
+                              setPartialOpen(true);
+                            }}
+                          >
+                            <Wallet className="w-3 h-3" />
+                            Pagamento Parcial
+                          </Button>
                         </>
                       )}
                       {isPrimaryAdmin && isPaidOrExempt && (
@@ -926,6 +964,63 @@ const AgendaPage = () => {
               );
             })
           )}
+
+          {/* Sub-parcelas (saldos pendentes / arrastados) */}
+          {(() => {
+            const cobIds = new Set(selectedCobrancas.map((c) => c.id));
+            const subs = subParcelas.filter((sp) => cobIds.has(sp.cobranca_id) && sp.status !== "rolado");
+            if (subs.length === 0) return null;
+            return (
+              <div className="space-y-2 pt-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <Wallet className="w-3 h-3" /> Saldos pendentes / Sub-parcelas
+                </h3>
+                {subs.map((sp) => {
+                  const cob = cobrancas.find((c) => c.id === sp.cobranca_id);
+                  const isPago = sp.status === "pago";
+                  return (
+                    <Card key={sp.id} className={cn("border-l-4", isPago ? "border-l-emerald-500" : "border-l-amber-500")}>
+                      <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{cob?.cliente_nome} — {sp.descricao}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Venc.: {format(parseISO(sp.data_vencimento), "dd/MM/yyyy")} · {formatCurrency(sp.valor)}
+                            {sp.parent_data_vencimento && (
+                              <> · ref. parcela {format(parseISO(sp.parent_data_vencimento), "dd/MM/yyyy")}</>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={isPago ? "border-emerald-500/40 text-emerald-700" : "border-amber-500/40 text-amber-700"}>
+                            {isPago ? "Pago" : "A pagar"}
+                          </Badge>
+                          {!isPago && isPrimaryAdmin && cob && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                              onClick={() => {
+                                setPartialTarget({
+                                  cobrancaId: cob.id,
+                                  data: sp.data_vencimento,
+                                  valor: Number(sp.valor),
+                                  cliente: cob.cliente_nome,
+                                  subParcelaId: sp.id,
+                                });
+                                setPartialOpen(true);
+                              }}
+                            >
+                              <DollarSign className="w-3 h-3" /> Receber
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1052,6 +1147,19 @@ const AgendaPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {partialTarget && (
+        <PartialPaymentDialog
+          open={partialOpen}
+          onOpenChange={(v) => { setPartialOpen(v); if (!v) setPartialTarget(null); }}
+          cobrancaId={partialTarget.cobrancaId}
+          dataVencimento={partialTarget.data}
+          valorParcela={partialTarget.valor}
+          clienteNome={partialTarget.cliente}
+          subParcelaId={partialTarget.subParcelaId ?? null}
+          onSuccess={fetchAll}
+        />
+      )}
     </div>
   );
 };

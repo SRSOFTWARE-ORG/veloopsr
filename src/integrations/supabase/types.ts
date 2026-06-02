@@ -284,31 +284,46 @@ export type Database = {
           cobranca_id: string
           created_at: string | null
           data_vencimento: string
+          destino_saldo: string | null
           id: string
+          juros_aplicado: number
           pago_em: string | null
           pago_por: string | null
+          saldo_restante: number
           status: string
           tipo_pagamento: string
+          valor_original: number | null
+          valor_pago: number | null
         }
         Insert: {
           cobranca_id: string
           created_at?: string | null
           data_vencimento: string
+          destino_saldo?: string | null
           id?: string
+          juros_aplicado?: number
           pago_em?: string | null
           pago_por?: string | null
+          saldo_restante?: number
           status?: string
           tipo_pagamento?: string
+          valor_original?: number | null
+          valor_pago?: number | null
         }
         Update: {
           cobranca_id?: string
           created_at?: string | null
           data_vencimento?: string
+          destino_saldo?: string | null
           id?: string
+          juros_aplicado?: number
           pago_em?: string | null
           pago_por?: string | null
+          saldo_restante?: number
           status?: string
           tipo_pagamento?: string
+          valor_original?: number | null
+          valor_pago?: number | null
         }
         Relationships: [
           {
@@ -319,6 +334,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cobranca_sub_parcelas: {
+        Row: {
+          cobranca_id: string
+          created_at: string
+          criado_por: string
+          data_vencimento: string
+          descricao: string
+          id: string
+          juros_aplicado: number
+          origem: string
+          pago_em: string | null
+          pago_por: string | null
+          parent_data_vencimento: string | null
+          parent_pagamento_id: string | null
+          rolado_para_data: string | null
+          status: string
+          updated_at: string
+          valor: number
+          valor_pago: number | null
+        }
+        Insert: {
+          cobranca_id: string
+          created_at?: string
+          criado_por: string
+          data_vencimento: string
+          descricao: string
+          id?: string
+          juros_aplicado?: number
+          origem?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          parent_data_vencimento?: string | null
+          parent_pagamento_id?: string | null
+          rolado_para_data?: string | null
+          status?: string
+          updated_at?: string
+          valor: number
+          valor_pago?: number | null
+        }
+        Update: {
+          cobranca_id?: string
+          created_at?: string
+          criado_por?: string
+          data_vencimento?: string
+          descricao?: string
+          id?: string
+          juros_aplicado?: number
+          origem?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          parent_data_vencimento?: string | null
+          parent_pagamento_id?: string | null
+          rolado_para_data?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          valor_pago?: number | null
+        }
+        Relationships: []
       }
       cobrancas: {
         Row: {

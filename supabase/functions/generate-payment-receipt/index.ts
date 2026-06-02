@@ -74,6 +74,15 @@ interface ReceiptData {
   totalParcelas: number;
   cobrancaObs: string | null;
   descricao: string;
+  // Pagamento parcial / sub-parcela
+  valorPagoAto?: number;
+  valorOriginalParcela?: number;
+  jurosAplicado?: number;
+  saldoRestante?: number;
+  destinoSaldo?: string | null;
+  subParcelaNovaData?: string | null;
+  detalhamento?: string[];
+  tituloDocumento?: string;
 }
 
 async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null = null): Promise<Uint8Array> {
@@ -177,23 +186,67 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   safeText(fmt(data.valorParcela), { x: 470, y, size: 9, font: regular, color: black });
   y -= 5;
 
+  // Table row
+  const descTxt = data.descricao || data.cobrancaObs || "Parcela de Servico";
+  safeText(descTxt.slice(0, 35), { x: 40, y, size: 9, font: regular, color: black });
+  safeText(`${data.parcelaNum}/${data.totalParcelas}`, { x: 290, y, size: 9, font: regular, color: black });
+  safeText(fmtDate(data.dataVencimento), { x: 370, y, size: 9, font: regular, color: black });
+  const valorAto = data.valorPagoAto ?? data.valorParcela;
+  safeText(fmt(valorAto), { x: 470, y, size: 9, font: regular, color: black });
+  y -= 5;
+
   // Table bottom line
   page.drawRectangle({ x: 30, y, width: width - 60, height: 1, color: lightGray });
   y -= 25;
 
-  // Total box
+  // Total box — sempre exibe somente o valor pago no ato
   page.drawRectangle({ x: 370, y: y - 5, width: width - 400, height: 28, color: green });
   safeText("TOTAL PAGO:", { x: 380, y, size: 11, font: bold, color: white });
-  const totalTxt = fmt(data.valorParcela);
+  const totalTxt = fmt(valorAto);
   safeText(totalTxt, { x: width - 40 - bold.widthOfTextAtSize(totalTxt, 13), y: y - 1, size: 13, font: bold, color: white });
   y -= 45;
+
+  // ── Detalhamento (juros, saldo, sub-parcela) ──
+  const detalhes: string[] = [];
+  if (data.valorOriginalParcela != null) {
+    detalhes.push(`Valor original da parcela: ${fmt(data.valorOriginalParcela)}`);
+  }
+  if ((data.jurosAplicado ?? 0) > 0) {
+    detalhes.push(`Juros por atraso aplicados: ${fmt(data.jurosAplicado!)}`);
+  }
+  if (data.valorPagoAto != null && data.valorOriginalParcela != null) {
+    detalhes.push(`Valor pago neste ato: ${fmt(data.valorPagoAto)}`);
+  }
+  if ((data.saldoRestante ?? 0) > 0) {
+    const venc = data.subParcelaNovaData ? fmtDate(data.subParcelaNovaData) : "data a definir";
+    if (data.destinoSaldo === "proxima_parcela") {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)} — sera somado a proxima fatura (${venc}).`);
+    } else if (data.destinoSaldo === "sub_parcela") {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)} — cobranca avulsa agendada para ${venc}.`);
+    } else {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)}`);
+    }
+  }
+  for (const linhaExtra of data.detalhamento || []) detalhes.push(linhaExtra);
+
+  if (detalhes.length > 0) {
+    page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
+    safeText("DETALHAMENTO DA COBRANCA", { x: 40, y: y, size: 11, font: bold, color: white });
+    y -= 24;
+    for (const linha of detalhes) {
+      safeText(`- ${linha}`.slice(0, 110), { x: 40, y, size: 9, font: regular, color: black });
+      y -= 14;
+    }
+    y -= 8;
+  }
 
   // ── Section: INFORMACOES DE PAGAMENTO ──
   page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
   safeText("INFORMACOES DE PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
   y -= 30;
 
-  drawRow("Status:", "PAGO ✓", "Forma:", "PIX");
+  const statusLabel = (data.saldoRestante ?? 0) > 0 ? "PAGAMENTO PARCIAL" : "PAGO OK";
+  drawRow("Status:", statusLabel, "Forma:", "PIX");
   drawRow("Data do Pagamento:", fmtDate(new Date().toISOString().slice(0, 10)), "Hora:", new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }));
 
   if (data.cobrancaObs) {
@@ -207,7 +260,7 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   y -= 25;
 
   // Legal text
-  safeText("Este documento comprova o recebimento do pagamento referente ao servico/produto descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
+  safeText("Este documento comprova o recebimento do pagamento descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
   safeText("Nota gerada automaticamente pelo sistema Veloop — SR Software. Documento valido sem assinatura.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
@@ -244,7 +297,20 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { cobranca_id, data_vencimento } = await req.json();
+    const bodyJson = await req.json();
+    const {
+      cobranca_id,
+      data_vencimento,
+      pagamento_id,
+      sub_parcela_id,
+      parcial,
+      valor_pago,
+      juros_aplicado,
+      valor_original,
+      saldo_restante,
+      destino_saldo,
+      sub_parcela_nova_data,
+    } = bodyJson;
     if (!cobranca_id || !data_vencimento) {
       return new Response(JSON.stringify({ error: "cobranca_id and data_vencimento required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -286,6 +352,33 @@ Deno.serve(async (req) => {
     const parcelaNum = dates.indexOf(data_vencimento) + 1 || 1;
     const totalParcelas = dates.length;
 
+    // Detalhamento extra para sub-parcela ou saldo arrastado
+    const detalhamento: string[] = [];
+    let descricaoFinal = cob.observacoes || "Parcela de Servico";
+
+    if (sub_parcela_id) {
+      const { data: sp } = await supabase.from("cobranca_sub_parcelas").select("*").eq("id", sub_parcela_id).single();
+      if (sp) {
+        descricaoFinal = sp.descricao;
+        detalhamento.push(`Cobranca avulsa: ${sp.descricao}`);
+        if (sp.parent_data_vencimento) {
+          detalhamento.push(`Referente a parcela de ${sp.parent_data_vencimento.split("-").reverse().join("/")}`);
+        }
+      }
+    } else {
+      // Verifica se ha sub-parcela vinculada a esta data (saldo arrastado da fatura anterior)
+      const { data: arrastadas } = await supabase
+        .from("cobranca_sub_parcelas")
+        .select("descricao, valor, parent_data_vencimento")
+        .eq("cobranca_id", cobranca_id)
+        .eq("data_vencimento", data_vencimento)
+        .in("status", ["a_pagar", "pago"]);
+      for (const arr of arrastadas || []) {
+        const ref = arr.parent_data_vencimento ? arr.parent_data_vencimento.split("-").reverse().join("/") : "";
+        detalhamento.push(`Inclui saldo restante da parcela ${ref}: ${fmt(Number(arr.valor))}`);
+      }
+    }
+
     const pdfBytes = await generatePdf({
       clienteNome,
       clienteCpf,
@@ -298,22 +391,37 @@ Deno.serve(async (req) => {
       parcelaNum,
       totalParcelas,
       cobrancaObs: cob.observacoes,
-      descricao: cob.observacoes || "Parcela de Servico",
+      descricao: descricaoFinal,
+      valorPagoAto: valor_pago != null ? Number(valor_pago) : undefined,
+      valorOriginalParcela: valor_original != null ? Number(valor_original) : undefined,
+      jurosAplicado: juros_aplicado != null ? Number(juros_aplicado) : undefined,
+      saldoRestante: saldo_restante != null ? Number(saldo_restante) : undefined,
+      destinoSaldo: destino_saldo ?? null,
+      subParcelaNovaData: sub_parcela_nova_data ?? null,
+      detalhamento,
     }, logoBytes);
 
-    const fileName = `comprovantes/${cobranca_id}_${data_vencimento}.pdf`;
+    const suffix = sub_parcela_id ? `_sub_${sub_parcela_id}` : (pagamento_id ? `_pag_${pagamento_id}` : "");
+    const fileName = `comprovantes/${cobranca_id}_${data_vencimento}${suffix}.pdf`;
     const { error: uploadErr } = await supabase.storage.from("documentos_vendas").upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
     if (uploadErr) throw new Error("Falha ao salvar PDF");
 
     const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
     const pdfUrl = urlData.publicUrl;
 
+    const valorExibido = valor_pago != null ? Number(valor_pago) : cob.valor_parcela;
     let whatsappSent = false;
     if (clienteTelefone) {
-      const caption = `📄 *Nota de Pagamento — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(cob.valor_parcela)}\n\n_Veloop — SR Software_ 🟢`;
+      const tituloMsg = (saldo_restante ?? 0) > 0 ? "Comprovante de Pagamento Parcial" : "Nota de Pagamento";
+      let caption = `📄 *${tituloMsg} — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(valorExibido)}`;
+      if ((saldo_restante ?? 0) > 0 && sub_parcela_nova_data) {
+        caption += `\n💡 Saldo restante de ${fmt(Number(saldo_restante))} sera cobrado em ${sub_parcela_nova_data.split("-").reverse().join("/")}`;
+      }
+      caption += `\n\n_Veloop — SR Software_ 🟢`;
       const docName = `Comprovante_${clienteNome.replace(/\s+/g, "_")}_${data_vencimento}.pdf`;
       whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption, docName);
     }
+
 
     return new Response(JSON.stringify({ success: true, pdf_url: pdfUrl, whatsapp_sent: whatsappSent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
