@@ -163,8 +163,8 @@ export default function PartialPaymentDialog({
                 <div className="flex items-start gap-2 rounded-md border p-3">
                   <RadioGroupItem value="proxima_parcela" id="d1" className="mt-0.5" />
                   <Label htmlFor="d1" className="font-normal cursor-pointer flex-1">
-                    <span className="font-medium">Somar à próxima parcela</span>
-                    <p className="text-xs text-muted-foreground">O saldo será incorporado automaticamente na próxima fatura.</p>
+                    <span className="font-medium">Gerar cobrança na data da próxima parcela</span>
+                    <p className="text-xs text-muted-foreground">O saldo vira uma nova cobrança normal na próxima data desta cobrança.</p>
                   </Label>
                 </div>
                 <div className="flex items-start gap-2 rounded-md border p-3">
