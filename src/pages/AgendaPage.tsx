@@ -1147,6 +1147,19 @@ const AgendaPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {partialTarget && (
+        <PartialPaymentDialog
+          open={partialOpen}
+          onOpenChange={(v) => { setPartialOpen(v); if (!v) setPartialTarget(null); }}
+          cobrancaId={partialTarget.cobrancaId}
+          dataVencimento={partialTarget.data}
+          valorParcela={partialTarget.valor}
+          clienteNome={partialTarget.cliente}
+          subParcelaId={partialTarget.subParcelaId ?? null}
+          onSuccess={fetchAll}
+        />
+      )}
     </div>
   );
 };
