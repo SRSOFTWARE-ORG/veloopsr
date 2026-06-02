@@ -180,6 +180,9 @@ const AgendaPage = () => {
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
+  const [subParcelas, setSubParcelas] = useState<SubParcela[]>([]);
+  const [partialOpen, setPartialOpen] = useState(false);
+  const [partialTarget, setPartialTarget] = useState<{ cobrancaId: string; data: string; valor: number; cliente: string; subParcelaId?: string | null } | null>(null);
 
   const [form, setForm] = useState({
     cliente_id: "",
