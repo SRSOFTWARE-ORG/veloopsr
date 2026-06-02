@@ -325,8 +325,15 @@ const AgendaPage = () => {
     // Gera comprovante PDF + envia via Evolution (WhatsApp) usando invoke (auth automática)
     if (newStatus === "pago") {
       toast.info("Gerando comprovante...");
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        toast.error("Sessão expirada. Entre novamente para gerar o comprovante.");
+        return;
+      }
       supabase.functions
         .invoke("generate-payment-receipt", {
+          headers: { Authorization: `Bearer ${accessToken}` },
           body: { cobranca_id: cobrancaId, data_vencimento: dateKey },
         })
         .then(({ data, error }) => {
