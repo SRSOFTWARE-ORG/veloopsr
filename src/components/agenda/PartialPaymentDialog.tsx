@@ -83,7 +83,11 @@ export default function PartialPaymentDialog({
 
     setSaving(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Sessão expirada. Entre novamente para registrar o pagamento.");
       const { data, error } = await supabase.functions.invoke("register-partial-payment", {
+        headers: { Authorization: `Bearer ${accessToken}` },
         body: {
           cobranca_id: cobrancaId,
           data_vencimento: dataVencimento,

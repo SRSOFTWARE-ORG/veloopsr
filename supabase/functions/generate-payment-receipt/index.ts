@@ -26,6 +26,24 @@ function placeholder(val: string | null | undefined, fallback = "* * *"): string
   return val && val.trim() ? val.trim() : fallback;
 }
 
+function getConfiguredPublicKeys(): string[] {
+  const rawKeys = [
+    Deno.env.get("SUPABASE_ANON_KEY"),
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY"),
+  ];
+  const plural = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+  if (plural) {
+    try {
+      const parsed = JSON.parse(plural);
+      if (Array.isArray(parsed)) rawKeys.push(...parsed.map(String));
+      else if (typeof parsed === "string") rawKeys.push(parsed);
+    } catch {
+      rawKeys.push(...plural.split(/[\s,]+/));
+    }
+  }
+  return [...new Set(rawKeys.filter((key): key is string => !!key?.trim()).map((key) => key.trim()))];
+}
+
 import { evoSendMedia, evoSendText } from "../_shared/evolution.ts";
 async function sendWhatsAppPdf(phone: string, pdfUrl: string, caption: string, docName: string): Promise<boolean> {
   try {
@@ -271,25 +289,35 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: allow service role (internal webhooks/background invokes) OR valid user JWT.
-  const _authToken = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
-  const _serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const _anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const _isInternal = _authToken && (_authToken === _serviceKey || _authToken === _anonKey);
-  if (!_isInternal) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const publicKeys = getConfiguredPublicKeys();
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const authToken = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
+  const apiKey = req.headers.get("apikey")?.trim() ?? "";
+  const isInternal = authToken === serviceRoleKey || apiKey === serviceRoleKey;
+
+  // Auth: allow service role/internal calls OR a valid signed-in user JWT.
+  if (!isInternal) {
     try {
-      const _authClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        _anonKey,
-      );
-      const { data: _claims, error: _claimsErr } = await _authClient.auth.getClaims(_authToken);
-      if (_claimsErr || !_claims?.claims?.sub) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      if (!authToken || publicKeys.includes(authToken)) {
+        return new Response(JSON.stringify({ error: "Unauthorized: sessão expirada ou ausente" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    } catch (_e) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      const authClient = createClient(supabaseUrl, publicKeys[0] ?? serviceRoleKey, {
+        global: { headers: { Authorization: `Bearer ${authToken}` } },
+      });
+      const { data: claims, error: claimsErr } = await authClient.auth.getClaims(authToken);
+      if (claimsErr || !claims?.claims?.sub) {
+        console.warn("[Receipt] JWT inválido ou sem usuário", claimsErr?.message);
+        return new Response(JSON.stringify({ error: "Unauthorized: token inválido" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } catch (e) {
+      console.warn("[Receipt] Falha na validação de autenticação", e);
+      return new Response(JSON.stringify({ error: "Unauthorized: falha na autenticação" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -297,8 +325,6 @@ Deno.serve(async (req) => {
 
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const bodyJson = await req.json();
