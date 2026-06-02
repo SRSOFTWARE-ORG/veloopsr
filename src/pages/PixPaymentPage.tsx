@@ -35,7 +35,7 @@ export default function PixPaymentPage() {
     const diffMs = hoje.getTime() - venc.getTime();
     const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
     const diasComJuros = diasAtraso; // juros desde o 1º dia de atraso
-    const juros = diasComJuros * 2; // R$2 per day
+    const juros = diasComJuros * 3; // R$3 per day
     return { diasAtraso, diasComJuros, juros, valorFinal: valorBase + juros };
   }, [dataVencimento, valorBase]);
 
