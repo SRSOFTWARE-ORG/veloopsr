@@ -964,6 +964,63 @@ const AgendaPage = () => {
               );
             })
           )}
+
+          {/* Sub-parcelas (saldos pendentes / arrastados) */}
+          {(() => {
+            const cobIds = new Set(selectedCobrancas.map((c) => c.id));
+            const subs = subParcelas.filter((sp) => cobIds.has(sp.cobranca_id) && sp.status !== "rolado");
+            if (subs.length === 0) return null;
+            return (
+              <div className="space-y-2 pt-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <Wallet className="w-3 h-3" /> Saldos pendentes / Sub-parcelas
+                </h3>
+                {subs.map((sp) => {
+                  const cob = cobrancas.find((c) => c.id === sp.cobranca_id);
+                  const isPago = sp.status === "pago";
+                  return (
+                    <Card key={sp.id} className={cn("border-l-4", isPago ? "border-l-emerald-500" : "border-l-amber-500")}>
+                      <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{cob?.cliente_nome} — {sp.descricao}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Venc.: {format(parseISO(sp.data_vencimento), "dd/MM/yyyy")} · {formatCurrency(sp.valor)}
+                            {sp.parent_data_vencimento && (
+                              <> · ref. parcela {format(parseISO(sp.parent_data_vencimento), "dd/MM/yyyy")}</>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={isPago ? "border-emerald-500/40 text-emerald-700" : "border-amber-500/40 text-amber-700"}>
+                            {isPago ? "Pago" : "A pagar"}
+                          </Badge>
+                          {!isPago && isPrimaryAdmin && cob && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                              onClick={() => {
+                                setPartialTarget({
+                                  cobrancaId: cob.id,
+                                  data: sp.data_vencimento,
+                                  valor: Number(sp.valor),
+                                  cliente: cob.cliente_nome,
+                                  subParcelaId: sp.id,
+                                });
+                                setPartialOpen(true);
+                              }}
+                            >
+                              <DollarSign className="w-3 h-3" /> Receber
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
