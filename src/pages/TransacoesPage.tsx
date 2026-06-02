@@ -35,7 +35,11 @@ function PdfButton({ cobrancaId, dataVencimento, exists }: { cobrancaId: string;
     }
     setLoading(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Sessão expirada");
       const { data, error } = await supabase.functions.invoke("generate-payment-receipt", {
+        headers: { Authorization: `Bearer ${accessToken}` },
         body: { cobranca_id: cobrancaId, data_vencimento: dataVencimento },
       });
       if (error) throw error;
