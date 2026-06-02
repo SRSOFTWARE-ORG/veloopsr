@@ -230,7 +230,7 @@ export default function PixPaymentPage() {
                   <span className="font-medium text-gray-800">{valorBaseFormatado}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-red-500 font-medium">Juros ({jurosInfo.diasComJuros} dia{jurosInfo.diasComJuros !== 1 ? 's' : ''} × R$2,00)</span>
+                  <span className="text-red-500 font-medium">Juros ({jurosInfo.diasComJuros} dia{jurosInfo.diasComJuros !== 1 ? 's' : ''} × R$3,00)</span>
                   <span className="font-bold text-red-600">+{jurosFormatado}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-1">
@@ -239,7 +239,7 @@ export default function PixPaymentPage() {
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-2 mt-2">
                   <p className="text-xs text-red-600 font-medium text-center">
-                    ⚠️ Juros de R$2,00/dia aplicados desde o 1º dia de atraso
+                    ⚠️ Juros de R$3,00/dia aplicados desde o 1º dia de atraso
                   </p>
                 </div>
               </>
