@@ -186,23 +186,67 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   safeText(fmt(data.valorParcela), { x: 470, y, size: 9, font: regular, color: black });
   y -= 5;
 
+  // Table row
+  const descTxt = data.descricao || data.cobrancaObs || "Parcela de Servico";
+  safeText(descTxt.slice(0, 35), { x: 40, y, size: 9, font: regular, color: black });
+  safeText(`${data.parcelaNum}/${data.totalParcelas}`, { x: 290, y, size: 9, font: regular, color: black });
+  safeText(fmtDate(data.dataVencimento), { x: 370, y, size: 9, font: regular, color: black });
+  const valorAto = data.valorPagoAto ?? data.valorParcela;
+  safeText(fmt(valorAto), { x: 470, y, size: 9, font: regular, color: black });
+  y -= 5;
+
   // Table bottom line
   page.drawRectangle({ x: 30, y, width: width - 60, height: 1, color: lightGray });
   y -= 25;
 
-  // Total box
+  // Total box — sempre exibe somente o valor pago no ato
   page.drawRectangle({ x: 370, y: y - 5, width: width - 400, height: 28, color: green });
   safeText("TOTAL PAGO:", { x: 380, y, size: 11, font: bold, color: white });
-  const totalTxt = fmt(data.valorParcela);
+  const totalTxt = fmt(valorAto);
   safeText(totalTxt, { x: width - 40 - bold.widthOfTextAtSize(totalTxt, 13), y: y - 1, size: 13, font: bold, color: white });
   y -= 45;
+
+  // ── Detalhamento (juros, saldo, sub-parcela) ──
+  const detalhes: string[] = [];
+  if (data.valorOriginalParcela != null) {
+    detalhes.push(`Valor original da parcela: ${fmt(data.valorOriginalParcela)}`);
+  }
+  if ((data.jurosAplicado ?? 0) > 0) {
+    detalhes.push(`Juros por atraso aplicados: ${fmt(data.jurosAplicado!)}`);
+  }
+  if (data.valorPagoAto != null && data.valorOriginalParcela != null) {
+    detalhes.push(`Valor pago neste ato: ${fmt(data.valorPagoAto)}`);
+  }
+  if ((data.saldoRestante ?? 0) > 0) {
+    const venc = data.subParcelaNovaData ? fmtDate(data.subParcelaNovaData) : "data a definir";
+    if (data.destinoSaldo === "proxima_parcela") {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)} — sera somado a proxima fatura (${venc}).`);
+    } else if (data.destinoSaldo === "sub_parcela") {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)} — cobranca avulsa agendada para ${venc}.`);
+    } else {
+      detalhes.push(`Saldo restante: ${fmt(data.saldoRestante!)}`);
+    }
+  }
+  for (const linhaExtra of data.detalhamento || []) detalhes.push(linhaExtra);
+
+  if (detalhes.length > 0) {
+    page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
+    safeText("DETALHAMENTO DA COBRANCA", { x: 40, y: y, size: 11, font: bold, color: white });
+    y -= 24;
+    for (const linha of detalhes) {
+      safeText(`- ${linha}`.slice(0, 110), { x: 40, y, size: 9, font: regular, color: black });
+      y -= 14;
+    }
+    y -= 8;
+  }
 
   // ── Section: INFORMACOES DE PAGAMENTO ──
   page.drawRectangle({ x: 30, y: y - 5, width: width - 60, height: 22, color: darkGreen });
   safeText("INFORMACOES DE PAGAMENTO", { x: 40, y: y, size: 11, font: bold, color: white });
   y -= 30;
 
-  drawRow("Status:", "PAGO ✓", "Forma:", "PIX");
+  const statusLabel = (data.saldoRestante ?? 0) > 0 ? "PAGAMENTO PARCIAL" : "PAGO OK";
+  drawRow("Status:", statusLabel, "Forma:", "PIX");
   drawRow("Data do Pagamento:", fmtDate(new Date().toISOString().slice(0, 10)), "Hora:", new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }));
 
   if (data.cobrancaObs) {
@@ -216,7 +260,7 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   y -= 25;
 
   // Legal text
-  safeText("Este documento comprova o recebimento do pagamento referente ao servico/produto descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
+  safeText("Este documento comprova o recebimento do pagamento descrito acima.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
   safeText("Nota gerada automaticamente pelo sistema Veloop — SR Software. Documento valido sem assinatura.", { x: 40, y, size: 8, font: regular, color: gray });
   y -= 14;
