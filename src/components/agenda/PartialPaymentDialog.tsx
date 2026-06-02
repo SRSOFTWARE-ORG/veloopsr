@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertCircle } from "lucide-react";
 
-const JUROS_DIA = 2;
+const JUROS_DIA = 3;
 
 interface Props {
   open: boolean;
