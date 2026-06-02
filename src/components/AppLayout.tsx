@@ -194,7 +194,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </NavLink>
             ))}
           </nav>
-          <div className="absolute bottom-0 left-0 right-0 p-4">
+          <div className="shrink-0 border-t border-border/40 p-4 bg-card">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                 {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
