@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const JUROS_DIA = 2; // R$ 2,00 por dia (regra do negócio)
+const JUROS_DIA = 3; // R$ 3,00 por dia (regra do negócio)
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
