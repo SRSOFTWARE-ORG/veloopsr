@@ -297,7 +297,20 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { cobranca_id, data_vencimento } = await req.json();
+    const bodyJson = await req.json();
+    const {
+      cobranca_id,
+      data_vencimento,
+      pagamento_id,
+      sub_parcela_id,
+      parcial,
+      valor_pago,
+      juros_aplicado,
+      valor_original,
+      saldo_restante,
+      destino_saldo,
+      sub_parcela_nova_data,
+    } = bodyJson;
     if (!cobranca_id || !data_vencimento) {
       return new Response(JSON.stringify({ error: "cobranca_id and data_vencimento required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -339,6 +352,33 @@ Deno.serve(async (req) => {
     const parcelaNum = dates.indexOf(data_vencimento) + 1 || 1;
     const totalParcelas = dates.length;
 
+    // Detalhamento extra para sub-parcela ou saldo arrastado
+    const detalhamento: string[] = [];
+    let descricaoFinal = cob.observacoes || "Parcela de Servico";
+
+    if (sub_parcela_id) {
+      const { data: sp } = await supabase.from("cobranca_sub_parcelas").select("*").eq("id", sub_parcela_id).single();
+      if (sp) {
+        descricaoFinal = sp.descricao;
+        detalhamento.push(`Cobranca avulsa: ${sp.descricao}`);
+        if (sp.parent_data_vencimento) {
+          detalhamento.push(`Referente a parcela de ${sp.parent_data_vencimento.split("-").reverse().join("/")}`);
+        }
+      }
+    } else {
+      // Verifica se ha sub-parcela vinculada a esta data (saldo arrastado da fatura anterior)
+      const { data: arrastadas } = await supabase
+        .from("cobranca_sub_parcelas")
+        .select("descricao, valor, parent_data_vencimento")
+        .eq("cobranca_id", cobranca_id)
+        .eq("data_vencimento", data_vencimento)
+        .in("status", ["a_pagar", "pago"]);
+      for (const arr of arrastadas || []) {
+        const ref = arr.parent_data_vencimento ? arr.parent_data_vencimento.split("-").reverse().join("/") : "";
+        detalhamento.push(`Inclui saldo restante da parcela ${ref}: ${fmt(Number(arr.valor))}`);
+      }
+    }
+
     const pdfBytes = await generatePdf({
       clienteNome,
       clienteCpf,
@@ -351,22 +391,37 @@ Deno.serve(async (req) => {
       parcelaNum,
       totalParcelas,
       cobrancaObs: cob.observacoes,
-      descricao: cob.observacoes || "Parcela de Servico",
+      descricao: descricaoFinal,
+      valorPagoAto: valor_pago != null ? Number(valor_pago) : undefined,
+      valorOriginalParcela: valor_original != null ? Number(valor_original) : undefined,
+      jurosAplicado: juros_aplicado != null ? Number(juros_aplicado) : undefined,
+      saldoRestante: saldo_restante != null ? Number(saldo_restante) : undefined,
+      destinoSaldo: destino_saldo ?? null,
+      subParcelaNovaData: sub_parcela_nova_data ?? null,
+      detalhamento,
     }, logoBytes);
 
-    const fileName = `comprovantes/${cobranca_id}_${data_vencimento}.pdf`;
+    const suffix = sub_parcela_id ? `_sub_${sub_parcela_id}` : (pagamento_id ? `_pag_${pagamento_id}` : "");
+    const fileName = `comprovantes/${cobranca_id}_${data_vencimento}${suffix}.pdf`;
     const { error: uploadErr } = await supabase.storage.from("documentos_vendas").upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
     if (uploadErr) throw new Error("Falha ao salvar PDF");
 
     const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
     const pdfUrl = urlData.publicUrl;
 
+    const valorExibido = valor_pago != null ? Number(valor_pago) : cob.valor_parcela;
     let whatsappSent = false;
     if (clienteTelefone) {
-      const caption = `📄 *Nota de Pagamento — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(cob.valor_parcela)}\n\n_Veloop — SR Software_ 🟢`;
+      const tituloMsg = (saldo_restante ?? 0) > 0 ? "Comprovante de Pagamento Parcial" : "Nota de Pagamento";
+      let caption = `📄 *${tituloMsg} — SR Software*\n\n👤 ${clienteNome}\n📅 Parcela ${parcelaNum}/${totalParcelas}\n💰 ${fmt(valorExibido)}`;
+      if ((saldo_restante ?? 0) > 0 && sub_parcela_nova_data) {
+        caption += `\n💡 Saldo restante de ${fmt(Number(saldo_restante))} sera cobrado em ${sub_parcela_nova_data.split("-").reverse().join("/")}`;
+      }
+      caption += `\n\n_Veloop — SR Software_ 🟢`;
       const docName = `Comprovante_${clienteNome.replace(/\s+/g, "_")}_${data_vencimento}.pdf`;
       whatsappSent = await sendWhatsAppPdf(clienteTelefone, pdfUrl, caption, docName);
     }
+
 
     return new Response(JSON.stringify({ success: true, pdf_url: pdfUrl, whatsapp_sent: whatsappSent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
