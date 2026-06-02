@@ -25,7 +25,7 @@ interface IntegrationStatus {
   logs: LogEntry[];
 }
 
-const CHECK_INTERVAL_MS = 8 * 60 * 60 * 1000; // 8 horas
+const CHECK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutos (monitoramento ativo)
 const LAST_CHECK_KEY = "integration_status_last_check";
 const MAX_ATTEMPTS = 3;
 
