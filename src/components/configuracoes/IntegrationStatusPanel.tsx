@@ -164,30 +164,37 @@ export default function IntegrationStatusPanel() {
         const res = await supabase.functions.invoke("send-whatsapp-uazapi", { body: { health: true } });
         if (res.error) {
           const msg = res.error.message || "Erro";
-          const missing = /Missing|obrigat/i.test(msg) ? " (campos ausentes)" : "";
-          return { value: { status: "offline", detail: `Função indisponível${missing}` }, ok: false, detail: msg };
+          return { value: { status: "offline", detail: `Função indisponível — ${msg}` }, ok: false, detail: msg };
         }
-        
+
         const data: any = res.data;
         const isOnline = data?.ok;
-        
+        const instance = data?.instance || "—";
+        const stateLabel = data?.status || "desconhecido";
+        const checkedAt = data?.checked_at ? new Date(data.checked_at).toLocaleTimeString("pt-BR") : new Date().toLocaleTimeString("pt-BR");
+
         // Detectar mudança de estado (desconexão/reconexão)
         const waInt = integrations.find(i => i.key === 'wa');
         const wasOnline = waInt?.status === 'online';
-        
+
         if (isOnline && !wasOnline && waInt?.status !== 'checking') {
           toast.success("WhatsApp reconectado! Iniciando reprocessamento automático...", { duration: 5000 });
           supabase.functions.invoke("admin-whatsapp-actions", { body: { action: "resend_all" } });
-          notifyAdmins("✅ WhatsApp Reconectado", "A instância do Evolution voltou a ficar online. Iniciando reprocessamento da fila de mensagens falhas.");
+          notifyAdmins("✅ WhatsApp Reconectado", `Instância "${instance}" voltou a ficar online. Reprocessando fila de mensagens falhas.`);
         } else if (!isOnline && wasOnline) {
-          toast.error("WhatsApp desconectado!", { duration: 5000 });
-          notifyAdmins("⚠️ WhatsApp Desconectado", "A instância do Evolution foi detectada como offline. Verifique a conexão.");
+          toast.error(`WhatsApp desconectado! Instância: ${instance}`, { duration: 8000 });
+          notifyAdmins("⚠️ WhatsApp Desconectado", `Instância "${instance}" detectada como offline (estado: ${stateLabel}). Verifique e reconecte via QR Code.`);
         }
 
-        if (isOnline) return { value: { status: "online", detail: "URL e token configurados" }, ok: true, status: 200 };
-        
-        const statusDetail = data?.configured ? "Instância desconectada" : "Verificar configuração";
-        return { value: { status: "offline", detail: statusDetail }, ok: false, status: 200, detail: "instancia_offline" };
+        if (isOnline) {
+          return { value: { status: "online", detail: `Instância: ${instance} • estado: ${stateLabel} • ${checkedAt}` }, ok: true, status: 200 };
+        }
+
+        const errDetail = data?.error || `estado: ${stateLabel}`;
+        const statusDetail = data?.configured
+          ? `Instância "${instance}" offline — ${errDetail} • ${checkedAt}`
+          : `Não configurada — ${errDetail}`;
+        return { value: { status: "offline", detail: statusDetail }, ok: false, status: 200, detail: errDetail };
       },
       (e) => appendLog("wa", e),
     );
