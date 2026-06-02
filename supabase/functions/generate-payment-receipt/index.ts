@@ -178,13 +178,6 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
   safeText("Valor", { x: 480, y, size: 9, font: bold, color: black });
   y -= 22;
 
-  // Table row
-  const descTxt = data.descricao || data.cobrancaObs || "Parcela de Servico";
-  safeText(descTxt.slice(0, 35), { x: 40, y, size: 9, font: regular, color: black });
-  safeText(`${data.parcelaNum}/${data.totalParcelas}`, { x: 290, y, size: 9, font: regular, color: black });
-  safeText(fmtDate(data.dataVencimento), { x: 370, y, size: 9, font: regular, color: black });
-  safeText(fmt(data.valorParcela), { x: 470, y, size: 9, font: regular, color: black });
-  y -= 5;
 
   // Table row
   const descTxt = data.descricao || data.cobrancaObs || "Parcela de Servico";
