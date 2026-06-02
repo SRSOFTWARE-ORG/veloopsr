@@ -216,15 +216,16 @@ Deno.serve(async (req) => {
         valor_original: valorOriginal,
         saldo_restante: saldoRestante,
         destino_saldo: isParcial ? destino_saldo : null,
-        sub_parcela_nova_data: subParcelaNovaData,
+        nova_cobranca_id: novaCobrancaId,
+        nova_cobranca_data: novaCobrancaData,
       },
     }).catch((e) => console.error("Receipt invoke failed:", e));
 
     return new Response(JSON.stringify({
       success: true,
       pagamento_id: pagamentoId,
-      sub_parcela_id: subParcelaNovaId,
-      sub_parcela_data: subParcelaNovaData,
+      nova_cobranca_id: novaCobrancaId,
+      nova_cobranca_data: novaCobrancaData,
       saldo_restante: saldoRestante,
       juros_aplicado: juros,
       valor_original: valorOriginal,
