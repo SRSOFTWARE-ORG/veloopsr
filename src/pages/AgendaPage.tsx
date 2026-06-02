@@ -202,14 +202,16 @@ const AgendaPage = () => {
   });
 
   const fetchAll = useCallback(async () => {
-    const [cobRes, pagRes, cliRes] = await Promise.all([
+    const [cobRes, pagRes, cliRes, subRes] = await Promise.all([
       supabase.from("cobrancas").select("*").order("data_inicio", { ascending: true }),
       supabase.from("cobranca_pagamentos").select("*"),
       supabase.from("clientes").select("id, nome, telefone, cpf").order("nome"),
+      supabase.from("cobranca_sub_parcelas").select("*").order("data_vencimento", { ascending: true }),
     ]);
     if (cobRes.data) setCobrancas(cobRes.data as Cobranca[]);
     if (pagRes.data) setPagamentos(pagRes.data as Pagamento[]);
     if (cliRes.data) setClientes(cliRes.data);
+    if (subRes.data) setSubParcelas(subRes.data as SubParcela[]);
   }, []);
 
   useEffect(() => {
