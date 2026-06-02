@@ -154,7 +154,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           onClick={() => setSidebarOpen(false)}
         />
         <aside
-          className={`absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl will-change-transform transition-transform duration-200 ease-out ${
+          className={`absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl will-change-transform transition-transform duration-200 ease-out flex flex-col ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -173,7 +173,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
             </div>
           </div>
-          <nav className="p-3 space-y-0.5">
+          <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-0.5 scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none]">
             {allItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -194,7 +194,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </NavLink>
             ))}
           </nav>
-          <div className="absolute bottom-0 left-0 right-0 p-4">
+          <div className="shrink-0 border-t border-border/40 p-4 bg-card">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                 {profile?.nome?.charAt(0)?.toUpperCase() || "U"}
