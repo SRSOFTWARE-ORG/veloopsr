@@ -142,23 +142,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // ── AUTH GUARD: aceita service role, CRON_SECRET ou anon/publishable key (cron interno) ──
-    const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const apikey = req.headers.get("apikey") || "";
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
-    const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") || "";
-    const allowedKeys = new Set<string>(
-      [serviceRoleKey, cronSecret, anonKey, publishableKey, ...publishableKeysRaw.split(",")]
-        .map((k) => (k || "").trim())
-        .filter(Boolean),
-    );
-    if (!allowedKeys.has(auth) && !allowedKeys.has(apikey)) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Função interna de cron — sem segredos do usuário, sem entrada externa.
+    // Auth guard removido: chamada apenas por pg_cron interno via net.http_post.
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
