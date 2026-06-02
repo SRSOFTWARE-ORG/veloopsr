@@ -39,17 +39,23 @@ Deno.serve(async (req) => {
     const body = await req.json();
 
     // Healthcheck mode
-    // Healthcheck mode
     if (body?.health === true) {
       if (!(await evolutionConfigured())) {
         return new Response(
-          JSON.stringify({ ok: false, configured: false, error: "Credenciais ausentes (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }),
+          JSON.stringify({ ok: false, configured: false, instance: null, status: "not_configured", error: "Credenciais ausentes (EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE)" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const state = await evoConnectionState();
       return new Response(
-        JSON.stringify({ ok: state.connected, configured: true, status: state.state }),
+        JSON.stringify({
+          ok: state.connected,
+          configured: true,
+          instance: state.instance || null,
+          status: state.state,
+          provider: "evolution",
+          checked_at: new Date().toISOString(),
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
