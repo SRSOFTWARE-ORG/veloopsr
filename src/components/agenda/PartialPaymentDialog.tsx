@@ -99,7 +99,7 @@ export default function PartialPaymentDialog({
 
       toast.success(
         isParcial
-          ? `Pagamento parcial registrado. Saldo de ${formatCurrency(saldoRestante)} agendado.`
+          ? `Pagamento parcial registrado. Nova cobrança de ${formatCurrency(saldoRestante)} criada.`
           : "Pagamento registrado!"
       );
       onSuccess?.();
