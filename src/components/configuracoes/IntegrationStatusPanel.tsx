@@ -349,8 +349,8 @@ export default function IntegrationStatusPanel() {
         })}
         <p className="text-[10px] text-muted-foreground pt-1">
           {lastCheck
-            ? `Última verificação: ${lastCheck.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} • Auto a cada 8h • Retry com backoff (até ${MAX_ATTEMPTS}x)`
-            : `Auto-verificação a cada 8h • Retry com backoff (até ${MAX_ATTEMPTS}x)`}
+            ? `Última verificação: ${lastCheck.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} • Monitoramento ativo a cada 2 min • Alerta automático no app se cair`
+            : `Monitoramento ativo a cada 2 min • Alerta automático no app se cair`}
         </p>
       </CardContent>
 
