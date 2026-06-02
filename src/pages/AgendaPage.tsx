@@ -905,6 +905,24 @@ const AgendaPage = () => {
                             <ShieldOff className="w-3 h-3" />
                             Isentar
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 gap-1 text-purple-600 border-purple-500/30 hover:bg-purple-500/10"
+                            onClick={() => {
+                              const valorBase = isEntradaDate && entrada ? entrada.valor_parcela : c.valor_parcela;
+                              setPartialTarget({
+                                cobrancaId: statusCobrancaId,
+                                data: selectedDateKey!,
+                                valor: valorBase,
+                                cliente: c.cliente_nome,
+                              });
+                              setPartialOpen(true);
+                            }}
+                          >
+                            <Wallet className="w-3 h-3" />
+                            Pagamento Parcial
+                          </Button>
                         </>
                       )}
                       {isPrimaryAdmin && isPaidOrExempt && (
