@@ -154,7 +154,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           onClick={() => setSidebarOpen(false)}
         />
         <aside
-          className={`absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl will-change-transform transition-transform duration-200 ease-out ${
+          className={`absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl will-change-transform transition-transform duration-200 ease-out flex flex-col ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
