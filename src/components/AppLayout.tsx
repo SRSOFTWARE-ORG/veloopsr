@@ -173,7 +173,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
             </div>
           </div>
-          <nav className="p-3 space-y-0.5">
+          <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-0.5 scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none]">
             {allItems.map((item) => (
               <NavLink
                 key={item.to}
