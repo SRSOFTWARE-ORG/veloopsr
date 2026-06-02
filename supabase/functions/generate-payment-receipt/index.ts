@@ -271,19 +271,30 @@ async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null =
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: allow service role (internal webhooks) OR authenticated users
+  // Auth: allow service role (internal webhooks/background invokes) OR valid user JWT.
   const _authToken = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
   const _serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  if (_authToken !== _serviceKey) {
-    const _r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${_authToken}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
-    });
-    if (!_r.ok) {
+  const _anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const _isInternal = _authToken && (_authToken === _serviceKey || _authToken === _anonKey);
+  if (!_isInternal) {
+    try {
+      const _authClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        _anonKey,
+      );
+      const { data: _claims, error: _claimsErr } = await _authClient.auth.getClaims(_authToken);
+      if (_claimsErr || !_claims?.claims?.sub) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } catch (_e) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
   }
+
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
