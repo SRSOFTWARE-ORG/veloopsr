@@ -25,7 +25,9 @@ import {
   MessageCircle,
   Send,
   Loader2,
+  Wallet,
 } from "lucide-react";
+import PartialPaymentDialog from "@/components/agenda/PartialPaymentDialog";
 import {
   Dialog,
   DialogContent,
