@@ -127,12 +127,12 @@ Deno.serve(async (req) => {
     const isParcial = saldoRestante > 0.009;
 
     let pagamentoId: string | null = null;
-    let subParcelaNovaId: string | null = null;
-    let subParcelaNovaData: string | null = null;
+    let novaCobrancaId: string | null = null;
+    let novaCobrancaData: string | null = null;
 
+    // 1) Registrar o pagamento (parcial ou total) na origem
     if (isSubParcela) {
-      // marca sub-parcela como paga (parcial ou total)
-      const { data: spUp, error: spErr } = await supabase
+      const { error: spErr } = await supabase
         .from("cobranca_sub_parcelas")
         .update({
           status: "pago",
@@ -141,31 +141,9 @@ Deno.serve(async (req) => {
           pago_em: new Date().toISOString(),
           pago_por: userId,
         })
-        .eq("id", sub_parcela_id)
-        .select()
-        .single();
+        .eq("id", sub_parcela_id);
       if (spErr) throw spErr;
-
-      // Mesmo se for parcial em sub-parcela, criamos outra sub-parcela com o saldo
-      if (isParcial && destino_saldo && destino_saldo !== "nenhum") {
-        const novaData = destino_saldo === "proxima_parcela"
-          ? nextDateFor(cob, data_vencimento)
-          : (data_sub_parcela ?? fmtDate(new Date(hoje.getTime() + (Number(dias_sub_parcela) || 7) * DAY_MS)));
-        const { data: novaSp } = await supabase.from("cobranca_sub_parcelas").insert({
-          cobranca_id,
-          parent_pagamento_id: null,
-          parent_data_vencimento: data_vencimento,
-          descricao: descricao_sub || `Saldo restante de ${data_vencimento.split("-").reverse().join("/")}`,
-          valor: saldoRestante,
-          data_vencimento: novaData,
-          origem: destino_saldo,
-          criado_por: userId,
-        }).select().single();
-        subParcelaNovaId = novaSp?.id ?? null;
-        subParcelaNovaData = novaData;
-      }
     } else {
-      // pagamento de parcela normal — upsert em cobranca_pagamentos
       const { data: existing } = await supabase
         .from("cobranca_pagamentos")
         .select("id")
@@ -199,29 +177,30 @@ Deno.serve(async (req) => {
         if (error) throw error;
         pagamentoId = data.id;
       }
+    }
 
-      // Cria sub-parcela do saldo se aplicável
-      if (isParcial && destino_saldo && destino_saldo !== "nenhum") {
-        const novaData = destino_saldo === "proxima_parcela"
-          ? nextDateFor(cob, data_vencimento)
-          : (data_sub_parcela ?? fmtDate(new Date(hoje.getTime() + (Number(dias_sub_parcela) || 7) * DAY_MS)));
-        const descPadrao = destino_saldo === "proxima_parcela"
-          ? `Saldo restante da parcela ${data_vencimento.split("-").reverse().join("/")}`
-          : `Saldo Restante — Parcela ${data_vencimento.split("-").reverse().join("/")}`;
-        const { data: novaSp, error: spErr } = await supabase.from("cobranca_sub_parcelas").insert({
-          cobranca_id,
-          parent_pagamento_id: pagamentoId,
-          parent_data_vencimento: data_vencimento,
-          descricao: descricao_sub || descPadrao,
-          valor: saldoRestante,
-          data_vencimento: novaData,
-          origem: destino_saldo,
-          criado_por: userId,
-        }).select().single();
-        if (spErr) throw spErr;
-        subParcelaNovaId = novaSp?.id ?? null;
-        subParcelaNovaData = novaData;
-      }
+    // 2) Se houver saldo restante, cria NOVA COBRANÇA (cobrança normal de 1 parcela)
+    if (isParcial && destino_saldo && destino_saldo !== "nenhum") {
+      const novaData = destino_saldo === "proxima_parcela"
+        ? nextDateFor(cob, data_vencimento)
+        : (data_sub_parcela ?? fmtDate(new Date(hoje.getTime() + (Number(dias_sub_parcela) || 7) * DAY_MS)));
+
+      const dataRefBr = data_vencimento.split("-").reverse().join("/");
+      const obs = descricao_sub || `Saldo restante da parcela ${dataRefBr} de ${cob.cliente_nome}`;
+
+      const { data: novaCob, error: ncErr } = await supabase.from("cobrancas").insert({
+        cliente_id: cob.cliente_id,
+        cliente_nome: cob.cliente_nome,
+        valor_parcela: saldoRestante,
+        frequencia: cob.frequencia || "mes",
+        data_inicio: novaData,
+        data_fim: novaData,
+        criado_por: userId,
+        observacoes: obs,
+      }).select().single();
+      if (ncErr) throw ncErr;
+      novaCobrancaId = novaCob?.id ?? null;
+      novaCobrancaData = novaData;
     }
 
     // Aciona comprovante PDF/WhatsApp em background
