@@ -85,6 +85,19 @@ interface Pagamento {
   tipo_pagamento?: string;
 }
 
+interface SubParcela {
+  id: string;
+  cobranca_id: string;
+  parent_data_vencimento: string | null;
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  status: string;
+  valor_pago: number | null;
+  origem: string;
+  rolado_para_data: string | null;
+}
+
 interface Cliente {
   id: string;
   nome: string;
