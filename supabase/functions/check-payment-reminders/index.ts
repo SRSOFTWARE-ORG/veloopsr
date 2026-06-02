@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
       } else {
         // D0
         const linhaJuros = statusAtual === "pendente"
-          ? `\nA partir de hoje, há cobrança de R$ 2,00 por dia de atraso.`
+          ? `\nA partir de hoje, há cobrança de R$ 3,00 por dia de atraso.`
           : ``;
         mensagemWpp = [
           `${saudacao}, ${primeiroNome}!`,
