@@ -74,6 +74,15 @@ interface ReceiptData {
   totalParcelas: number;
   cobrancaObs: string | null;
   descricao: string;
+  // Pagamento parcial / sub-parcela
+  valorPagoAto?: number;
+  valorOriginalParcela?: number;
+  jurosAplicado?: number;
+  saldoRestante?: number;
+  destinoSaldo?: string | null;
+  subParcelaNovaData?: string | null;
+  detalhamento?: string[];
+  tituloDocumento?: string;
 }
 
 async function generatePdf(data: ReceiptData, preloadedLogo: Uint8Array | null = null): Promise<Uint8Array> {
