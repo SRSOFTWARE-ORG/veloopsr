@@ -57,26 +57,46 @@ function calcJurosAtraso(dataVencimento: string, hoje: Date): number {
   return diff * JUROS_DIA;
 }
 
+function getConfiguredPublicKeys(): string[] {
+  const rawKeys = [Deno.env.get("SUPABASE_ANON_KEY"), Deno.env.get("SUPABASE_PUBLISHABLE_KEY")];
+  const plural = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+  if (plural) {
+    try {
+      const parsed = JSON.parse(plural);
+      if (Array.isArray(parsed)) rawKeys.push(...parsed.map(String));
+      else if (typeof parsed === "string") rawKeys.push(parsed);
+    } catch {
+      rawKeys.push(...plural.split(/[\s,]+/));
+    }
+  }
+  return [...new Set(rawKeys.filter((key): key is string => !!key?.trim()).map((key) => key.trim()))];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authToken = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const publicKeys = getConfiguredPublicKeys();
+    const authToken = req.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
 
-    // Auth user
-    const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${authToken}`, apikey: anonKey },
-    });
-    if (!userRes.ok) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    if (!authToken || publicKeys.includes(authToken) || authToken === serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized: sessão expirada ou ausente" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userData = await userRes.json();
-    const userId = userData.id as string;
+
+    const authClient = createClient(supabaseUrl, publicKeys[0] ?? serviceRoleKey, {
+      global: { headers: { Authorization: `Bearer ${authToken}` } },
+    });
+    const { data: claims, error: claimsErr } = await authClient.auth.getClaims(authToken);
+    if (claimsErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized: token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = claims.claims.sub as string;
 
     const body = await req.json();
     const {
