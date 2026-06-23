@@ -80,7 +80,7 @@ async function sendWebPush(subscription: { endpoint: string; p256dh: string; aut
   if (!vapidPublicKey || !vapidPrivateKey) return;
   try {
     const { default: webpush } = await import("npm:web-push@3.6.7");
-    webpush.setVapidDetails("mailto:admin@veloop.app", vapidPublicKey, vapidPrivateKey);
+    webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "mailto:admin@veloop.app", vapidPublicKey, vapidPrivateKey);
     await webpush.sendNotification(
       { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
       JSON.stringify(payload)
