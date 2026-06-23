@@ -54,27 +54,36 @@ serve(async (req) => {
     const pdfBase64 = btoa(binary);
     const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `Você é um assistente especializado em extrair dados de carnês de pagamento brasileiros.
+    let result: any = null;
+    let lastErr: any = null;
+    const MAX_ATTEMPTS = 3;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 120_000);
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "system",
+                content: `Você é um assistente especializado em extrair dados de carnês de pagamento brasileiros.
 Analise o PDF do carnê e extraia as informações de pagamento.
 O nome do arquivo é: "${nome_arquivo}" - use isso como dica para o nome do cliente se não conseguir ler do PDF.`
-          },
-          {
-            role: "user",
-            content: [
+              },
               {
-                type: "text",
-                text: `Extraia os dados deste carnê de pagamento. Preciso de:
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `Extraia os dados deste carnê de pagamento. Preciso de:
 - Nome do cliente
 - CPF do cliente (se visível)
 - Telefone do cliente (se visível)
@@ -85,59 +94,65 @@ O nome do arquivo é: "${nome_arquivo}" - use isso como dica para o nome do clie
 - Frequência de pagamento (semanal, quinzenal ou mensal)
 
 Analise todas as páginas do carnê para encontrar essas informações.`
+                  },
+                  { type: "image_url", image_url: { url: pdfDataUrl } }
+                ],
               },
-              {
-                type: "image_url",
-                image_url: { url: pdfDataUrl }
-              }
             ],
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_carne_data",
-              description: "Dados extraídos do carnê de pagamento",
-              parameters: {
-                type: "object",
-                properties: {
-                  cliente_nome: { type: "string", description: "Nome completo do cliente" },
-                  cliente_cpf: { type: "string", description: "CPF do cliente, formato 000.000.000-00" },
-                  cliente_telefone: { type: "string", description: "Telefone do cliente" },
-                  valor_total: { type: "number", description: "Valor total da venda/financiamento em reais" },
-                  valor_parcela: { type: "number", description: "Valor de cada parcela em reais" },
-                  num_parcelas: { type: "number", description: "Número total de parcelas" },
-                  data_primeira_parcela: { type: "string", description: "Data da primeira parcela no formato YYYY-MM-DD" },
-                  frequencia: { type: "string", enum: ["semana", "quinzena", "mes"], description: "Frequência de pagamento" },
-                  valor_entrada: { type: "number", description: "Valor da entrada, se houver. 0 se não houver." },
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "extract_carne_data",
+                  description: "Dados extraídos do carnê de pagamento",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      cliente_nome: { type: "string", description: "Nome completo do cliente" },
+                      cliente_cpf: { type: "string", description: "CPF do cliente, formato 000.000.000-00" },
+                      cliente_telefone: { type: "string", description: "Telefone do cliente" },
+                      valor_total: { type: "number", description: "Valor total da venda/financiamento em reais" },
+                      valor_parcela: { type: "number", description: "Valor de cada parcela em reais" },
+                      num_parcelas: { type: "number", description: "Número total de parcelas" },
+                      data_primeira_parcela: { type: "string", description: "Data da primeira parcela no formato YYYY-MM-DD" },
+                      frequencia: { type: "string", enum: ["semana", "quinzena", "mes"], description: "Frequência de pagamento" },
+                      valor_entrada: { type: "number", description: "Valor da entrada, se houver. 0 se não houver." },
+                    },
+                    required: ["cliente_nome", "valor_total", "valor_parcela", "num_parcelas", "data_primeira_parcela", "frequencia"],
+                  },
                 },
-                required: ["cliente_nome", "valor_total", "valor_parcela", "num_parcelas", "data_primeira_parcela", "frequencia"],
               },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_carne_data" } },
-      }),
-    });
+            ],
+            tool_choice: { type: "function", function: { name: "extract_carne_data" } },
+          }),
+        });
+        clearTimeout(to);
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        if (response.status === 429 || response.status === 503) {
+          const backoff = Math.min(8000, 1000 * 2 ** (attempt - 1));
+          console.warn(`[scan-carne] ${response.status} tentativa ${attempt}, aguardando ${backoff}ms`);
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, backoff));
+            continue;
+          }
+        }
+
+        if (!response.ok) {
+          const t = await response.text();
+          throw new Error(`AI error ${response.status}: ${t.slice(0, 200)}`);
+        }
+
+        result = await response.json();
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (attempt >= MAX_ATTEMPTS) throw err;
+        await new Promise((r) => setTimeout(r, 1500 * attempt));
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI error:", response.status, t);
-      throw new Error("Erro na IA");
     }
 
-    const result = await response.json();
+    if (!result) throw lastErr ?? new Error("Falha ao analisar carnê");
+
     let extracted: any = {};
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
@@ -146,6 +161,18 @@ Analise todas as páginas do carnê para encontrar essas informações.`
       const content = result.choices?.[0]?.message?.content || "";
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) extracted = JSON.parse(jsonMatch[0]);
+    }
+
+    // Validação anti "null" literal
+    const required = ["cliente_nome", "valor_total", "valor_parcela", "num_parcelas", "data_primeira_parcela", "frequencia"];
+    for (const k of required) {
+      const v = extracted?.[k];
+      if (v === undefined || v === null || v === "" || v === "null") {
+        throw new Error(`Não consegui extrair "${k}" deste carnê. Tente reescanear ou edite manualmente.`);
+      }
+    }
+    if (Number(extracted.valor_total) <= 0 || Number(extracted.valor_parcela) <= 0) {
+      throw new Error("Valores inválidos no carnê (zero ou negativo).");
     }
 
     return new Response(JSON.stringify({ data: extracted }), {
