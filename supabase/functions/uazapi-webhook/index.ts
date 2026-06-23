@@ -386,8 +386,8 @@ Deno.serve(async (req) => {
       req.headers.get("x-evolution-apikey") ||
       body?.apikey ||
       body?.token;
-    if (expectedKey && receivedKey !== expectedKey) {
-      console.warn("[Webhook] apikey inválida — request rejeitado");
+    if (!expectedKey || receivedKey !== expectedKey) {
+      console.warn("[Webhook] apikey inválida ou EVOLUTION_API_KEY não configurada — request rejeitado");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

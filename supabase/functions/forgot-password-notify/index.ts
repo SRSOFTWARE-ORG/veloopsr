@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0]?.trim() || "unknown";
 
     // ── ANTI-ABUSO: máximo 5 solicitações por email por hora ──
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -37,17 +38,33 @@ Deno.serve(async (req) => {
       .contains("detalhes", { email: normalizedEmail });
 
     if ((recentCount || 0) >= 5) {
-      // Sempre responder 200 para não vazar info, mas não notificar admins.
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // ── ANTI-ABUSO IP: máximo 10 solicitações por IP por hora ──
+    if (ip !== "unknown") {
+      const { count: ipCount } = await supabaseAdmin
+        .from("audit_log")
+        .select("id", { count: "exact", head: true })
+        .eq("tabela", "forgot_password")
+        .gte("created_at", oneHourAgo)
+        .contains("detalhes", { ip });
+
+      if ((ipCount || 0) >= 10) {
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     await supabaseAdmin.from("audit_log").insert({
       tabela: "forgot_password",
       acao: "request",
-      detalhes: { email: normalizedEmail, ip: req.headers.get("x-forwarded-for") || "" },
+      detalhes: { email: normalizedEmail, ip },
     });
 
     // Find user by email
