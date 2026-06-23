@@ -660,6 +660,7 @@ export type Database = {
         Row: {
           cliente_nome: string | null
           created_at: string | null
+          hash_arquivo: string | null
           id: string
           nome_arquivo: string
           processado: boolean | null
@@ -671,6 +672,7 @@ export type Database = {
         Insert: {
           cliente_nome?: string | null
           created_at?: string | null
+          hash_arquivo?: string | null
           id?: string
           nome_arquivo: string
           processado?: boolean | null
@@ -682,6 +684,7 @@ export type Database = {
         Update: {
           cliente_nome?: string | null
           created_at?: string | null
+          hash_arquivo?: string | null
           id?: string
           nome_arquivo?: string
           processado?: boolean | null
@@ -1085,7 +1088,9 @@ export type Database = {
           created_at: string | null
           endpoint: string
           id: string
+          last_used_at: string
           p256dh: string
+          user_agent: string | null
           user_id: string
         }
         Insert: {
@@ -1093,7 +1098,9 @@ export type Database = {
           created_at?: string | null
           endpoint: string
           id?: string
+          last_used_at?: string
           p256dh: string
+          user_agent?: string | null
           user_id: string
         }
         Update: {
@@ -1101,7 +1108,9 @@ export type Database = {
           created_at?: string | null
           endpoint?: string
           id?: string
+          last_used_at?: string
           p256dh?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []

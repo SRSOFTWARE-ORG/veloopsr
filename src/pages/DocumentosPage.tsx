@@ -560,7 +560,31 @@ const DocumentosPage = () => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Check for existing document with the same filename — replace it
+      // Hash do conteúdo para impedir reimportar o MESMO PDF
+      let hashHex = "";
+      try {
+        const buf = await file.arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", buf);
+        hashHex = Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+      } catch (e) {
+        console.warn("hash falhou", e);
+      }
+
+      if (hashHex) {
+        const { data: dup } = await supabase
+          .from("documentos")
+          .select("id,nome_arquivo")
+          .eq("hash_arquivo", hashHex)
+          .limit(1);
+        if (dup && dup.length > 0) {
+          toast.info(`"${file.name}" já existe (${dup[0].nome_arquivo}) — ignorado.`);
+          continue;
+        }
+      }
+
+      // Replace por nome para reprocessar versões com mesmo filename
       const { data: existingDocs } = await supabase
         .from("documentos")
         .select("id, nome_arquivo")
@@ -568,9 +592,7 @@ const DocumentosPage = () => {
 
       if (existingDocs && existingDocs.length > 0) {
         for (const oldDoc of existingDocs) {
-          // Remove linked vendas/cobrancas from the old document
           await removeOldLinkedRecords(oldDoc.nome_arquivo);
-          // Delete the old document record
           await supabase.from("documentos").delete().eq("id", oldDoc.id);
         }
       }
@@ -592,7 +614,8 @@ const DocumentosPage = () => {
         nome_arquivo: file.name,
         url_arquivo: urlData.publicUrl,
         uploaded_by: user?.id,
-      }).select("*").single();
+        hash_arquivo: hashHex || null,
+      } as any).select("*").single();
 
       if (insertError) {
         console.error("Document insert error:", insertError.message);
