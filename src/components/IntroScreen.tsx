@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const IntroScreen = ({ onFinish }: { onFinish: () => void }) => {
   useEffect(() => {
-    const timer = setTimeout(() => onFinish(), 1800);
+    const timer = setTimeout(() => onFinish(), 800);
     return () => clearTimeout(timer);
   }, [onFinish]);
 
