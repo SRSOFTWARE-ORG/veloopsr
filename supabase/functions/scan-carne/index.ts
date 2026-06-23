@@ -91,7 +91,13 @@ O nome do arquivo é: "${nome_arquivo}" - use isso como dica para o nome do clie
 
 Analise todas as páginas do carnê para encontrar essas informações.`
                   },
-                  { type: "image_url", image_url: { url: pdfDataUrl } }
+                  {
+                    type: "file",
+                    file: {
+                      filename: nome_arquivo || "carne.pdf",
+                      file_data: pdfDataUrl,
+                    },
+                  },
                 ],
               },
             ],
