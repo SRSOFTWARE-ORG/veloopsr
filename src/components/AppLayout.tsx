@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import SobreDialog from "@/components/SobreDialog";
+import FirstVisitPushPrompt from "@/components/FirstVisitPushPrompt";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -264,6 +265,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <main className="flex-1 md:ml-64 pt-14 md:pt-0 w-full min-w-0 overflow-x-hidden">
         {children}
       </main>
+      <FirstVisitPushPrompt />
     </div>
   );
 };
