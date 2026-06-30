@@ -233,10 +233,18 @@ Para NOTA FISCAL, extraia:
 
 NÃO DEIXE NENHUM CAMPO EM BRANCO se a informação estiver visível. Seja preciso nos valores e datas.`
               },
-              {
-                type: "image_url",
-                image_url: { url: dataUrl }
-              }
+              isPdf
+                ? {
+                    type: "file",
+                    file: {
+                      filename: nome_arquivo || "documento.pdf",
+                      file_data: dataUrl,
+                    },
+                  }
+                : {
+                    type: "image_url",
+                    image_url: { url: dataUrl },
+                  }
             ],
           },
         ],
