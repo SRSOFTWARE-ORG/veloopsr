@@ -36,6 +36,8 @@ import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
 import PermissionsManager from "@/components/PermissionsManager";
 import AISearchBar from "@/components/configuracoes/AISearchBar";
 import IntegrationStatusPanel from "@/components/configuracoes/IntegrationStatusPanel";
+import ModoForaDoArCard from "@/components/configuracoes/ModoForaDoArCard";
+
 
 interface UserWithPermissions {
   id: string;
@@ -215,6 +217,13 @@ const ConfiguracoesPage = () => {
       <div className="mb-6 slide-up">
         <AISearchBar />
       </div>
+
+      {isFounder && (
+        <div className="mb-6">
+          <ModoForaDoArCard />
+        </div>
+      )}
+
 
       <div className="mb-6 slide-up flex items-center justify-between">
         <div>
