@@ -24,6 +24,7 @@ import CaixaPage from "@/pages/CaixaPage";
 
 // Lazy for less-used pages
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const AcessoAlternativoPage = lazy(() => import("@/pages/AcessoAlternativoPage"));
 const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
@@ -152,8 +153,20 @@ const App = () => {
               path="/*"
               element={
                 <AuthProvider>
+                  <Routes>
+                  {/* Aba alternativa — acessível mesmo com o app fora do ar */}
+                  <Route
+                    path="/acesso"
+                    element={
+                      <Suspense fallback={<ScreenLoader />}>
+                        <AcessoAlternativoPage />
+                      </Suspense>
+                    }
+                  />
+                  <Route path="*" element={
                   <MaintenanceGate>
                   <Routes>
+
 
                     <Route
                       path="/login"
@@ -287,6 +300,8 @@ const App = () => {
                     />
                   </Routes>
                   </MaintenanceGate>
+                  } />
+                  </Routes>
                 </AuthProvider>
 
               }

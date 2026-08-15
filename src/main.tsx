@@ -19,6 +19,18 @@ if (isPreviewHost || isInIframe) {
   navigator.serviceWorker?.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
+} else if ("serviceWorker" in navigator) {
+  // Registra/atualiza o SW para todos — ele também aplica o "modo fora do ar"
+  // em PWAs instalados, mesmo que a versão em cache esteja desatualizada.
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw-push.js", { scope: "/" })
+      .then((reg) => {
+        void reg.update();
+        window.setInterval(() => void reg.update(), 10 * 60 * 1000);
+      })
+      .catch(() => undefined);
+  });
 }
 
 // Auto-recover from stale chunk errors after a redeploy.

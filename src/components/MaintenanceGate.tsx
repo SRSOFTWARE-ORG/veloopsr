@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth, FOUNDER_EMAIL } from "@/contexts/AuthContext";
 import { useMaintenanceMode, canBypass } from "@/hooks/useMaintenanceMode";
-import { Wrench } from "lucide-react";
+import { allowPwaBypass, clearPwaBypass } from "@/lib/pwa-maintenance";
+import { Wrench, KeyRound, PauseCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 
 /**
  * Bloqueia todo o app quando o modo "fora do ar" está ativo.
- * O CEO fundador e os e-mails liberados no bypass continuam com acesso normal.
+ * O CEO fundador e os e-mails liberados no bypass continuam com acesso normal,
+ * porém com aviso de que os serviços automáticos seguem pausados.
  */
 const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, signOut } = useAuth();
@@ -15,8 +18,30 @@ const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const isFounder = user?.email?.toLowerCase() === FOUNDER_EMAIL;
   const liberado = isFounder || canBypass(config, user?.email);
 
-  if (loading || !manutencao || liberado) {
+  // Mantém o service worker (PWA, mesmo desatualizado) alinhado ao estado atual.
+  useEffect(() => {
+    if (loading) return;
+    if (manutencao && liberado) void allowPwaBypass();
+    if (!manutencao) void clearPwaBypass();
+  }, [loading, manutencao, liberado]);
+
+  if (loading || !manutencao) {
     return <>{children}</>;
+  }
+
+  if (liberado) {
+    return (
+      <>
+        <div className="sticky top-0 z-50 flex items-center gap-2 bg-destructive/10 text-destructive px-4 py-2 text-xs font-semibold">
+          <PauseCircle className="w-4 h-4 shrink-0" />
+          <span className="truncate">
+            Modo fora do ar ativo — serviços automáticos pausados
+            {isFounder ? "" : " até o administrador reativar"}.
+          </span>
+        </div>
+        {children}
+      </>
+    );
   }
 
   return (
@@ -29,8 +54,14 @@ const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
         Os serviços foram pausados pelo administrador para manutenção. Tente novamente em alguns
         instantes — o acesso volta automaticamente assim que for reativado.
       </p>
+      <Button asChild variant="outline" size="sm">
+        <Link to="/acesso">
+          <KeyRound className="w-4 h-4" />
+          Acesso alternativo
+        </Link>
+      </Button>
       {user && (
-        <Button variant="outline" size="sm" onClick={() => void signOut()}>
+        <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           Sair
         </Button>
       )}
