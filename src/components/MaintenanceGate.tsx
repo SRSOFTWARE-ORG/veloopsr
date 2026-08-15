@@ -1,20 +1,21 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth, FOUNDER_EMAIL } from "@/contexts/AuthContext";
-import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { useMaintenanceMode, canBypass } from "@/hooks/useMaintenanceMode";
 import { Wrench } from "lucide-react";
 
 /**
  * Bloqueia todo o app quando o modo "fora do ar" está ativo.
- * Somente o CEO fundador continua com acesso normal.
+ * O CEO fundador e os e-mails liberados no bypass continuam com acesso normal.
  */
 const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, signOut } = useAuth();
-  const { manutencao, loading } = useMaintenanceMode();
+  const { manutencao, config, loading } = useMaintenanceMode();
 
   const isFounder = user?.email?.toLowerCase() === FOUNDER_EMAIL;
+  const liberado = isFounder || canBypass(config, user?.email);
 
-  if (loading || !manutencao || isFounder) {
+  if (loading || !manutencao || liberado) {
     return <>{children}</>;
   }
 
