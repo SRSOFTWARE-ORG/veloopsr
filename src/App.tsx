@@ -10,6 +10,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import IntroScreen from "@/components/IntroScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import MaintenanceGate from "@/components/MaintenanceGate";
+
 import { useFirebaseInit } from "@/hooks/useFirebase";
 
 // Eager imports for critical pages — no lazy loading delay
