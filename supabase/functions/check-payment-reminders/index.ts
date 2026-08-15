@@ -48,6 +48,7 @@ const diasSemana: Record<number, string> = {
 
 // ── Enviar WhatsApp via Evolution API ──
 import { evoSendText } from "../_shared/evolution.ts";
+import { maintenanceGuard } from "../_shared/maintenance.ts";
 async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
   const r = await evoSendText(phone, message);
   if (!r.ok) console.error("[Evolution] Falha envio:", r.status, r.error);
@@ -137,6 +138,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const paused = await maintenanceGuard(corsHeaders);
+  if (paused) return paused;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

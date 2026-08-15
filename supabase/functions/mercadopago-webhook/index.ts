@@ -17,6 +17,7 @@ function formatDate(d: string): string {
 }
 
 import { evoSendText } from "../_shared/evolution.ts";
+import { maintenanceGuard } from "../_shared/maintenance.ts";
 async function sendWhatsAppText(phone: string, message: string): Promise<boolean> {
   const r = await evoSendText(phone, message);
   if (!r.ok) console.error("[Evolution] Text send error:", r.status, r.error);
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const paused = await maintenanceGuard(corsHeaders);
+  if (paused) return paused;
 
   try {
     const MP_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
