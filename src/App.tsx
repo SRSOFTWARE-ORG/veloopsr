@@ -152,8 +152,20 @@ const App = () => {
               path="/*"
               element={
                 <AuthProvider>
+                  <Routes>
+                  {/* Aba alternativa — acessível mesmo com o app fora do ar */}
+                  <Route
+                    path="/acesso"
+                    element={
+                      <Suspense fallback={<ScreenLoader />}>
+                        <AcessoAlternativoPage />
+                      </Suspense>
+                    }
+                  />
+                  <Route path="*" element={
                   <MaintenanceGate>
                   <Routes>
+
 
                     <Route
                       path="/login"
