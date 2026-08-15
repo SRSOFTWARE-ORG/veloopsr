@@ -138,7 +138,7 @@ export const appendMaintenanceAudit = async (entry: MaintenanceAudit) => {
   try {
     const { data } = await supabase.auth.getUser();
     await supabase.from("audit_log").insert({
-      user_id: data.user?.id ?? null,
+      user_id: data.user?.id,
       acao: `manutencao:${entry.action}`,
       tabela: "app_config_manutencao",
       detalhes: entry as unknown as Record<string, unknown>,
