@@ -24,6 +24,7 @@ import CaixaPage from "@/pages/CaixaPage";
 
 // Lazy for less-used pages
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const AcessoAlternativoPage = lazy(() => import("@/pages/AcessoAlternativoPage"));
 const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
