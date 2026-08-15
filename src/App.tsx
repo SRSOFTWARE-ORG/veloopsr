@@ -299,6 +299,8 @@ const App = () => {
                     />
                   </Routes>
                   </MaintenanceGate>
+                  } />
+                  </Routes>
                 </AuthProvider>
 
               }
