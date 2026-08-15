@@ -120,6 +120,34 @@ export const saveMaintenance = async (
   return next;
 };
 
+/**
+ * Registra um evento de auditoria sem alterar o estado da manutenção.
+ * Grava no JSON de configuração e, em paralelo (best-effort), no audit_log do banco.
+ */
+export const appendMaintenanceAudit = async (entry: MaintenanceAudit) => {
+  try {
+    const current = await readMaintenanceConfig();
+    await writeMaintenanceConfig({
+      ...current,
+      audit: [entry, ...(current.audit ?? [])].slice(0, 100),
+    });
+  } catch {
+    // storage indisponível — a auditoria no banco abaixo ainda pode funcionar
+  }
+
+  try {
+    const { data } = await supabase.auth.getUser();
+    await supabase.from("audit_log").insert({
+      user_id: data.user?.id ?? null,
+      acao: `manutencao:${entry.action}`,
+      tabela: "app_config_manutencao",
+      detalhes: entry as unknown as Record<string, unknown>,
+    });
+  } catch {
+    // auditoria em banco é complementar; nunca deve bloquear o acesso
+  }
+};
+
 export const writeMaintenance = async (manutencao: boolean) => {
   const current = await readMaintenanceConfig();
   await writeMaintenanceConfig({ ...current, manutencao });
