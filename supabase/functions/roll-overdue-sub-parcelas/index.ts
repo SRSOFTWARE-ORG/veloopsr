@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { maintenanceGuard } from "../_shared/maintenance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,9 @@ function nextProjected(cob: any, after: string, hoje: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const paused = await maintenanceGuard(corsHeaders);
+  if (paused) return paused;
 
   try {
     const supabase = createClient(

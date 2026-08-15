@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { maintenanceGuard } from "../_shared/maintenance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -194,6 +195,9 @@ Deno.serve(async (req) => {
   if (!(await _isAdmin(_user.id))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(null, { headers: corsHeaders });
   }
+
+  const paused = await maintenanceGuard(corsHeaders);
+  if (paused) return paused;
 
   try {
     const externalUrl = Deno.env.get("EXTERNAL_SUPABASE_URL");

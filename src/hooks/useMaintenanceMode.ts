@@ -4,22 +4,95 @@ import { supabase } from "@/integrations/supabase/client";
 const BUCKET = "produto_imagens";
 const PATH = "app-config/maintenance.json";
 
+export type MaintenanceAudit = {
+  action: "ativado" | "desativado" | "agenda" | "bypass";
+  by: string;
+  at: string;
+  detalhe?: string;
+};
+
+export type MaintenanceConfig = {
+  manutencao: boolean;
+  updated_at: string;
+  schedule?: {
+    enabled: boolean;
+    /** "HH:MM" horário de ativação (fuso America/Sao_Paulo) */
+    start: string;
+    /** "HH:MM" horário de desativação */
+    end: string;
+  };
+  bypass_emails?: string[];
+  audit?: MaintenanceAudit[];
+};
+
+export const emptyConfig: MaintenanceConfig = {
+  manutencao: false,
+  updated_at: new Date(0).toISOString(),
+  schedule: { enabled: false, start: "23:00", end: "05:00" },
+  bypass_emails: [],
+  audit: [],
+};
+
 const publicUrl = () =>
   supabase.storage.from(BUCKET).getPublicUrl(PATH).data.publicUrl;
 
-export const readMaintenance = async (): Promise<boolean> => {
+/** Minutos desde a meia-noite no fuso de São Paulo. */
+const nowMinutesSP = () => {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
+};
+
+const toMinutes = (hhmm?: string) => {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(":").map((n) => Number(n));
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+};
+
+/** A janela agendada está ativa agora? (suporta janelas que cruzam a meia-noite) */
+export const isScheduleActive = (config: MaintenanceConfig | null): boolean => {
+  const s = config?.schedule;
+  if (!s?.enabled) return false;
+  const start = toMinutes(s.start);
+  const end = toMinutes(s.end);
+  if (start === null || end === null || start === end) return false;
+  const now = nowMinutesSP();
+  return start < end ? now >= start && now < end : now >= start || now < end;
+};
+
+/** Estado efetivo: manual OU dentro da janela agendada. */
+export const isMaintenanceActive = (config: MaintenanceConfig | null): boolean =>
+  Boolean(config?.manutencao) || isScheduleActive(config);
+
+export const canBypass = (config: MaintenanceConfig | null, email?: string | null) => {
+  if (!email) return false;
+  const list = (config?.bypass_emails ?? []).map((e) => e.trim().toLowerCase());
+  return list.includes(email.trim().toLowerCase());
+};
+
+export const readMaintenanceConfig = async (): Promise<MaintenanceConfig> => {
   try {
     const res = await fetch(`${publicUrl()}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return false;
-    const json = await res.json();
-    return json?.manutencao === true;
+    if (!res.ok) return emptyConfig;
+    const json = (await res.json()) as MaintenanceConfig;
+    return { ...emptyConfig, ...json };
   } catch {
-    return false;
+    return emptyConfig;
   }
 };
 
-export const writeMaintenance = async (manutencao: boolean) => {
-  const body = new Blob([JSON.stringify({ manutencao, updated_at: new Date().toISOString() })], {
+export const readMaintenance = async (): Promise<boolean> =>
+  isMaintenanceActive(await readMaintenanceConfig());
+
+export const writeMaintenanceConfig = async (config: MaintenanceConfig) => {
+  const body = new Blob([JSON.stringify({ ...config, updated_at: new Date().toISOString() })], {
     type: "application/json",
   });
 
@@ -32,16 +105,39 @@ export const writeMaintenance = async (manutencao: boolean) => {
   if (error) throw error;
 };
 
+/** Grava mantendo histórico de auditoria (últimos 100 registros). */
+export const saveMaintenance = async (
+  current: MaintenanceConfig,
+  patch: Partial<MaintenanceConfig>,
+  audit: MaintenanceAudit,
+) => {
+  const next: MaintenanceConfig = {
+    ...current,
+    ...patch,
+    audit: [audit, ...(current.audit ?? [])].slice(0, 100),
+  };
+  await writeMaintenanceConfig(next);
+  return next;
+};
+
+export const writeMaintenance = async (manutencao: boolean) => {
+  const current = await readMaintenanceConfig();
+  await writeMaintenanceConfig({ ...current, manutencao });
+};
+
 /** Estado global de "app fora do ar", com verificação periódica. */
 export const useMaintenanceMode = (intervalMs = 15000) => {
+  const [config, setConfig] = useState<MaintenanceConfig>(emptyConfig);
   const [manutencao, setManutencao] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const value = await readMaintenance();
-    setManutencao(value);
+    const cfg = await readMaintenanceConfig();
+    setConfig(cfg);
+    const active = isMaintenanceActive(cfg);
+    setManutencao(active);
     setLoading(false);
-    return value;
+    return active;
   }, []);
 
   useEffect(() => {
@@ -55,5 +151,5 @@ export const useMaintenanceMode = (intervalMs = 15000) => {
     };
   }, [refresh, intervalMs]);
 
-  return { manutencao, loading, refresh, setManutencao };
+  return { manutencao, config, setConfig, loading, refresh, setManutencao };
 };

@@ -161,6 +161,7 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
 
 // ─── Evolution send ───
 import { evoSendText, evoDownloadMediaBase64, evoSendAudio } from "../_shared/evolution.ts";
+import { maintenanceGuard } from "../_shared/maintenance.ts";
 
 async function sendWhatsApp(phone: string, message: string) {
   const r = await evoSendText(phone, message);
@@ -372,6 +373,9 @@ function generatePixLink(cobrancaId: string, dataVencimento: string, valor: numb
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const paused = await maintenanceGuard(corsHeaders);
+  if (paused) return paused;
 
   try {
     const body = await req.json();
