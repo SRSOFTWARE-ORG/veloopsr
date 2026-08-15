@@ -5,7 +5,7 @@ const BUCKET = "produto_imagens";
 const PATH = "app-config/maintenance.json";
 
 export type MaintenanceAudit = {
-  action: "ativado" | "desativado" | "agenda" | "bypass";
+  action: "ativado" | "desativado" | "agenda" | "bypass" | "acesso";
   by: string;
   at: string;
   detalhe?: string;
