@@ -152,7 +152,9 @@ const App = () => {
               path="/*"
               element={
                 <AuthProvider>
+                  <MaintenanceGate>
                   <Routes>
+
                     <Route
                       path="/login"
                       element={
@@ -284,7 +286,9 @@ const App = () => {
                       }
                     />
                   </Routes>
+                  </MaintenanceGate>
                 </AuthProvider>
+
               }
             />
           </Routes>
