@@ -141,7 +141,7 @@ export const appendMaintenanceAudit = async (entry: MaintenanceAudit) => {
       user_id: data.user?.id,
       acao: `manutencao:${entry.action}`,
       tabela: "app_config_manutencao",
-      detalhes: entry as unknown as Record<string, unknown>,
+      detalhes: entry as unknown as never,
     });
   } catch {
     // auditoria em banco é complementar; nunca deve bloquear o acesso
