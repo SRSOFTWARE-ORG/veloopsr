@@ -4,13 +4,22 @@
  * Mesmo em PWAs desatualizados o service worker bloqueia a navegação quando a
  * manutenção está ativa. Estas funções liberam (ou revogam) esse bloqueio para
  * o usuário autorizado que entrou pela aba /acesso.
+ *
+ * IMPORTANTE: nunca podem travar a navegação — se o service worker não estiver
+ * disponível (preview, iframe, navegador sem suporte) resolvem rapidamente.
  */
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
+  Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
 
 const post = async (message: Record<string, unknown>): Promise<boolean> => {
   try {
     if (!("serviceWorker" in navigator)) return false;
-    const reg = await navigator.serviceWorker.ready;
-    const target = reg.active ?? navigator.serviceWorker.controller;
+    const reg = await withTimeout(navigator.serviceWorker.ready, 1500);
+    const target = reg?.active ?? navigator.serviceWorker.controller;
     if (!target) return false;
     target.postMessage(message);
     return true;
