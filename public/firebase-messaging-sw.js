@@ -14,11 +14,54 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+const MAINT_CACHE = "veloop-maintenance-state";
+const STATE_KEY = "https://veloop.local/maintenance-state";
+const BYPASS_KEY = "https://veloop.local/maintenance-bypass";
+
+async function persistMaintenanceState(active) {
+  const cache = await caches.open(MAINT_CACHE);
+  await cache.put(
+    STATE_KEY,
+    new Response(JSON.stringify({ active, at: Date.now() }), {
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+}
+
+async function hasMaintenanceBypass() {
+  const cache = await caches.open(MAINT_CACHE);
+  const hit = await cache.match(BYPASS_KEY);
+  if (!hit) return false;
+  const { until } = await hit.json();
+  if (!until || Date.now() > until) {
+    await cache.delete(BYPASS_KEY);
+    return false;
+  }
+  return true;
+}
+
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
   console.log("[firebase-messaging-sw] Background message:", payload);
 
   const data = payload.data || {};
+  if (data.type === "veloop-maintenance") {
+    const active = data.active === "true";
+    return (async () => {
+      await persistMaintenanceState(active);
+      if (!active) {
+        const cache = await caches.open(MAINT_CACHE);
+        await cache.delete(BYPASS_KEY);
+      }
+      const windowClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      await Promise.allSettled(
+        windowClients.map(async (client) => {
+          if (active && (await hasMaintenanceBypass())) return;
+          await client.navigate(client.url);
+        }),
+      );
+    })();
+  }
   const notification = payload.notification || {};
 
   const title = data.titulo || notification.title || "Veloop";
