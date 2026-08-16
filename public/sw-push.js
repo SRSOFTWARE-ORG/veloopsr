@@ -6,6 +6,27 @@ self.addEventListener("push", (event) => {
 
   try {
     const data = event.data.json();
+    if (data.type === "veloop-maintenance") {
+      const active = data.active === true || data.active === "true";
+      event.waitUntil(
+        (async () => {
+          maintCache = { at: Date.now(), active, ok: true };
+          await persistState(active);
+          if (!active) {
+            const cache = await caches.open(MAINT_CACHE);
+            await cache.delete(BYPASS_KEY);
+          }
+          const windowClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+          await Promise.allSettled(
+            windowClients.map(async (client) => {
+              if (active && (await hasBypass())) return;
+              await client.navigate(client.url);
+            }),
+          );
+        })(),
+      );
+      return;
+    }
     const options = {
       body: data.mensagem || data.body || "",
       icon: "/icons/icon-192x192.png",
@@ -214,6 +235,10 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/acesso")) return; // aba alternativa sempre liberada
 
+  // Este arquivo é importado pelo Workbox. O bloqueio de manutenção precisa ser
+  // o único responsável pelas navegações para não haver dois respondWith concorrentes.
+  event.stopImmediatePropagation();
+
   event.respondWith(
     (async () => {
       try {
@@ -226,7 +251,17 @@ self.addEventListener("fetch", (event) => {
       } catch {
         // qualquer falha na checagem não deve derrubar a navegação
       }
-      return fetch(req);
+      try {
+        return await fetch(req);
+      } catch {
+        const cached = await caches.match(req, { ignoreSearch: true });
+        const shell = cached ?? await caches.match("/index.html", { ignoreSearch: true });
+        if (shell) return shell;
+        return new Response("Sem conexão", {
+          status: 503,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
     })(),
   );
 });

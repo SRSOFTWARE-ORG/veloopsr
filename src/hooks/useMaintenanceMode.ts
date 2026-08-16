@@ -154,7 +154,7 @@ export const writeMaintenance = async (manutencao: boolean) => {
 };
 
 /** Estado global de "app fora do ar", com verificação periódica. */
-export const useMaintenanceMode = (intervalMs = 15000) => {
+export const useMaintenanceMode = (intervalMs = 3000) => {
   const [config, setConfig] = useState<MaintenanceConfig>(emptyConfig);
   const [manutencao, setManutencao] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -172,10 +172,15 @@ export const useMaintenanceMode = (intervalMs = 15000) => {
     void refresh();
     const id = window.setInterval(() => void refresh(), intervalMs);
     const onFocus = () => void refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(id);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refresh, intervalMs]);
 
