@@ -79,8 +79,9 @@ const AcessoAlternativoPage = () => {
     }
   };
 
-  const entrarNoApp = async () => {
-    await allowPwaBypass();
+  const entrarNoApp = () => {
+    // Não bloqueia a navegação: o aviso ao service worker é best-effort.
+    void allowPwaBypass();
     navigate("/", { replace: true });
   };
 
