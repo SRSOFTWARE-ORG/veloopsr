@@ -3,6 +3,7 @@ import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/anal
 import { getPerformance } from "firebase/performance";
 import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "firebase/messaging";
 import { fetchAndActivate, getRemoteConfig, getValue } from "firebase/remote-config";
+import { getAppServiceWorkerRegistration } from "@/lib/app-service-worker";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAxN7XUraOmXRG6q8SNiFfVZdwwQRlp8xw",
@@ -84,7 +85,9 @@ export const getFCMToken = async (vapidKey: string) => {
   if (!messaging) return null;
 
   try {
-    const token = await getToken(messaging, { vapidKey });
+    const serviceWorkerRegistration = await getAppServiceWorkerRegistration();
+    if (!serviceWorkerRegistration) return null;
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
     return token;
   } catch (err) {
     console.error("Failed to get FCM token:", err);

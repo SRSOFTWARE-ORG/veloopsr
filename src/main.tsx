@@ -1,37 +1,10 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { startAppServiceWorker } from "@/lib/app-service-worker";
 
-// Guard: unregister service workers in iframe/preview contexts
-const isInIframe = (() => {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-})();
-
-const isPreviewHost =
-  window.location.hostname.includes("id-preview--") ||
-  window.location.hostname.includes("lovableproject.com");
-
-if (isPreviewHost || isInIframe) {
-  navigator.serviceWorker?.getRegistrations().then((registrations) => {
-    registrations.forEach((r) => r.unregister());
-  });
-} else if ("serviceWorker" in navigator) {
-  // Registra/atualiza o SW para todos — ele também aplica o "modo fora do ar"
-  // em PWAs instalados, mesmo que a versão em cache esteja desatualizada.
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw-push.js", { scope: "/" })
-      .then((reg) => {
-        void reg.update();
-        window.setInterval(() => void reg.update(), 10 * 60 * 1000);
-      })
-      .catch(() => undefined);
-  });
-}
+// Registro único: o Workbox cuida do offline e importa o bloqueio de manutenção/push.
+startAppServiceWorker();
 
 // Auto-recover from stale chunk errors after a redeploy.
 // When the client tries to load a JS chunk that no longer exists,
@@ -62,4 +35,5 @@ window.addEventListener("unhandledrejection", (e) => {
   if (isChunkLoadError(msg)) tryReloadOnce();
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+const root = document.getElementById("root");
+if (root) createRoot(root).render(<App />);

@@ -20,7 +20,7 @@ const fmt = (iso: string) =>
 
 const ModoForaDoArCard = () => {
   const { user } = useAuth();
-  const { manutencao, config, setConfig, loading, refresh } = useMaintenanceMode(30000);
+  const { manutencao, config, setConfig, loading, refresh } = useMaintenanceMode();
   const [saving, setSaving] = useState(false);
   const [novoEmail, setNovoEmail] = useState("");
 
@@ -47,7 +47,12 @@ const ModoForaDoArCard = () => {
       { manutencao: value },
       { action: value ? "ativado" : "desativado", by: quem, at: new Date().toISOString() },
     );
-    if (ok) toast.success(value ? "App colocado fora do ar" : "App reativado — serviços liberados");
+    if (ok) {
+      // Avisa imediatamente instalações abertas/fechadas. O bloqueio não depende do envio:
+      // navegação e polling continuam validando diretamente a configuração pública.
+      void supabase.functions.invoke("maintenance-broadcast", { body: { active: value } });
+      toast.success(value ? "App colocado fora do ar" : "App reativado — serviços liberados");
+    }
   };
 
   const schedule = config.schedule ?? { enabled: false, start: "23:00", end: "05:00" };

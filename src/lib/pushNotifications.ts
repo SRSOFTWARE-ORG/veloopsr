@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getAppServiceWorkerRegistration } from "@/lib/app-service-worker";
 
 // Chave pública VAPID (pública por design — pode ficar no client)
 const VAPID_PUBLIC_KEY =
@@ -30,10 +31,7 @@ export function isPushSupported(): boolean {
 async function getSwRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
   try {
-    const existing = await navigator.serviceWorker.getRegistrations();
-    const match = existing.find((r) => r.active?.scriptURL.includes("sw-push"));
-    if (match) return match;
-    return await navigator.serviceWorker.register("/sw-push.js", { scope: "/" });
+    return await getAppServiceWorkerRegistration();
   } catch (e) {
     console.warn("[push] sw register failed", e);
     return null;
