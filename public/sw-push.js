@@ -68,6 +68,33 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 let maintCache = { at: 0, active: false, ok: false };
+const STATE_KEY = "https://veloop.local/maintenance-state";
+
+async function readPersistedState() {
+  try {
+    const cache = await caches.open(MAINT_CACHE);
+    const hit = await cache.match(STATE_KEY);
+    if (!hit) return null;
+    const json = await hit.json();
+    return typeof json?.active === "boolean" ? json.active : null;
+  } catch {
+    return null;
+  }
+}
+
+async function persistState(active) {
+  try {
+    const cache = await caches.open(MAINT_CACHE);
+    await cache.put(
+      STATE_KEY,
+      new Response(JSON.stringify({ active, at: Date.now() }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  } catch {
+    // ignora
+  }
+}
 
 function minutesSP() {
   const parts = new Intl.DateTimeFormat("pt-BR", {
@@ -106,11 +133,21 @@ async function isMaintenanceActive() {
       }
     }
     maintCache = { at: Date.now(), active, ok: true };
+    await persistState(active);
     return active;
   } catch {
-    // Offline/erro: mantém o último estado conhecido (fail-safe, sem travar o app).
-    maintCache = { ...maintCache, at: Date.now() };
-    return maintCache.ok ? maintCache.active : false;
+    // Offline/erro: mantém o último estado conhecido (persistido), de forma que
+    // um PWA desatualizado ou sem rede continue bloqueado durante a manutenção.
+    if (maintCache.ok) {
+      maintCache = { ...maintCache, at: Date.now() };
+      return maintCache.active;
+    }
+    const persisted = await readPersistedState();
+    if (persisted !== null) {
+      maintCache = { at: Date.now(), active: persisted, ok: true };
+      return persisted;
+    }
+    return false;
   }
 }
 
@@ -166,7 +203,6 @@ a{margin-top:8px;padding:10px 18px;border-radius:12px;border:1px solid #3a3a3c;c
 </style></head><body>
 <h1>App temporariamente fora do ar</h1>
 <p>Os serviços foram pausados pelo administrador para manutenção. O acesso volta automaticamente assim que for reativado.</p>
-<a href="/acesso">Acesso alternativo</a>
 <script>setTimeout(function(){location.reload()},30000)</script>
 </body></html>`;
 
