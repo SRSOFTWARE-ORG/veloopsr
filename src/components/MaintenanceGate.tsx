@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth, FOUNDER_EMAIL } from "@/contexts/AuthContext";
 import { useMaintenanceMode, canBypass } from "@/hooks/useMaintenanceMode";
 import { allowPwaBypass, clearPwaBypass } from "@/lib/pwa-maintenance";
-import { Wrench, KeyRound, PauseCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Wrench, PauseCircle } from "lucide-react";
 
 /**
  * Bloqueia todo o app quando o modo "fora do ar" está ativo.
@@ -54,12 +53,6 @@ const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
         Os serviços foram pausados pelo administrador para manutenção. Tente novamente em alguns
         instantes — o acesso volta automaticamente assim que for reativado.
       </p>
-      <Button asChild variant="outline" size="sm">
-        <Link to="/acesso">
-          <KeyRound className="w-4 h-4" />
-          Acesso alternativo
-        </Link>
-      </Button>
       {user && (
         <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           Sair
