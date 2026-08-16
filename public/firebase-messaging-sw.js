@@ -17,6 +17,11 @@ const messaging = firebase.messaging();
 const MAINT_CACHE = "veloop-maintenance-state";
 const STATE_KEY = "https://veloop.local/maintenance-state";
 const BYPASS_KEY = "https://veloop.local/maintenance-bypass";
+const MAINT_URL =
+  "https://vajadqjzwveuxzmcywvn.supabase.co/storage/v1/object/public/produto_imagens/app-config/maintenance.json";
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 async function persistMaintenanceState(active) {
   const cache = await caches.open(MAINT_CACHE);
@@ -39,6 +44,40 @@ async function hasMaintenanceBypass() {
   }
   return true;
 }
+
+async function isMaintenanceActive() {
+  try {
+    const response = await fetch(`${MAINT_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("config indisponível");
+    const config = await response.json();
+    const active = config?.manutencao === true;
+    await persistMaintenanceState(active);
+    return active;
+  } catch {
+    const cache = await caches.open(MAINT_CACHE);
+    const hit = await cache.match(STATE_KEY);
+    if (!hit) return false;
+    return (await hit.json()).active === true;
+  }
+}
+
+const MAINT_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Veloop — em manutenção</title><style>:root{color-scheme:dark}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;background:#0b0b0c;color:#f5f5f7}main{max-width:360px}h1{font-size:20px;margin:0 0 14px;font-weight:800}p{font-size:14px;margin:0;color:#a1a1a6;line-height:1.5}</style></head><body><main><h1>App temporariamente fora do ar</h1><p>Os serviços foram pausados pelo administrador para manutenção. O acesso volta automaticamente assim que for reativado.</p></main><script>setTimeout(function(){location.reload()},30000)</script></body></html>`;
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.mode !== "navigate") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/acesso")) return;
+  event.respondWith((async () => {
+    if ((await isMaintenanceActive()) && !(await hasMaintenanceBypass())) {
+      return new Response(MAINT_HTML, {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+    return fetch(request);
+  })());
+});
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {

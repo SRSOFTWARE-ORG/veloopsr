@@ -57,11 +57,21 @@ export const getAppServiceWorkerRegistration = async () => {
 };
 
 export const startAppServiceWorker = () => {
+  let reloading = false;
+  navigator.serviceWorker?.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
     void registerAppServiceWorker()
       .then((registration) => {
         if (!registration) return;
         window.setInterval(() => void registration.update(), 60_000);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") void registration.update();
+        });
       })
       .catch(() => undefined);
   });
