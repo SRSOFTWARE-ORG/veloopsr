@@ -21,10 +21,11 @@ import ProdutosPage from "@/pages/ProdutosPage";
 import ClientesPage from "@/pages/ClientesPage";
 import AgendaPage from "@/pages/AgendaPage";
 import CaixaPage from "@/pages/CaixaPage";
+// Acesso de emergência: sempre embutido no bundle principal (nunca pode falhar)
+import AcessoAlternativoPage from "@/pages/AcessoAlternativoPage";
 
 // Lazy for less-used pages
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const AcessoAlternativoPage = lazy(() => import("@/pages/AcessoAlternativoPage"));
 const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
@@ -157,11 +158,7 @@ const App = () => {
                   {/* Aba alternativa — acessível mesmo com o app fora do ar */}
                   <Route
                     path="/acesso"
-                    element={
-                      <Suspense fallback={<ScreenLoader />}>
-                        <AcessoAlternativoPage />
-                      </Suspense>
-                    }
+                    element={<AcessoAlternativoPage />}
                   />
                   <Route path="*" element={
                   <MaintenanceGate>
