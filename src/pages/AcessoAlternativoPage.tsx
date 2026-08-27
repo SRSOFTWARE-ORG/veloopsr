@@ -35,8 +35,11 @@ const AcessoAlternativoPage = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [working, setWorking] = useState(false);
+  const [reconectando, setReconectando] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
 
   const refresh = async () => setConfig(await readMaintenanceConfig());
+
 
   useEffect(() => {
     void refresh();
