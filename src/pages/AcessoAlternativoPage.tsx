@@ -190,7 +190,13 @@ const AcessoAlternativoPage = () => {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
               Entrar
             </Button>
+            {reconectando && (
+              <p className="text-[11px] text-center text-muted-foreground">
+                Servidor instável — reconectando automaticamente (tentativa {tentativa})…
+              </p>
+            )}
           </form>
+
         ) : liberado ? (
           <div className="space-y-3">
             <div className="rounded-xl border border-border p-4 text-sm">
