@@ -47,37 +47,69 @@ const AcessoAlternativoPage = () => {
   const isFounder = currentEmail === FOUNDER_EMAIL;
   const liberado = isFounder || canBypass(config, currentEmail);
 
+  const finalizeLogin = async (loggedEmail: string) => {
+    const logged = loggedEmail.toLowerCase();
+    const cfg = await readMaintenanceConfig();
+    setConfig(cfg);
+
+    const ok = logged === FOUNDER_EMAIL || canBypass(cfg, logged);
+    void appendMaintenanceAudit({
+      action: "acesso",
+      by: logged || email,
+      at: new Date().toISOString(),
+      detalhe: ok ? "Login pela aba alternativa" : "Tentativa negada na aba alternativa",
+    });
+
+    if (!ok) {
+      await supabase.auth.signOut();
+      toast.error("Este usuário não está liberado durante a manutenção.");
+      return;
+    }
+    toast.success("Acesso liberado — serviços seguem pausados.");
+  };
+
+  const attemptLogin = async () => {
+    const result = await resilientSignIn(email, password, {
+      onAttempt: (n) => setTentativa(n),
+    });
+
+    if (result.ok && result.email) {
+      setReconectando(false);
+      await finalizeLogin(result.email);
+      return true;
+    }
+
+    if (result.backendDown) {
+      setReconectando(true);
+      toast.error(result.error || "Servidor indisponível — tentando novamente…");
+    } else {
+      setReconectando(false);
+      toast.error(result.error || "Não foi possível entrar");
+    }
+    return false;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      const logged = data.user?.email?.toLowerCase() ?? "";
-      const cfg = await readMaintenanceConfig();
-      setConfig(cfg);
-
-      const ok = logged === FOUNDER_EMAIL || canBypass(cfg, logged);
-      await appendMaintenanceAudit({
-        action: "acesso",
-        by: logged || email,
-        at: new Date().toISOString(),
-        detalhe: ok ? "Login pela aba alternativa" : "Tentativa negada na aba alternativa",
-      });
-
-      if (!ok) {
-        await supabase.auth.signOut();
-        toast.error("Este usuário não está liberado durante a manutenção.");
-        return;
-      }
-      toast.success("Acesso liberado — serviços seguem pausados.");
-    } catch (err: any) {
-      toast.error(err?.message || "Não foi possível entrar");
+      await attemptLogin();
     } finally {
       setLoading(false);
     }
   };
+
+  // Enquanto o servidor estiver fora, a aba /acesso continua tentando sozinha.
+  useEffect(() => {
+    if (!reconectando || user) return;
+    const id = window.setInterval(() => {
+      if (!email || !password) return;
+      void attemptLogin();
+    }, 10000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconectando, user, email, password]);
+
 
   const entrarNoApp = () => {
     // Não bloqueia a navegação: o aviso ao service worker é best-effort.
