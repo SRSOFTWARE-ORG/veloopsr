@@ -17,6 +17,8 @@ import {
   type MaintenanceConfig,
 } from "@/hooks/useMaintenanceMode";
 import { allowPwaBypass, clearPwaBypass } from "@/lib/pwa-maintenance";
+import { resilientSignIn } from "@/lib/resilient-auth";
+
 
 /**
  * Aba alternativa de acesso durante o modo "fora do ar".
