@@ -5,6 +5,7 @@ const CONFIG_URL = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/pro
 
 type MaintenanceConfig = {
   manutencao?: boolean;
+  whatsapp_offline?: boolean;
   schedule?: { enabled?: boolean; start?: string; end?: string };
 };
 
@@ -53,4 +54,16 @@ export async function maintenanceGuard(headers: Record<string, string> = {}) {
     JSON.stringify({ paused: true, reason: "Modo fora do ar ativo — serviços pausados" }),
     { status: 503, headers: { ...headers, "Content-Type": "application/json" } },
   );
+}
+
+/** WhatsApp pausado? Fica offline por padrão até ser reativado nas configurações. */
+export async function isWhatsappPaused(): Promise<boolean> {
+  try {
+    const res = await fetch(`${CONFIG_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return true;
+    const cfg = (await res.json()) as MaintenanceConfig;
+    return cfg?.whatsapp_offline !== false;
+  } catch {
+    return true;
+  }
 }

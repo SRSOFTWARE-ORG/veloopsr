@@ -5,7 +5,7 @@ const BUCKET = "produto_imagens";
 const PATH = "app-config/maintenance.json";
 
 export type MaintenanceAudit = {
-  action: "ativado" | "desativado" | "agenda" | "bypass" | "acesso";
+  action: "ativado" | "desativado" | "agenda" | "bypass" | "acesso" | "whatsapp";
   by: string;
   at: string;
   detalhe?: string;
@@ -22,6 +22,8 @@ export type MaintenanceConfig = {
     end: string;
   };
   bypass_emails?: string[];
+  /** Quando true, todos os envios de WhatsApp ficam pausados. */
+  whatsapp_offline?: boolean;
   audit?: MaintenanceAudit[];
 };
 
@@ -30,6 +32,7 @@ export const emptyConfig: MaintenanceConfig = {
   updated_at: new Date(0).toISOString(),
   schedule: { enabled: false, start: "23:00", end: "05:00" },
   bypass_emails: [],
+  whatsapp_offline: true,
   audit: [],
 };
 
@@ -70,6 +73,10 @@ export const isScheduleActive = (config: MaintenanceConfig | null): boolean => {
 /** Estado efetivo: manual OU dentro da janela agendada. */
 export const isMaintenanceActive = (config: MaintenanceConfig | null): boolean =>
   Boolean(config?.manutencao) || isScheduleActive(config);
+
+/** WhatsApp fica offline até ser explicitamente reativado nas configurações. */
+export const isWhatsappOffline = (config: MaintenanceConfig | null): boolean =>
+  config?.whatsapp_offline !== false;
 
 export const canBypass = (config: MaintenanceConfig | null, email?: string | null) => {
   if (!email) return false;
