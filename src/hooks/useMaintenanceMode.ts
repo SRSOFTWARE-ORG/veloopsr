@@ -84,16 +84,43 @@ export const canBypass = (config: MaintenanceConfig | null, email?: string | nul
   return list.includes(email.trim().toLowerCase());
 };
 
-export const readMaintenanceConfig = async (): Promise<MaintenanceConfig> => {
+const CACHE_KEY = "veloop.maintenance.cache";
+
+const readCache = (): MaintenanceConfig => {
   try {
-    const res = await fetch(`${publicUrl()}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return emptyConfig;
-    const json = (await res.json()) as MaintenanceConfig;
-    return { ...emptyConfig, ...json };
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? { ...emptyConfig, ...(JSON.parse(raw) as MaintenanceConfig) } : emptyConfig;
   } catch {
     return emptyConfig;
   }
 };
+
+export const readMaintenanceConfig = async (): Promise<MaintenanceConfig> => {
+  try {
+    // Timeout curto: o backend pode estar lento/reiniciando e não podemos travar a UI.
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${publicUrl()}?t=${Date.now()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    window.clearTimeout(timer);
+    // 5xx/timeout do storage não deve ser tratado como "config vazia":
+    // mantemos o último estado conhecido para não oscilar o app.
+    if (!res.ok) return res.status >= 500 ? readCache() : emptyConfig;
+    const json = (await res.json()) as MaintenanceConfig;
+    const config = { ...emptyConfig, ...json };
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(config));
+    } catch {
+      // storage local indisponível — segue sem cache
+    }
+    return config;
+  } catch {
+    return readCache();
+  }
+};
+
 
 export const readMaintenance = async (): Promise<boolean> =>
   isMaintenanceActive(await readMaintenanceConfig());
