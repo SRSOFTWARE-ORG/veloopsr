@@ -37,6 +37,7 @@ import PermissionsManager from "@/components/PermissionsManager";
 import AISearchBar from "@/components/configuracoes/AISearchBar";
 import IntegrationStatusPanel from "@/components/configuracoes/IntegrationStatusPanel";
 import ModoForaDoArCard from "@/components/configuracoes/ModoForaDoArCard";
+import WhatsAppSwitchCard from "@/components/configuracoes/WhatsAppSwitchCard";
 
 
 interface UserWithPermissions {
@@ -223,6 +224,10 @@ const ConfiguracoesPage = () => {
           <ModoForaDoArCard />
         </div>
       )}
+
+      <div className="mb-6">
+        <WhatsAppSwitchCard />
+      </div>
 
 
       <div className="mb-6 slide-up flex items-center justify-between">

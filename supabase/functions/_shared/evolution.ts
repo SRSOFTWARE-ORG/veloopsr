@@ -119,6 +119,10 @@ export function normalizeBrPhone(phone: string): string {
 
 export type EvoResult = { ok: boolean; status: number; data?: any; error?: string };
 
+import { isWhatsappPaused } from "./maintenance.ts";
+
+export const WHATSAPP_PAUSED_ERROR = "WhatsApp desativado nas configurações do app";
+
 async function _getReadyCfg(): Promise<{ url: string; key: string; instance: string } | { error: string }> {
   const { url, key } = _baseCfg();
   if (!url || !key) return { error: "Evolution API não configurada (EVOLUTION_API_URL/KEY)" };
@@ -129,6 +133,7 @@ async function _getReadyCfg(): Promise<{ url: string; key: string; instance: str
 }
 
 export async function evoSendText(phone: string, text: string): Promise<EvoResult> {
+  if (await isWhatsappPaused()) return { ok: false, status: 423, error: WHATSAPP_PAUSED_ERROR };
   const cfg = await _getReadyCfg();
   if ("error" in cfg) return { ok: false, status: 403, error: cfg.error };
   try {
@@ -155,6 +160,7 @@ export async function evoSendMedia(opts: {
   caption?: string;
   mimetype?: string;
 }): Promise<EvoResult> {
+  if (await isWhatsappPaused()) return { ok: false, status: 423, error: WHATSAPP_PAUSED_ERROR };
   const cfg = await _getReadyCfg();
   if ("error" in cfg) return { ok: false, status: 403, error: cfg.error };
   try {
@@ -181,6 +187,7 @@ export async function evoSendMedia(opts: {
 }
 
 export async function evoSendAudio(phone: string, audioBase64OrUrl: string): Promise<EvoResult> {
+  if (await isWhatsappPaused()) return { ok: false, status: 423, error: WHATSAPP_PAUSED_ERROR };
   const cfg = await _getReadyCfg();
   if ("error" in cfg) return { ok: false, status: 403, error: cfg.error };
   try {
