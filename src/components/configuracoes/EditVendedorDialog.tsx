@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, Eye, EyeOff } from "lucide-react";
+import { Save, Eye, EyeOff, Camera } from "lucide-react";
+import { UserAvatar, uploadAvatar } from "./UserAvatar";
 
 interface EditVendedorDialogProps {
   vendedor: { id: string; nome: string; email?: string } | null;
@@ -25,6 +26,23 @@ const EditVendedorDialog = ({ vendedor, open, onOpenChange, onSaved }: EditVende
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState<number | undefined>(undefined);
+
+  const handlePhoto = async (file?: File) => {
+    if (!vendedor || !file) return;
+    setUploading(true);
+    try {
+      await uploadAvatar(vendedor.id, file);
+      setAvatarVersion(Date.now());
+      toast.success("Foto atualizada!");
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar foto");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (vendedor) {
@@ -75,6 +93,22 @@ const EditVendedorDialog = ({ vendedor, open, onOpenChange, onSaved }: EditVende
           <DialogTitle>Editar Vendedor</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          {vendedor && (
+            <div className="flex flex-col items-center gap-2">
+              <UserAvatar userId={vendedor.id} nome={vendedor.nome} version={avatarVersion} className="w-20 h-20 text-2xl" />
+              <label className="inline-flex items-center gap-1.5 text-sm text-primary font-medium cursor-pointer">
+                <Camera className="w-4 h-4" />
+                {uploading ? "Enviando..." : "Alterar foto"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(e) => { void handlePhoto(e.target.files?.[0]); e.target.value = ""; }}
+                />
+              </label>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Nome</Label>
             <Input

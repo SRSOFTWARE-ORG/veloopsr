@@ -71,23 +71,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Reassign vendas, assistencias, cobrancas, saidas to the admin before deleting
-    await supabaseAdmin.from("vendas").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);
-    await supabaseAdmin.from("assistencias").update({ vendedor_id: caller.id }).eq("vendedor_id", user_id);
-    await supabaseAdmin.from("cobrancas").update({ criado_por: caller.id }).eq("criado_por", user_id);
-    await supabaseAdmin.from("saidas_caixa").update({ responsavel_id: caller.id }).eq("responsavel_id", user_id);
-    await supabaseAdmin.from("saidas_caixa").update({ registrado_por: caller.id }).eq("registrado_por", user_id);
+    // Reatribui ao admin que está excluindo TODOS os registros que apontam para o usuário.
+    // Sem isso o banco recusa a exclusão ("Database error deleting user").
+    const reassign: Array<[string, string]> = [
+      ["vendas", "vendedor_id"],
+      ["assistencias", "vendedor_id"],
+      ["cobrancas", "criado_por"],
+      ["saidas_caixa", "responsavel_id"],
+      ["saidas_caixa", "registrado_por"],
+      ["clientes", "criado_por"],
+      ["documentos", "uploaded_by"],
+      ["estoque_movimentacao", "usuario_id"],
+      ["produtos", "atualizado_por"],
+      ["checklist_entrega", "verificado_por"],
+      ["audit_log", "user_id"],
+      ["comunicados", "criado_por"],
+      ["cobranca_sub_parcelas", "criado_por"],
+      ["cobranca_pagamentos", "pago_por"],
+    ];
+    for (const [table, col] of reassign) {
+      const { error } = await supabaseAdmin.from(table).update({ [col]: caller.id }).eq(col, user_id);
+      if (error) console.warn(`reassign ${table}.${col}:`, error.message);
+    }
 
-    // Delete related data
-    await supabaseAdmin.from("permissions").delete().eq("user_id", user_id);
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
-    await supabaseAdmin.from("profiles").delete().eq("id", user_id);
+    // Remove dados pessoais do usuário
+    for (const [table, col] of [
+      ["permissions", "user_id"],
+      ["user_roles", "user_id"],
+      ["notificacoes", "user_id"],
+      ["push_subscriptions", "user_id"],
+      ["calendar_sync", "user_id"],
+      ["google_calendar_tokens", "user_id"],
+      ["profiles", "id"],
+    ] as const) {
+      const { error } = await supabaseAdmin.from(table).delete().eq(col, user_id);
+      if (error) console.warn(`delete ${table}:`, error.message);
+    }
+    await supabaseAdmin.storage.from("produto_imagens").remove([`avatars/${user_id}.jpg`]);
 
     // Delete the auth user
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
 
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
+      console.error("deleteUser failed:", deleteError.message);
+      return new Response(JSON.stringify({ error: `Não foi possível excluir: ${deleteError.message}` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

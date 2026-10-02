@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UserAvatar } from "@/components/configuracoes/UserAvatar";
 import EditVendedorDialog from "@/components/configuracoes/EditVendedorDialog";
 import PermissionsManager from "@/components/PermissionsManager";
 import AISearchBar from "@/components/configuracoes/AISearchBar";
@@ -70,6 +71,7 @@ const ConfiguracoesPage = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState<number | undefined>(undefined);
   const isPreviewEnvironment = typeof window !== "undefined" && window.location.hostname.includes("lovableproject.com");
 
   const fetchUsers = async () => {
@@ -169,7 +171,12 @@ const ConfiguracoesPage = () => {
         body: { user_id: deleteUserId },
       });
       if (res.error || res.data?.error) {
-        toast.error(res.data?.error || res.error?.message || "Erro ao excluir");
+        let msg = res.data?.error as string | undefined;
+        const ctx = (res.error as { context?: Response } | null)?.context;
+        if (!msg && ctx && typeof ctx.json === "function") {
+          try { msg = (await ctx.json())?.error; } catch { /* corpo não-JSON */ }
+        }
+        toast.error(msg || "Erro ao excluir");
       } else {
         toast.success("Vendedor excluído com sucesso!");
         fetchUsers();
@@ -277,9 +284,7 @@ const ConfiguracoesPage = () => {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center justify-between text-base">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                    {u.nome.charAt(0).toUpperCase()}
-                  </div>
+                  <UserAvatar userId={u.id} nome={u.nome} version={avatarVersion} className="w-10 h-10" />
                   <div>
                     <span className="block">{u.nome}</span>
                     {u.email === FOUNDER_EMAIL && (
@@ -418,7 +423,7 @@ const ConfiguracoesPage = () => {
         </div>
       </details>
 
-      <EditVendedorDialog vendedor={editVendedor} open={editDialogOpen} onOpenChange={setEditDialogOpen} onSaved={fetchUsers} />
+      <EditVendedorDialog vendedor={editVendedor} open={editDialogOpen} onOpenChange={setEditDialogOpen} onSaved={() => { setAvatarVersion(Date.now()); void fetchUsers(); }} />
 
       <AlertDialog open={!!deleteUserId} onOpenChange={(o) => !o && setDeleteUserId(null)}>
         <AlertDialogContent>
