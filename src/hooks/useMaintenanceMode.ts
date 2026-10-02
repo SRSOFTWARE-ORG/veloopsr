@@ -130,13 +130,26 @@ export const writeMaintenanceConfig = async (config: MaintenanceConfig) => {
     type: "application/json",
   });
 
-  const { error } = await supabase.storage.from(BUCKET).upload(PATH, body, {
-    upsert: true,
-    contentType: "application/json",
-    cacheControl: "0",
-  });
-
-  if (error) throw error;
+  // O servidor pode oscilar logo após reiniciar (ex.: "Internal Server Error").
+  // Tentamos até 4 vezes com espera crescente antes de mostrar erro ao usuário.
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { error } = await supabase.storage.from(BUCKET).upload(PATH, body, {
+      upsert: true,
+      contentType: "application/json",
+      cacheControl: "0",
+    });
+    if (!error) return;
+    lastError = error;
+    const msg = String((error as { message?: string }).message ?? "");
+    const transient = /internal server error|timeout|fetch|network|50\d|gateway/i.test(msg);
+    if (!transient) break;
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+  }
+  throw new Error(
+    "Servidor instável — não foi possível salvar agora. Tente novamente em instantes.",
+    { cause: lastError },
+  );
 };
 
 /** Grava mantendo histórico de auditoria (últimos 100 registros). */
