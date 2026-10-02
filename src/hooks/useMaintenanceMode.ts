@@ -146,10 +146,8 @@ export const writeMaintenanceConfig = async (config: MaintenanceConfig) => {
     if (!transient) break;
     await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
   }
-  throw new Error(
-    "Servidor instável — não foi possível salvar agora. Tente novamente em instantes.",
-    { cause: lastError },
-  );
+  console.error("Falha ao salvar modo fora do ar:", lastError);
+  throw new Error("Servidor instável — não foi possível salvar agora. Tente novamente em instantes.");
 };
 
 /** Grava mantendo histórico de auditoria (últimos 100 registros). */
