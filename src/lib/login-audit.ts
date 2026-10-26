@@ -16,7 +16,10 @@ export const readLoginDiagnostics = (): LoginDiagnostic[] => {
     if (!Array.isArray(data)) return [];
     return data.slice(-100).flatMap(entry => {
       const parsed = diagnosticSchema.safeParse(entry);
-      return parsed.success ? [parsed.data] : [];
+      if (!parsed.success) return [];
+      const { id, at, outcome, attempts, path } = parsed.data;
+      if (!id || !at || !outcome || attempts === undefined || !path) return [];
+      return [{ id, at, outcome, attempts, path }];
     });
   } catch { return []; }
 };
