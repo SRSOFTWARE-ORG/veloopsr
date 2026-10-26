@@ -1,3 +1,3 @@
-- [ ] Corrigir tentativas de login e travamentos de sessão.
-- [ ] Registrar diagnósticos de login sem credenciais e testar regressões.
+- [x] Corrigir tentativas de login e travamentos de sessão.
+- [x] Registrar diagnósticos de login sem credenciais e testar regressões (8 testes passaram; falha real verificada na tela).
 - [ ] Verificar login autenticado após reativação Cloud (bloqueado por saldo Cloud insuficiente).
