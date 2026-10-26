@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ const AcessoAlternativoPage = () => {
   const [working, setWorking] = useState(false);
   const [reconectando, setReconectando] = useState(false);
   const [tentativa, setTentativa] = useState(0);
+  const loginInFlight = useRef(false);
 
   const refresh = async () => setConfig(await readMaintenanceConfig());
 
@@ -74,7 +75,11 @@ const AcessoAlternativoPage = () => {
   };
 
   const attemptLogin = async () => {
+    if (loginInFlight.current) return false;
+    loginInFlight.current = true;
+    try {
     const result = await resilientSignIn(email, password, {
+      attempts: 2,
       onAttempt: (n) => setTentativa(n),
     });
 
@@ -92,6 +97,7 @@ const AcessoAlternativoPage = () => {
       toast.error(result.error || "Não foi possível entrar");
     }
     return false;
+    } finally { loginInFlight.current = false; }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
