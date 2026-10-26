@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Lock, Mail, User, Eye, EyeOff, Phone } from "lucide-react";
 import { maskPhone } from "@/lib/masks";
 import veloopLogo from "@/assets/veloop-logo-transparent.png";
+import { resilientSignIn } from "@/lib/resilient-auth";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,6 +18,7 @@ const LoginPage = () => {
   const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [manterLogado, setManterLogado] = useState(() => {
     return localStorage.getItem("veloop_manter_logado") === "true";
   });
@@ -24,6 +26,7 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginError(null);
 
     try {
       if (isForgotPassword) {
@@ -35,8 +38,11 @@ const LoginPage = () => {
         setIsForgotPassword(false);
       } else if (isLogin) {
         localStorage.setItem("veloop_manter_logado", manterLogado.toString());
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const result = await resilientSignIn(email, password, { attempts: 2, timeoutMs: 8000 });
+        if (!result.ok) {
+          setLoginError(result.error || "Não foi possível entrar.");
+          return;
+        }
         toast.success("Login realizado com sucesso!");
       } else {
         const rawPhone = telefone.replace(/\D/g, "");
@@ -82,7 +88,8 @@ const LoginPage = () => {
             {isForgotPassword ? "Esqueci a Senha" : isLogin ? "Entrar" : "Criar Conta"}
           </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+           <form onSubmit={handleSubmit} className="space-y-4">
+            {loginError && <p role="alert" className="text-sm text-destructive">{loginError}</p>}
             {isForgotPassword && (
               <p className="text-sm text-muted-foreground">
                 Informe seu email. O administrador será notificado e poderá redefinir sua senha.

@@ -158,7 +158,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === "INITIAL_SESSION") {
         initialSessionHandledRef.current = true;
       }
-      void syncSession(nextSession);
+      // Release the SDK auth lock before any profile/role requests.
+      window.setTimeout(() => void syncSession(nextSession), 0);
     });
 
     void supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
