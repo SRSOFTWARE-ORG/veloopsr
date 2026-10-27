@@ -318,7 +318,7 @@ function sanitizeFields(table: string, fields: Record<string, any>): Record<stri
   return clean;
 }
 
-async function executeAction(sb: any, action: string, args: any): Promise<string> {
+async function executeAction(sb: any, action: string, args: any, actorId: string): Promise<string> {
   switch (action) {
     case "update_payment_status": {
       const update: any = { status: args.status };
@@ -364,7 +364,8 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       return `✅ Venda atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_sale": {
-      await sb.from("venda_itens").delete().eq("venda_id", args.sale_id);
+      const { error: itemsError } = await sb.from("venda_itens").delete().eq("venda_id", args.sale_id);
+      if (itemsError) throw itemsError;
       const { error } = await sb.from("vendas").delete().eq("id", args.sale_id);
       if (error) throw error;
       return `✅ Venda e seus itens excluídos permanentemente`;
@@ -377,7 +378,8 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       return `✅ Cobrança atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_cobranca": {
-      await sb.from("cobranca_pagamentos").delete().eq("cobranca_id", args.cobranca_id);
+      const { error: paymentsError } = await sb.from("cobranca_pagamentos").delete().eq("cobranca_id", args.cobranca_id);
+      if (paymentsError) throw paymentsError;
       const { error } = await sb.from("cobrancas").delete().eq("id", args.cobranca_id);
       if (error) throw error;
       return `✅ Cobrança e seus pagamentos excluídos permanentemente`;
@@ -494,10 +496,6 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       return `📋 **Histórico** (últimos ${dias} dias):\n${lines.join("\n")}`;
     }
     case "create_cobranca": {
-      const { data: adminRoles } = await sb.from("user_roles").select("user_id").eq("role", "admin").limit(1);
-      const adminId = adminRoles?.[0]?.user_id;
-      if (!adminId) return "❌ Nenhum admin encontrado";
-
       const { data: newCob, error } = await sb.from("cobrancas").insert({
         cliente_id: args.cliente_id,
         cliente_nome: args.cliente_nome,
@@ -506,7 +504,7 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
         data_fim: args.data_fim,
         frequencia: args.frequencia || "mes",
         observacoes: args.observacoes || null,
-        criado_por: adminId,
+        criado_por: actorId,
       }).select().single();
       if (error) throw error;
 
@@ -524,7 +522,13 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
         else if (args.frequencia === "quinzena") current = new Date(current.getTime() + 15 * 86400000);
         else current.setUTCMonth(current.getUTCMonth() + 1);
       }
-      if (payments.length > 0) await sb.from("cobranca_pagamentos").insert(payments);
+      if (payments.length > 0) {
+        const { error: paymentsError } = await sb.from("cobranca_pagamentos").insert(payments);
+        if (paymentsError) {
+          await sb.from("cobrancas").delete().eq("id", newCob.id);
+          throw paymentsError;
+        }
+      }
       return `✅ Cobrança criada para ${args.cliente_nome} com ${payments.length} parcelas de R$ ${args.valor_parcela}`;
     }
     case "delete_dispositivo": {
@@ -546,25 +550,53 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
 
 
 async function _verifyAuth(req: Request) {
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) return null;
-  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
-  });
-  if (!r.ok) return null;
-  return await r.json();
+  const authorization = req.headers.get("Authorization") || "";
+  const match = /^Bearer\s+([^\s]+)$/i.exec(authorization);
+  if (!match) return null;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return null;
+  try {
+    const r = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${match[1]}`, apikey: anonKey },
+    });
+    if (!r.ok) return null;
+    const user = await r.json();
+    return typeof user?.id === "string" ? user : null;
+  } catch {
+    return null;
+  }
 }
 async function _isAdmin(userId: string): Promise<boolean> {
-  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=id`, {
-    headers: { apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}` },
-  });
-  if (!r.ok) return false;
-  const d = await r.json();
-  return Array.isArray(d) && d.length > 0;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return false;
+  const params = new URLSearchParams({ user_id: `eq.${userId}`, role: "eq.admin", select: "id", limit: "1" });
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/user_roles?${params.toString()}`, {
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    return Array.isArray(d) && d.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
+  const declaredLength = Number(req.headers.get("content-length") || "0");
+  if (Number.isFinite(declaredLength) && declaredLength > 64 * 1024) {
+    return new Response(JSON.stringify({ error: "Requisição muito grande." }), {
+      status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const _user = await _verifyAuth(req);
   if (!_user?.id) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   if (!(await _isAdmin(_user.id))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -577,12 +609,37 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { query, type, confirm_action, history } = await req.json();
+    let requestBody: any;
+    try {
+      requestBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Corpo JSON inválido." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { query, type, confirm_action, history } = requestBody ?? {};
 
-    // Execute confirmed action
-    if (confirm_action) {
-      const { action, args } = confirm_action;
-      const result = await executeAction(sb, action, args);
+    if (confirm_action !== undefined && confirm_action !== null) {
+      const action = confirm_action?.action;
+      const args = confirm_action?.args;
+      const tool = actionTools.find((item: any) => item.function.name === action);
+      if (!tool || !args || typeof args !== "object" || Array.isArray(args)) {
+        return new Response(JSON.stringify({ error: "Ação de confirmação inválida." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const required = tool.function.parameters.required || [];
+      if (required.some((key: string) => args[key] === undefined || args[key] === null || args[key] === "")) {
+        return new Response(JSON.stringify({ error: "A ação está incompleta; revise os dados antes de confirmar." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (JSON.stringify(args).length > 16 * 1024) {
+        return new Response(JSON.stringify({ error: "Parâmetros da ação excedem o limite permitido." }), {
+          status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const result = await executeAction(sb, action, args, _user.id);
       return new Response(JSON.stringify({ response: result, action_executed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -676,13 +733,29 @@ REGRAS:
     // Build messages with history
     const aiMessages: any[] = [{ role: "system", content: systemPrompt }];
 
-    // Add conversation history
-    if (history && Array.isArray(history)) {
+    // Client-supplied history is untrusted: do not allow system/developer role injection.
+    if (history !== undefined && !Array.isArray(history)) {
+      return new Response(JSON.stringify({ error: "Histórico de conversa inválido." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (Array.isArray(history)) {
       for (const msg of history.slice(-8)) {
-        aiMessages.push({ role: msg.role, content: msg.content });
+        if (msg && (msg.role === "user" || msg.role === "assistant") &&
+            typeof msg.content === "string" && msg.content.length <= 4000) {
+          aiMessages.push({ role: msg.role, content: msg.content });
+        }
+      }
+      if (typeof query === "string" && query.trim() && query.length <= 4000) {
+        aiMessages.push({ role: "user", content: query.trim() });
       }
     } else {
-      aiMessages.push({ role: "user", content: query });
+      if (typeof query !== "string" || !query.trim() || query.length > 4000) {
+        return new Response(JSON.stringify({ error: "Consulta inválida ou excede o limite de tamanho." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      aiMessages.push({ role: "user", content: query.trim() });
     }
 
     const body: any = {
