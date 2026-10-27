@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     }
 
     const paymentId = body.data?.id;
-    if (!paymentId || !/^\\d{1,30}$/.test(String(paymentId))) {
+    if (!paymentId || !/^[0-9]{1,30}$/.test(String(paymentId))) {
       return new Response(JSON.stringify({ error: "No payment ID" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
