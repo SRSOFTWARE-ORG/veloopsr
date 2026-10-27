@@ -95,6 +95,14 @@ BEGIN
     RAISE EXCEPTION 'A signed contract status cannot be changed'
       USING ERRCODE = '42501';
   END IF;
+  IF NEW.status = 'assinado' AND OLD.status IS DISTINCT FROM 'assinado' AND NOT (
+    EXISTS (SELECT 1 FROM public.sale_contract_signatures s WHERE s.contract_id = OLD.id AND s.signer_role = 'vendedor')
+    AND EXISTS (SELECT 1 FROM public.sale_contract_signatures s WHERE s.contract_id = OLD.id AND s.signer_role = 'comprador')
+  ) THEN
+    RAISE EXCEPTION 'Both seller and buyer signatures are required to finalize a contract'
+      USING ERRCODE = '42501';
+  END IF;
+
   IF OLD.status = 'assinado' OR EXISTS (
     SELECT 1 FROM public.sale_contract_signatures s WHERE s.contract_id = OLD.id
   ) THEN
