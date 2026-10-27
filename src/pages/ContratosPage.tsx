@@ -22,7 +22,7 @@ type Contract = {
   id: string; venda_id: string; status: string; contract_data: Record<string, unknown>;
   document_html: string; document_sha256: string; created_at: string; signed_at: string | null;
 };
-type Signature = { id: string; contract_id: string; signer_role: string; signer_name: string; signed_at: string; };
+type Signature = { id: string; contract_id: string; signer_role: string; signer_name: string; signed_at: string; signature_image_data?: string; document_sha256?: string; };
 type SaleItem = { nome: string; quantidade: number; preco_unitario: number; subtotal: number; };
 const money = (v: unknown) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
 const dateBR = (v: string | null | undefined) => v ? new Date(v.length === 10 ? v + "T12:00:00" : v).toLocaleDateString("pt-BR") : "Não informado";
@@ -62,6 +62,19 @@ function buildContractHtml(sale: Sale, items: SaleItem[], sellerName: string, cu
 <h2>17. CHECKLIST DE DOCUMENTOS</h2><p>□ Documento de identificação conferido &nbsp; □ Comprovante de endereço, se necessário &nbsp; □ Comprovante da entrada &nbsp; □ Recibo de entrega &nbsp; □ Registro do IMEI &nbsp; □ Via do contrato entregue ao comprador.</p>
 <p><b>Ciência expressa:</b> declaro que tive oportunidade de ler o contrato principal e o anexo, compreendi as datas e valores de pagamento, multa máxima de 2% por parcela vencida, juros de mora aplicáveis, medidas de cobrança legalmente possíveis e limites legais relativos à reserva de domínio, rastreamento e bloqueio. Pude esclarecer dúvidas antes de assinar e receberei uma via dos documentos.</p>
 <div class="footer">SR SOFTWARE • Documento gerado pelo Veloop. CNPJ informado no modelo: 64.909.239/0001-61 — confirmar dados cadastrais e revisar juridicamente antes do uso. Este modelo não substitui revisão jurídica individualizada.</div></body></html>`;
+}
+
+function withSignatureEvidence(html: string, signatures: Signature[], hash: string) {
+  if (!signatures.length) return html;
+  const roleLabels: Record<string, string> = { vendedor: "Vendedor", comprador: "Comprador", testemunha_1: "Testemunha 1", testemunha_2: "Testemunha 2" };
+  const rows = signatures.map((s) => {
+    const safeImage = s.signature_image_data && /^data:image\\/png;base64,[A-Za-z0-9+/=]+$/.test(s.signature_image_data)
+      ? `<img alt="Assinatura de ${esc(s.signer_name)}" src="${s.signature_image_data}" style="display:block;max-width:260px;max-height:90px;margin:8px auto;object-fit:contain">`
+      : "<p>Assinatura manuscrita digital não disponível</p>";
+    return `<div style="border:1px solid #bbb;border-radius:6px;padding:12px;margin:12px 0;text-align:center"><b>${esc(roleLabels[s.signer_role] || s.signer_role)}</b>${safeImage}<div>${esc(s.signer_name)}</div><small>Registrado em ${esc(new Date(s.signed_at).toLocaleString("pt-BR"))}</small></div>`;
+  }).join("");
+  const evidence = `<section class="pagebreak"><h2>REGISTRO DE ASSINATURAS ELETRÔNICAS</h2><p>As evidências abaixo foram registradas no Veloop e vinculadas ao conteúdo contratual identificado pelo hash SHA-256:</p><p style="word-break:break-all;font-family:monospace;font-size:8pt">${esc(hash)}</p>${rows}<p class="small">O registro identifica o usuário autenticado que submeteu cada evidência. A modalidade é assinatura eletrônica simples e não equivale, por si só, a certificado ICP-Brasil ou a verificação independente da identidade civil.</p></section>`;
+  return html.replace("</body>", `${evidence}</body>`);
 }
 
 function SignaturePad({ onChange }: { onChange: (data: string) => void }) {
@@ -162,7 +175,7 @@ export default function ContratosPage() {
 
   const openContract = async (contract: Contract) => {
     setSelectedContract(contract);
-    const { data } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",contract.id).order("signed_at");
+    const { data } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at,signature_image_data,document_sha256").eq("contract_id",contract.id).order("signed_at");
     setSignatures((data || []) as Signature[]);
   };
 
@@ -180,7 +193,7 @@ export default function ContratosPage() {
         user_agent:navigator.userAgent.slice(0,500),
       });
       if (error) throw error;
-      const { data: sigData } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",selectedContract.id).order("signed_at");
+      const { data: sigData } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at,signature_image_data,document_sha256").eq("contract_id",selectedContract.id).order("signed_at");
       const next = (sigData || []) as Signature[]; setSignatures(next);
       const roles = new Set(next.map(s=>s.signer_role));
       if (roles.has("vendedor") && roles.has("comprador")) {
@@ -222,7 +235,7 @@ export default function ContratosPage() {
     </div>
     {selectedContract && <Card><CardHeader><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-base">Contrato selecionado</CardTitle><p className="text-xs text-muted-foreground mt-1">SHA-256: <span className="break-all">{selectedContract.document_sha256}</span></p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={printContract}><Printer className="h-4 w-4 mr-2"/>Imprimir / salvar PDF</Button><Button onClick={()=>{setSignRole(signatures.some(s=>s.signer_role==="comprador")?"vendedor":"comprador");setSignerName(signatures.some(s=>s.signer_role==="comprador")?sellerName:(selectedSaleForContract?.cliente_nome||""));setSignOpen(true);}} disabled={selectedContract.status==="assinado"||selectedContract.status==="cancelado"}><PenLine className="h-4 w-4 mr-2"/>Assinar eletronicamente</Button></div></div></CardHeader><CardContent className="space-y-4">
       <div className="flex flex-wrap gap-2">{signatures.map(s=><Badge key={s.id} variant="outline">{s.signer_role.replace("_"," ")}: {s.signer_name} · {dateBR(s.signed_at)}</Badge>)}</div>
-      <div className="rounded-lg border overflow-hidden bg-white"><iframe ref={frameRef} title="Prévia do contrato de venda" srcDoc={selectedContract.document_html} sandbox="" className="w-full h-[70vh] bg-white"/></div>
+      <div className="rounded-lg border overflow-hidden bg-white"><iframe ref={frameRef} title="Prévia do contrato de venda" srcDoc={withSignatureEvidence(selectedContract.document_html, signatures, selectedContract.document_sha256)} sandbox="allow-modals" className="w-full h-[70vh] bg-white"/></div>
       <div className="text-xs text-muted-foreground flex items-start gap-2"><ShieldCheck className="h-4 w-4 shrink-0"/><span>O sistema registra o aceite, o desenho da assinatura, a data/hora, o usuário autenticado e o hash SHA-256 do documento. A assinatura eletrônica simples não equivale automaticamente a certificado ICP-Brasil nem substitui análise jurídica.</span></div>
     </CardContent></Card>}
     <Dialog open={signOpen} onOpenChange={setSignOpen}><DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Registrar assinatura eletrônica</DialogTitle></DialogHeader><div className="space-y-4"><div className="rounded-md bg-muted/50 p-3 text-sm">Documento SHA-256: <span className="font-mono break-all">{selectedContract?.document_sha256}</span></div><div className="space-y-2"><Label>Quem está assinando?</Label><Select value={signRole} onValueChange={v=>setSignRole(v as typeof signRole)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="comprador" disabled={signatures.some(s=>s.signer_role==="comprador")}>Comprador</SelectItem><SelectItem value="vendedor" disabled={signatures.some(s=>s.signer_role==="vendedor")}>Vendedor</SelectItem><SelectItem value="testemunha_1" disabled={signatures.some(s=>s.signer_role==="testemunha_1")}>Testemunha 1</SelectItem><SelectItem value="testemunha_2" disabled={signatures.some(s=>s.signer_role==="testemunha_2")}>Testemunha 2</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Nome completo</Label><Input value={signerName} onChange={e=>setSignerName(e.target.value)} maxLength={180}/></div><div className="space-y-2"><Label>CPF/RG (opcional)</Label><Input value={signerDocument} onChange={e=>setSignerDocument(e.target.value)} maxLength={40}/></div><div className="space-y-2"><Label>Desenhe a assinatura na área abaixo</Label><SignaturePad onChange={setSignatureData}/></div><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} className="mt-1"/><span>Confirmo que tive oportunidade de ler o documento exibido, compreendi seu conteúdo e concordo em registrar esta assinatura eletrônica vinculada ao hash acima.</span></label></div><DialogFooter><Button variant="outline" onClick={()=>setSignOpen(false)}>Cancelar</Button><Button onClick={()=>void saveSignature()} disabled={saving||!consent||!signatureData||!signerName.trim()}>{saving?<Loader2 className="h-4 w-4 mr-2 animate-spin"/>:<PenLine className="h-4 w-4 mr-2"/>}Registrar assinatura</Button></DialogFooter></DialogContent></Dialog>
