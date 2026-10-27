@@ -311,7 +311,7 @@ function base64UrlEncode(value: string): string {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function base64UrlDecode(value: string): string {
@@ -327,7 +327,7 @@ async function signActionPayload(payload: Record<string, unknown>, secret: strin
   const bytes = new Uint8Array(signature);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const encodedSignature = btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  const encodedSignature = btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   return encodedPayload + "." + encodedSignature;
 }
 
