@@ -10,6 +10,7 @@ interface PendingAction {
   action: string;
   args: any;
   description: string;
+  confirmation_token: string;
 }
 
 interface ChatMessage {
@@ -69,7 +70,7 @@ const AISearchBar = () => {
     setExecuting(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { confirm_action: { action: pendingAction.action, args: pendingAction.args } },
+        body: { confirm_action: { action: pendingAction.action, args: pendingAction.args, confirmation_token: pendingAction.confirmation_token } },
       });
       if (error) throw error;
       if (data?.error) {
