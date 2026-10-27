@@ -91,6 +91,10 @@ BEGIN
     END IF;
     RETURN OLD;
   END IF;
+  IF OLD.status = 'assinado' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    RAISE EXCEPTION 'A signed contract status cannot be changed'
+      USING ERRCODE = '42501';
+  END IF;
   IF OLD.status = 'assinado' OR EXISTS (
     SELECT 1 FROM public.sale_contract_signatures s WHERE s.contract_id = OLD.id
   ) THEN
@@ -99,8 +103,9 @@ BEGIN
        OR NEW.contract_data IS DISTINCT FROM OLD.contract_data
        OR NEW.venda_id IS DISTINCT FROM OLD.venda_id
        OR NEW.vendedor_id IS DISTINCT FROM OLD.vendedor_id
-       OR NEW.template_version IS DISTINCT FROM OLD.template_version THEN
-      RAISE EXCEPTION 'Signed contract content is immutable'
+       OR NEW.template_version IS DISTINCT FROM OLD.template_version
+       OR NEW.status = 'cancelado' THEN
+      RAISE EXCEPTION 'Signed contract content and status are protected'
         USING ERRCODE = '42501';
     END IF;
   END IF;
