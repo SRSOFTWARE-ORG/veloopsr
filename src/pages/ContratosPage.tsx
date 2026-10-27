@@ -130,6 +130,7 @@ export default function ContratosPage() {
     const { data: saleData, error: saleError } = await supabase.from("vendas").select("id,cliente_nome,cliente_telefone,cliente_cpf,valor_total,valor_entrada,num_parcelas,valor_parcela,status,created_at,vendedor_id,forma_pagamento,frequencia_parcela,data_inicio_pagamento,observacoes").order("created_at",{ascending:false}).limit(200);
     if (saleError) toast.error("Não foi possível carregar as vendas");
     setSales((saleData || []) as Sale[]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
     const { data: contractData, error: contractError } = await (supabase as any).from("sale_contracts").select("id,venda_id,status,contract_data,document_html,document_sha256,created_at,signed_at").order("created_at",{ascending:false}).limit(200);
     if (contractError && !/sale_contracts/i.test(contractError.message)) toast.error("Não foi possível carregar os contratos");
     setContracts((contractData || []) as Contract[]);
@@ -147,6 +148,7 @@ export default function ContratosPage() {
       supabase.from("profiles").select("nome").eq("id",sale.vendedor_id).maybeSingle(),
     ]);
     setCustomer(customerResult.data as Record<string, unknown> | null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- joined product shape is not represented in generated database types.
     setItems((itemResult.data || []).map((i: any) => ({nome:i.produtos?.nome || "Produto",quantidade:i.quantidade,preco_unitario:Number(i.preco_unitario),subtotal:Number(i.subtotal)})));
     setSellerName(profileResult.data?.nome || user?.email || "Representante SR SOFTWARE");
   };
@@ -160,6 +162,7 @@ export default function ContratosPage() {
       const data = { ...extra };
       const html = buildContractHtml(sale, items, sellerName, customer, data);
       const hash = await sha256(html);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
       const { data: created, error } = await (supabase as any).from("sale_contracts").insert({
         venda_id:sale.id, vendedor_id:sale.vendedor_id, status:"aguardando_assinaturas",
         template_version:"sr-venda-celular-2026-01", contract_data:data, document_html:html,
@@ -176,6 +179,7 @@ export default function ContratosPage() {
 
   const openContract = async (contract: Contract) => {
     setSelectedContract(contract);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
     const { data } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at,signature_image_data,document_sha256").eq("contract_id",contract.id).order("signed_at");
     setSignatures((data || []) as Signature[]);
   };
@@ -186,6 +190,7 @@ export default function ContratosPage() {
     }
     setSaving(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
       const { error } = await (supabase as any).from("sale_contract_signatures").insert({
         contract_id:selectedContract.id, signer_role:signRole, signer_name:signerName.trim(),
         signer_document:signerDocument.trim() || null, signature_image_data:signatureData,
@@ -194,10 +199,12 @@ export default function ContratosPage() {
         user_agent:navigator.userAgent.slice(0,500),
       });
       if (error) throw error;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
       const { data: sigData } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at,signature_image_data,document_sha256").eq("contract_id",selectedContract.id).order("signed_at");
       const next = (sigData || []) as Signature[]; setSignatures(next);
       const roles = new Set(next.map(s=>s.signer_role));
       if (roles.has("vendedor") && roles.has("comprador")) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
         const { error: updateError } = await (supabase as any).from("sale_contracts").update({status:"assinado",signed_at:new Date().toISOString()}).eq("id",selectedContract.id);
         if (updateError) throw updateError;
         setSelectedContract({...selectedContract,status:"assinado",signed_at:new Date().toISOString()});
