@@ -6,6 +6,31 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function generateDueDates(startDate: string, endDate: string, frequency: string): string[] {
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T00:00:00.000Z`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) return [];
+  const dates: string[] = [];
+  let current = new Date(start);
+  for (let i = 0; i < 600 && current <= end; i++) {
+    dates.push(current.toISOString().slice(0, 10));
+    if (frequency === "semana") {
+      current = new Date(current.getTime() + 7 * DAY_MS);
+    } else if (frequency === "quinzena") {
+      current = new Date(current.getTime() + 15 * DAY_MS);
+    } else {
+      const day = current.getUTCDate();
+      current.setUTCDate(1);
+      current.setUTCMonth(current.getUTCMonth() + 1);
+      const lastDay = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0)).getUTCDate();
+      current.setUTCDate(Math.min(day, lastDay));
+    }
+  }
+  return dates;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -32,23 +57,49 @@ Deno.serve(async (req) => {
 
     const { cobranca_id, data_vencimento, cliente_nome, cliente_id } = body;
 
-    if (!cobranca_id || !data_vencimento) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+    if (
+      typeof cobranca_id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cobranca_id) ||
+      typeof data_vencimento !== "string" ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(data_vencimento) ||
+      !Number.isFinite(Date.parse(`${data_vencimento}T00:00:00.000Z`)) ||
+      new Date(`${data_vencimento}T00:00:00.000Z`).toISOString().slice(0, 10) !== data_vencimento
+    ) {
+      return new Response(JSON.stringify({ error: "Identificador ou data de vencimento inválidos" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── SEGURANÇA: nunca confiar no valor enviado pelo cliente. ──
-    // Buscar o valor real da cobrança no banco e calcular juros (R$3/dia desde o 1º dia de atraso).
+    // Never trust the amount or customer identity supplied by a public payment link.
     const { data: cobranca, error: cobErr } = await supabase
       .from("cobrancas")
-      .select("valor_parcela, cliente_nome")
+      .select("valor_parcela, cliente_nome, cliente_id, data_inicio, data_fim, frequencia")
       .eq("id", cobranca_id)
       .maybeSingle();
 
     if (cobErr || !cobranca) {
       return new Response(JSON.stringify({ error: "Cobrança não encontrada" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const dueDates = generateDueDates(cobranca.data_inicio, cobranca.data_fim, cobranca.frequencia);
+    if (!dueDates.includes(data_vencimento)) {
+      return new Response(JSON.stringify({ error: "A data informada não pertence às parcelas desta cobrança" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: installmentStatus, error: installmentError } = await supabase
+      .from("cobranca_pagamentos")
+      .select("status")
+      .eq("cobranca_id", cobranca_id)
+      .eq("data_vencimento", data_vencimento)
+      .maybeSingle();
+    if (installmentError) throw installmentError;
+    if (["pago", "isento"].includes(String(installmentStatus?.status || "").toLowerCase())) {
+      return new Response(JSON.stringify({ error: "Esta parcela já está quitada ou isenta" }), {
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -67,7 +118,7 @@ Deno.serve(async (req) => {
     const juros = diasAtraso * 3;
     const valor = +(valorBase + juros).toFixed(2);
 
-    const nomeCliente = cliente_nome || cobranca.cliente_nome || "Cliente";
+    const nomeCliente = cobranca.cliente_nome || "Cliente";
 
     // Check for existing active payment
     const { data: existing } = await supabase
@@ -139,7 +190,7 @@ Deno.serve(async (req) => {
       .upsert({
         cobranca_id,
         data_vencimento,
-        cliente_id: cliente_id || null,
+        cliente_id: cobranca.cliente_id || null,
         valor,
         mp_payment_id: String(mpData.id),
         mp_qr_code_base64: qrCodeBase64,
