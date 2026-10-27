@@ -105,7 +105,7 @@ function SignaturePad({ onChange }: { onChange: (data: string) => void }) {
 }
 
 export default function ContratosPage() {
-  const { user, isPrimaryAdmin } = useAuth();
+  const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [signatures, setSignatures] = useState<Signature[]>([]);
