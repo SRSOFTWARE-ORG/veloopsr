@@ -26,6 +26,7 @@ interface Documento {
   tipo: string;
   nome_arquivo: string;
   url_arquivo: string;
+  storage_path?: string;
   cliente_nome: string | null;
   created_at: string;
   processado: boolean | null;
@@ -125,7 +126,7 @@ const DocumentosPage = () => {
          .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 60);
       if (signedError || !signed?.signedUrl) {
         console.warn("Não foi possível gerar link privado para", doc.nome_arquivo);
-        return { ...doc, url_arquivo: "" };
+        return { ...doc, storage_path: doc.url_arquivo, url_arquivo: "" };
       }
       return { ...doc, storage_path: doc.url_arquivo, url_arquivo: signed.signedUrl };
     }));
