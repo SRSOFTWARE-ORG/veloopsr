@@ -114,8 +114,22 @@ const DocumentosPage = () => {
   };
 
   const fetchDocumentos = async () => {
-    const { data } = await supabase.from("documentos").select("*").order("created_at", { ascending: false });
-    setDocumentos((data as Documento[]) || []);
+    const { data, error } = await supabase.from("documentos").select("*").order("created_at", { ascending: false });
+    if (error) {
+      console.error("Erro ao carregar documentos:", error.message);
+      setDocumentos([]);
+      return;
+    }
+    const docsWithSignedUrls = await Promise.all((data || []).map(async (doc: any) => {
+      const { data: signed, error: signedError } = await supabase.storage
+        .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 60);
+      if (signedError || !signed?.signedUrl) {
+        console.warn("Não foi possível gerar link privado para", doc.nome_arquivo);
+        return { ...doc, url_arquivo: "" };
+      }
+      return { ...doc, url_arquivo: signed.signedUrl };
+    }));
+    setDocumentos(docsWithSignedUrls as Documento[]);
   };
 
   const scanDocumentAndProcess = async (doc: Documento) => {
@@ -125,8 +139,12 @@ const DocumentosPage = () => {
       const functionName = isPdv ? "scan-pdv" : "scan-document";
       const bodyKey = isPdv ? "file_url" : "pdf_url";
 
+      const { data: signedFile, error: signedFileError } = await supabase.storage
+        .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 10);
+      if (signedFileError || !signedFile?.signedUrl) throw new Error("Não foi possível acessar o documento privado.");
+
       const { data: scanResult, error: scanError } = await supabase.functions.invoke(functionName, {
-        body: { [bodyKey]: doc.url_arquivo, nome_arquivo: doc.nome_arquivo },
+        body: { [bodyKey]: signedFile.signedUrl, nome_arquivo: doc.nome_arquivo },
       });
 
       if (scanError) throw scanError;
@@ -606,13 +624,13 @@ const DocumentosPage = () => {
         continue;
       }
 
-      const { data: urlData } = supabase.storage.from("documentos_vendas").getPublicUrl(fileName);
       const tipo = detectTipoFromFileName(file.name);
 
+      // Persist only the object path. Access is provided through short-lived signed URLs.
       const { data: docData, error: insertError } = await supabase.from("documentos").insert({
         tipo,
         nome_arquivo: file.name,
-        url_arquivo: urlData.publicUrl,
+        url_arquivo: fileName,
         uploaded_by: user?.id,
         hash_arquivo: hashHex || null,
       } as any).select("*").single();
