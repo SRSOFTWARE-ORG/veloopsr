@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 
 interface PendingAction {
   action: string;
-  args: any;
+  args: Record<string, unknown>;
   description: string;
   confirmation_token: string;
 }
@@ -57,8 +57,8 @@ const AISearchBar = () => {
       if (data?.pending_action) {
         setPendingAction(data.pending_action);
       }
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao consultar IA");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao consultar IA");
     } finally {
       setLoading(false);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -81,8 +81,8 @@ const AISearchBar = () => {
       setMessages((prev) => [...prev, { role: "assistant", content: result }]);
       setPendingAction(null);
       toast.success("Ação executada com sucesso!");
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao executar ação");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao executar ação");
     } finally {
       setExecuting(false);
     }
