@@ -1,3 +1,7 @@
 - [x] Corrigir tentativas de login e travamentos de sessão.
 - [x] Registrar diagnósticos de login sem credenciais e testar regressões (8 testes passaram; falha real verificada na tela).
 - [ ] Verificar login autenticado após reativação Cloud (bloqueado por saldo Cloud insuficiente).
+- [ ] Inspect connected production schema, storage, configuration and PR #1 at da1445b.
+- [ ] Integrate reviewed assistant guards, document access, signing and tests without overwriting current flows.
+- [ ] Prepare unapplied, idempotent security migrations and ordered production rollout.
+- [ ] Run relevant tests, check preview build results and report exact changes and limitations.
