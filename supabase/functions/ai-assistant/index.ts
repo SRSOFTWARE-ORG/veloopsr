@@ -307,6 +307,46 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
   dispositivos: ["status_seguranca", "modelo", "nome_dispositivo", "observacoes", "memoria", "imei2", "serial_number", "imei_serial"],
 };
 
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  return atob(padded);
+}
+
+async function signActionPayload(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encodedPayload));
+  const bytes = new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encodedSignature = btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return encodedPayload + "." + encodedSignature;
+}
+
+async function verifyActionToken(token: string, secret: string): Promise<Record<string, unknown> | null> {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [encodedPayload, encodedSignature] = parts;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const base64 = encodedSignature.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const signatureBytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, new TextEncoder().encode(encodedPayload));
+  if (!valid) return null;
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  } catch { return null; }
+}
+
 function sanitizeFields(table: string, fields: Record<string, any>): Record<string, any> {
   const allowed = ALLOWED_FIELDS[table] || [];
   const clean: Record<string, any> = {};
@@ -645,6 +685,15 @@ serve(async (req) => {
     if (confirm_action !== undefined && confirm_action !== null) {
       const action = confirm_action?.action;
       const args = confirm_action?.args;
+      const confirmationToken = confirm_action?.confirmation_token;
+      const signingSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (typeof confirmationToken !== "string" || !signingSecret) {
+        return new Response(JSON.stringify({ error: "Confirmação inválida ou expirada. Solicite a ação novamente." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const signedPayload = await verifyActionToken(confirmationToken, signingSecret);
+      if (!signedPayload || signedPayload.user_id !== _user.id || signedPayload.action !== action || typeof signedPayload.expires_at !== "number" || signedPayload.expires_at < Date.now() || JSON.stringify(signedPayload.args) !== JSON.stringify(args)) {
+        return new Response(JSON.stringify({ error: "Confirmação inválida ou expirada. Solicite a ação novamente." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const tool = actionTools.find((item: any) => item.function.name === action);
       if (!tool || !args || typeof args !== "object" || Array.isArray(args)) {
         return new Response(JSON.stringify({ error: "Ação de confirmação inválida." }), {
@@ -856,9 +905,12 @@ REGRAS:
 
       let description = message.content || describeAction(actionName, actionArgs, context);
 
+      const signingSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!signingSecret) throw new Error("Confirmação segura indisponível");
+      const confirmationToken = await signActionPayload({ user_id: _user.id, action: actionName, args: actionArgs, expires_at: Date.now() + 5 * 60 * 1000 }, signingSecret);
       return new Response(JSON.stringify({
         response: description,
-        pending_action: { action: actionName, args: actionArgs, description },
+        pending_action: { action: actionName, args: actionArgs, description, confirmation_token: confirmationToken },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
