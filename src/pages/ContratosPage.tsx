@@ -72,7 +72,6 @@ function withSignatureEvidence(html: string, signatures: Signature[], hash: stri
     const safeImage = s.signature_image_data && s.signature_image_data.startsWith(prefix) && /^[A-Za-z0-9+/=]+$/.test(s.signature_image_data.slice(prefix.length))
       ? `<img alt="Assinatura de ${esc(s.signer_name)}" src="${s.signature_image_data}" style="display:block;max-width:260px;max-height:90px;margin:8px auto;object-fit:contain">`
       : "<p>Assinatura manuscrita digital não disponível</p>";
-      : "<p>Assinatura manuscrita digital não disponível</p>";
     return `<div style="border:1px solid #bbb;border-radius:6px;padding:12px;margin:12px 0;text-align:center"><b>${esc(roleLabels[s.signer_role] || s.signer_role)}</b>${safeImage}<div>${esc(s.signer_name)}</div><small>Registrado em ${esc(new Date(s.signed_at).toLocaleString("pt-BR"))}</small></div>`;
   }).join("");
   const evidence = `<section class="pagebreak"><h2>REGISTRO DE ASSINATURAS ELETRÔNICAS</h2><p>As evidências abaixo foram registradas no Veloop e vinculadas ao conteúdo contratual identificado pelo hash SHA-256:</p><p style="word-break:break-all;font-family:monospace;font-size:8pt">${esc(hash)}</p>${rows}<p class="small">O registro identifica o usuário autenticado que submeteu cada evidência. A modalidade é assinatura eletrônica simples e não equivale, por si só, a certificado ICP-Brasil ou a verificação independente da identidade civil.</p></section>`;
