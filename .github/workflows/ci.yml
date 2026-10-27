@@ -24,6 +24,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Lint changed AI assistant UI and contracts
         run: bunx eslint src/components/configuracoes/AISearchBar.tsx src/pages/ContratosPage.tsx
+      - name: Contract security and integrity audit
+        run: node scripts/audit-contracts.mjs
       - name: Unit tests
         run: bun run test
       - name: Production build
