@@ -122,12 +122,12 @@ const DocumentosPage = () => {
     }
     const docsWithSignedUrls = await Promise.all((data || []).map(async (doc: any) => {
       const { data: signed, error: signedError } = await supabase.storage
-        .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 60);
+         .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 60);
       if (signedError || !signed?.signedUrl) {
         console.warn("Não foi possível gerar link privado para", doc.nome_arquivo);
         return { ...doc, url_arquivo: "" };
       }
-      return { ...doc, url_arquivo: signed.signedUrl };
+      return { ...doc, storage_path: doc.url_arquivo, url_arquivo: signed.signedUrl };
     }));
     setDocumentos(docsWithSignedUrls as Documento[]);
   };
@@ -140,7 +140,7 @@ const DocumentosPage = () => {
       const bodyKey = isPdv ? "file_url" : "pdf_url";
 
       const { data: signedFile, error: signedFileError } = await supabase.storage
-        .from("documentos_vendas").createSignedUrl(doc.url_arquivo, 60 * 10);
+        .from("documentos_vendas").createSignedUrl(doc.storage_path || doc.url_arquivo, 60 * 10);
       if (signedFileError || !signedFile?.signedUrl) throw new Error("Não foi possível acessar o documento privado.");
 
       const { data: scanResult, error: scanError } = await supabase.functions.invoke(functionName, {
