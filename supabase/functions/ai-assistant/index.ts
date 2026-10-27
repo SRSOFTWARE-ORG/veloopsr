@@ -681,7 +681,13 @@ serve(async (req) => {
 
     let requestBody: any;
     try {
-      requestBody = await req.json();
+      const rawBody = await req.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 64 * 1024) {
+        return new Response(JSON.stringify({ error: "Requisição muito grande." }), {
+          status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      requestBody = JSON.parse(rawBody);
     } catch {
       return new Response(JSON.stringify({ error: "Corpo JSON inválido." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
