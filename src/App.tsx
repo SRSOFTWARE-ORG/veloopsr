@@ -27,6 +27,7 @@ import AcessoAlternativoPage from "@/pages/AcessoAlternativoPage";
 // Lazy for less-used pages
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const DocumentosPage = lazy(() => import("@/pages/DocumentosPage"));
+const ContratosPage = lazy(() => import("@/pages/ContratosPage"));
 const SegurancaPage = lazy(() => import("@/pages/SegurancaPage"));
 const ConfiguracoesPage = lazy(() => import("@/pages/ConfiguracoesPage"));
 const AssistenciaPage = lazy(() => import("@/pages/AssistenciaPage"));
@@ -202,6 +203,14 @@ const App = () => {
                       element={
                         <ProtectedRoute>
                           <DocumentosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/contratos"
+                      element={
+                        <ProtectedRoute>
+                          <ContratosPage />
                         </ProtectedRoute>
                       }
                     />
