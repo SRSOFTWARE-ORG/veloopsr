@@ -788,7 +788,7 @@ serve(async (req) => {
       sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, cliente_id, observacoes").limit(100),
       sb.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status, pago_em, tipo_pagamento").limit(500),
       sb.from("produtos").select("id, nome, preco_venda, preco_custo, estoque_atual, categoria").limit(200),
-      sb.from("dispositivos").select("id, imei_serial, modelo, nome_dispositivo, status_seguranca, cliente_nome, memoria").limit(100),
+      sb.from("dispositivos").select("id, modelo, nome_dispositivo, status_seguranca, cliente_nome, memoria").limit(100),
     ]);
 
     // ── Minimização de dados (PII) antes de enviar ao gateway de IA ──
@@ -841,8 +841,7 @@ update_sale, delete_sale, update_cobranca, delete_cobranca, create_payment_recor
 delete_payment_record, send_webhook, trigger_payment_reminders, send_notification,
 view_whatsapp_history, create_cobranca, delete_dispositivo, update_dispositivo
 
-PRIVACIDADE: CPF e telefone vêm mascarados (cpf_mask, telefone_mask). Se precisar
-do dado completo para uma ação específica, busque pelo id do cliente via ferramenta.
+PRIVACIDADE: CPF e telefone vêm mascarados (cpf_mask, telefone_mask). Não invente nem exponha dados pessoais completos que não estejam disponíveis no contexto.
 
 DADOS DO SISTEMA:
 - ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças
