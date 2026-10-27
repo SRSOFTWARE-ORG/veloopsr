@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const ADMIN_PHONE = "5527999177265";
@@ -65,6 +66,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", "Allow": "POST, OPTIONS" },
+    });
+  }
 
   const paused = await maintenanceGuard(corsHeaders);
   if (paused) return paused;
@@ -77,8 +83,20 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const body = await req.json();
-    console.log("[MP Webhook] Received:", JSON.stringify(body));
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 32 * 1024) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let body: Record<string, any>;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (body.type !== "payment" && body.action !== "payment.updated" && body.action !== "payment.created") {
       return new Response(JSON.stringify({ ok: true, skipped: true }), {
@@ -87,7 +105,7 @@ Deno.serve(async (req) => {
     }
 
     const paymentId = body.data?.id;
-    if (!paymentId) {
+    if (!paymentId || !/^\\d{1,30}$/.test(String(paymentId))) {
       return new Response(JSON.stringify({ error: "No payment ID" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -95,16 +113,18 @@ Deno.serve(async (req) => {
 
     // ── Signature verification (anti-spoofing) ──
     const WEBHOOK_SECRET = Deno.env.get("MERCADOPAGO_WEBHOOK_SECRET");
-    if (WEBHOOK_SECRET) {
-      const valid = await verifyMercadoPagoSignature(req, String(paymentId), WEBHOOK_SECRET);
-      if (!valid) {
-        console.warn("[MP Webhook] Invalid signature for payment", paymentId);
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    } else {
-      console.warn("[MP Webhook] MERCADOPAGO_WEBHOOK_SECRET not set — accepting unsigned (configure to enforce)");
+    if (!WEBHOOK_SECRET) {
+      console.error("[MP Webhook] MERCADOPAGO_WEBHOOK_SECRET is not configured; refusing unsigned event");
+      return new Response(JSON.stringify({ error: "Webhook signature verification is not configured" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const valid = await verifyMercadoPagoSignature(req, String(paymentId), WEBHOOK_SECRET);
+    if (!valid) {
+      console.warn("[MP Webhook] Invalid signature for payment", String(paymentId));
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Fetch payment details from MP
