@@ -6,12 +6,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  caller_email text;
 BEGIN
-  IF NEW.is_ceo IS DISTINCT FROM OLD.is_ceo
-     AND auth.uid() IS NOT NULL
-     AND NOT public.has_role(auth.uid(), 'admin') THEN
-    RAISE EXCEPTION 'Only an administrator can change the CEO profile flag'
-      USING ERRCODE = '42501';
+  IF NEW.is_ceo IS DISTINCT FROM OLD.is_ceo AND auth.uid() IS NOT NULL THEN
+    SELECT lower(email)
+      INTO caller_email
+      FROM auth.users
+     WHERE id = auth.uid();
+
+    IF caller_email IS DISTINCT FROM 'srcj9975@gmail.com' THEN
+      RAISE EXCEPTION 'Only the founder can change the CEO profile flag'
+        USING ERRCODE = '42501';
+    END IF;
   END IF;
 
   RETURN NEW;
