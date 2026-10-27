@@ -389,46 +389,53 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
     case "update_client": {
       const clean = sanitizeFields("clientes", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("clientes").update(clean).eq("id", args.client_id);
+      const { data, error } = await sb.from("clientes").update(clean).eq("id", args.client_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cliente não encontrado; nenhuma alteração foi feita.";
       return `✅ Cliente atualizado: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_client": {
-      const { error } = await sb.from("clientes").delete().eq("id", args.client_id);
+      const { data, error } = await sb.from("clientes").delete().eq("id", args.client_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cliente não encontrado; nada foi excluído.";
       return `✅ Cliente excluído permanentemente`;
     }
     case "update_product": {
       const clean = sanitizeFields("produtos", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("produtos").update(clean).eq("id", args.product_id);
+      const { data, error } = await sb.from("produtos").update(clean).eq("id", args.product_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Produto não encontrado; nenhuma alteração foi feita.";
       return `✅ Produto atualizado: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_product": {
-      const { error } = await sb.from("produtos").delete().eq("id", args.product_id);
+      const { data, error } = await sb.from("produtos").delete().eq("id", args.product_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Produto não encontrado; nada foi excluído.";
       return `✅ Produto excluído permanentemente`;
     }
     case "update_sale": {
       const clean = sanitizeFields("vendas", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("vendas").update(clean).eq("id", args.sale_id);
+      const { data, error } = await sb.from("vendas").update(clean).eq("id", args.sale_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Venda não encontrada; nenhuma alteração foi feita.";
       return `✅ Venda atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_sale": {
-      const { error: itemsError } = await sb.from("venda_itens").delete().eq("venda_id", args.sale_id);
-      if (itemsError) throw itemsError;
-      const { error } = await sb.from("vendas").delete().eq("id", args.sale_id);
+      // The venda_itens foreign key uses ON DELETE CASCADE, so deleting the sale
+      // directly avoids deleting child rows before discovering a missing sale.
+      const { data, error } = await sb.from("vendas").delete().eq("id", args.sale_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Venda não encontrada; nada foi excluído.";
       return `✅ Venda e seus itens excluídos permanentemente`;
     }
     case "update_cobranca": {
       const clean = sanitizeFields("cobrancas", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id);
+      const { data, error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cobrança não encontrada; nenhuma alteração foi feita.";
       return `✅ Cobrança atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_cobranca": {
@@ -615,15 +622,17 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       return `✅ Cobrança criada para ${args.cliente_nome} com ${payments.length} parcelas de R$ ${args.valor_parcela}`;
     }
     case "delete_dispositivo": {
-      const { error } = await sb.from("dispositivos").delete().eq("id", args.dispositivo_id);
+      const { data, error } = await sb.from("dispositivos").delete().eq("id", args.dispositivo_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Dispositivo não encontrado; nada foi excluído.";
       return `✅ Dispositivo excluído permanentemente`;
     }
     case "update_dispositivo": {
       const clean = sanitizeFields("dispositivos", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("dispositivos").update(clean).eq("id", args.dispositivo_id);
+      const { data, error } = await sb.from("dispositivos").update(clean).eq("id", args.dispositivo_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Dispositivo não encontrado; nenhuma alteração foi feita.";
       return `✅ Dispositivo atualizado: ${Object.keys(clean).join(", ")}`;
     }
     default:
