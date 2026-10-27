@@ -317,7 +317,9 @@ function base64UrlEncode(value: string): string {
 function base64UrlDecode(value: string): string {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(padded);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 async function sha256Hex(value: string): Promise<string> {
