@@ -371,12 +371,19 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       const update: any = { status: args.status };
       if (args.status === "pago") {
         update.pago_em = new Date().toISOString();
+        update.pago_por = actorId;
       } else {
         update.pago_em = null;
         update.pago_por = null;
       }
-      const { error } = await sb.from("cobranca_pagamentos").update(update).eq("id", args.payment_id);
+      const { data, error } = await sb
+        .from("cobranca_pagamentos")
+        .update(update)
+        .eq("id", args.payment_id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Parcela não encontrada; nenhum pagamento foi alterado.";
       return `✅ Pagamento atualizado para "${args.status}"`;
     }
     case "update_client": {
@@ -534,12 +541,18 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
     case "view_whatsapp_history": {
       const dias = args.dias || 7;
       const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      let q = sb.from("envio_cobranca").select("*").gte("data_envio", since).order("data_envio", { ascending: false }).limit(50);
+      let q = sb.from("envio_cobranca").select("data_envio, cpf, tipo_envio, enviado_com_sucesso").gte("data_envio", since).order("data_envio", { ascending: false }).limit(50);
       if (args.cpf) q = q.eq("cpf", args.cpf);
       const { data, error } = await q;
       if (error) throw error;
       if (!data || data.length === 0) return "📭 Nenhum envio encontrado no período";
-      const lines = data.map((e: any) => `- ${e.data_envio} | ${e.cpf} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
+      const maskHistoryCpf = (cpf?: string | null) => {
+        if (!cpf) return "CPF não informado";
+        const digits = cpf.replace(/\D/g, "");
+        if (digits.length < 4) return "***";
+        return `***.***.***-${digits.slice(-2)}`;
+      };
+      const lines = data.map((e: any) => `- ${e.data_envio} | ${maskHistoryCpf(e.cpf)} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
       return `📋 **Histórico** (últimos ${dias} dias):\n${lines.join("\n")}`;
     }
     case "create_cobranca": {
