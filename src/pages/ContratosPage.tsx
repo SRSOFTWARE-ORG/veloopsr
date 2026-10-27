@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,18 +65,18 @@ function SignaturePad({ onChange }: { onChange: (data: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const hasInk = useRef(false);
-  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const point = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     return { x: (event.clientX - rect.left) * (canvas.width / rect.width), y: (event.clientY - rect.top) * (canvas.height / rect.height) };
   };
-  const start = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const start = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current, ctx = canvas?.getContext("2d"), p = point(event);
     if (!canvas || !ctx || !p) return;
     canvas.setPointerCapture(event.pointerId); drawing.current = true; ctx.beginPath(); ctx.moveTo(p.x, p.y);
   };
-  const move = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const move = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return;
     const ctx = canvasRef.current?.getContext("2d"), p = point(event);
     if (!ctx || !p) return;
@@ -112,7 +113,7 @@ export default function ContratosPage() {
     const { data: saleData, error: saleError } = await supabase.from("vendas").select("id,cliente_nome,cliente_telefone,cliente_cpf,valor_total,valor_entrada,num_parcelas,valor_parcela,status,created_at,vendedor_id,forma_pagamento,frequencia_parcela,data_inicio_pagamento,observacoes").order("created_at",{ascending:false}).limit(200);
     if (saleError) toast.error("Não foi possível carregar as vendas");
     setSales((saleData || []) as Sale[]);
-    const { data: contractData, error: contractError } = await supabase.from("sale_contracts").select("id,venda_id,status,contract_data,document_html,document_sha256,created_at,signed_at").order("created_at",{ascending:false}).limit(200);
+    const { data: contractData, error: contractError } = await (supabase as any).from("sale_contracts").select("id,venda_id,status,contract_data,document_html,document_sha256,created_at,signed_at").order("created_at",{ascending:false}).limit(200);
     if (contractError && !/sale_contracts/i.test(contractError.message)) toast.error("Não foi possível carregar os contratos");
     setContracts((contractData || []) as Contract[]);
     setLoading(false);
@@ -142,7 +143,7 @@ export default function ContratosPage() {
       const data = { ...extra };
       const html = buildContractHtml(sale, items, sellerName, customer, data);
       const hash = await sha256(html);
-      const { data: created, error } = await supabase.from("sale_contracts").insert({
+      const { data: created, error } = await (supabase as any).from("sale_contracts").insert({
         venda_id:sale.id, vendedor_id:sale.vendedor_id, status:"aguardando_assinaturas",
         template_version:"sr-venda-celular-2026-01", contract_data:data, document_html:html,
         document_sha256:hash, created_by:user.id,
@@ -158,7 +159,7 @@ export default function ContratosPage() {
 
   const openContract = async (contract: Contract) => {
     setSelectedContract(contract);
-    const { data } = await supabase.from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",contract.id).order("signed_at");
+    const { data } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",contract.id).order("signed_at");
     setSignatures((data || []) as Signature[]);
   };
 
@@ -168,7 +169,7 @@ export default function ContratosPage() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from("sale_contract_signatures").insert({
+      const { error } = await (supabase as any).from("sale_contract_signatures").insert({
         contract_id:selectedContract.id, signer_role:signRole, signer_name:signerName.trim(),
         signer_document:signerDocument.trim() || null, signature_image_data:signatureData,
         consent_text:"Declaro que tive oportunidade de ler o contrato exibido, compreendi seu conteúdo e concordo com a assinatura eletrônica vinculada ao resumo criptográfico informado.",
@@ -176,11 +177,11 @@ export default function ContratosPage() {
         user_agent:navigator.userAgent.slice(0,500),
       });
       if (error) throw error;
-      const { data: sigData } = await supabase.from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",selectedContract.id).order("signed_at");
+      const { data: sigData } = await (supabase as any).from("sale_contract_signatures").select("id,contract_id,signer_role,signer_name,signed_at").eq("contract_id",selectedContract.id).order("signed_at");
       const next = (sigData || []) as Signature[]; setSignatures(next);
       const roles = new Set(next.map(s=>s.signer_role));
       if (roles.has("vendedor") && roles.has("comprador")) {
-        const { error: updateError } = await supabase.from("sale_contracts").update({status:"assinado",signed_at:new Date().toISOString()}).eq("id",selectedContract.id);
+        const { error: updateError } = await (supabase as any).from("sale_contracts").update({status:"assinado",signed_at:new Date().toISOString()}).eq("id",selectedContract.id);
         if (updateError) throw updateError;
         setSelectedContract({...selectedContract,status:"assinado",signed_at:new Date().toISOString()});
         setContracts(prev=>prev.map(c=>c.id===selectedContract.id?{...c,status:"assinado",signed_at:new Date().toISOString()}:c));
