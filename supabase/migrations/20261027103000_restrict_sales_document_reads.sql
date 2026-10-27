@@ -167,7 +167,10 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "Can insert movimentacao" ON public.estoque_movimentacao;
-CREATE POLICY "Admins insert inventory movements"
+CREATE POLICY "Users record own inventory movements"
 ON public.estoque_movimentacao
 FOR INSERT TO authenticated
-WITH CHECK (public.has_role(auth.uid(), 'admin'::public.app_role));
+WITH CHECK (
+  usuario_id = auth.uid()
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
