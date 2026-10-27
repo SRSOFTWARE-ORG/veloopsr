@@ -365,7 +365,7 @@ function sanitizeFields(table: string, fields: Record<string, any>): Record<stri
   return clean;
 }
 
-async function executeAction(sb: any, action: string, args: any, actorId: string): Promise<string> {
+async function executeAction(sb: any, action: string, args: any, actorId: string, accessToken: string): Promise<string> {
   switch (action) {
     case "update_payment_status": {
       const update: any = { status: args.status };
@@ -481,7 +481,7 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-uazapi`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({
           telefone,
           mensagem: args.mensagem,
@@ -497,7 +497,7 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-webhook`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({
           nome_cliente: args.nome_cliente,
           telefone: args.telefone,
@@ -520,7 +520,7 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/check-payment-reminders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -802,7 +802,7 @@ serve(async (req) => {
           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const result = await executeAction(sb, action, args, _user.id);
+      const result = await executeAction(sb, action, args, _user.id, match[1]);
       return new Response(JSON.stringify({ response: result, action_executed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
