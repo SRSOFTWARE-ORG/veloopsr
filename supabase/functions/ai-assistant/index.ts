@@ -496,6 +496,31 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       return `📋 **Histórico** (últimos ${dias} dias):\n${lines.join("\n")}`;
     }
     case "create_cobranca": {
+      const start = new Date(`${args.data_inicio}T00:00:00Z`);
+      const end = new Date(`${args.data_fim}T00:00:00Z`);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(args.data_inicio) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(args.data_fim) ||
+        !Number.isFinite(start.getTime()) ||
+        !Number.isFinite(end.getTime()) ||
+        start > end
+      ) return "❌ Período da cobrança inválido.";
+      if (typeof args.valor_parcela !== "number" || !Number.isFinite(args.valor_parcela) || args.valor_parcela <= 0) {
+        return "❌ O valor da parcela deve ser maior que zero.";
+      }
+      if (args.frequencia && !["semana", "quinzena", "mes"].includes(args.frequencia)) {
+        return "❌ Frequência da cobrança inválida.";
+      }
+      const stepDays = args.frequencia === "semana" ? 7 : args.frequencia === "quinzena" ? 15 : null;
+      let count = 0;
+      const probe = new Date(start);
+      while (probe <= end && count <= 240) {
+        count++;
+        if (stepDays) probe.setUTCDate(probe.getUTCDate() + stepDays);
+        else probe.setUTCMonth(probe.getUTCMonth() + 1);
+      }
+      if (count > 240) return "❌ O período gera mais de 240 parcelas; reduza o intervalo.";
+
       const { data: newCob, error } = await sb.from("cobrancas").insert({
         cliente_id: args.cliente_id,
         cliente_nome: args.cliente_nome,
@@ -508,8 +533,6 @@ async function executeAction(sb: any, action: string, args: any, actorId: string
       }).select().single();
       if (error) throw error;
 
-      const start = new Date(`${args.data_inicio}T00:00:00Z`);
-      const end = new Date(`${args.data_fim}T00:00:00Z`);
       const payments: any[] = [];
       let current = new Date(start);
       while (current <= end) {
@@ -628,12 +651,46 @@ serve(async (req) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const required = tool.function.parameters.required || [];
+      const schema = tool.function.parameters;
+      const required = schema.required || [];
       if (required.some((key: string) => args[key] === undefined || args[key] === null || args[key] === "")) {
         return new Response(JSON.stringify({ error: "A ação está incompleta; revise os dados antes de confirmar." }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // Enforce declared top-level argument types/enums on the server, not just in the model UI.
+      const properties = schema.properties || {};
+      for (const key of Object.keys(args)) {
+        const rule = properties[key];
+        if (!rule) {
+          return new Response(JSON.stringify({ error: `Parâmetro não permitido: ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const value = args[key];
+        if (rule.type === "string" && typeof value !== "string") {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.type === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.type === "object" && (typeof value !== "object" || value === null || Array.isArray(value))) {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.enum && !rule.enum.includes(value)) {
+          return new Response(JSON.stringify({ error: `Valor não permitido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       if (JSON.stringify(args).length > 16 * 1024) {
         return new Response(JSON.stringify({ error: "Parâmetros da ação excedem o limite permitido." }), {
           status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
