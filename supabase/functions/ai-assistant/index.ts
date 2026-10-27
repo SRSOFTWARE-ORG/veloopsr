@@ -320,6 +320,11 @@ function base64UrlDecode(value: string): string {
   return atob(padded);
 }
 
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 async function signActionPayload(payload: Record<string, unknown>, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
@@ -745,6 +750,21 @@ serve(async (req) => {
           status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const tokenHash = await sha256Hex(confirmationToken);
+      const { data: consumedConfirmation, error: consumeError } = await sb
+        .from("ai_action_confirmations")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("token_hash", tokenHash)
+        .eq("user_id", _user.id)
+        .is("consumed_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .select("id")
+        .maybeSingle();
+      if (consumeError || !consumedConfirmation) {
+        return new Response(JSON.stringify({ error: "Esta confirmação já foi usada ou expirou. Solicite a ação novamente." }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const result = await executeAction(sb, action, args, _user.id);
       return new Response(JSON.stringify({ response: result, action_executed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -907,7 +927,20 @@ REGRAS:
 
       const signingSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       if (!signingSecret) throw new Error("Confirmação segura indisponível");
-      const confirmationToken = await signActionPayload({ user_id: _user.id, action: actionName, args: actionArgs, expires_at: Date.now() + 5 * 60 * 1000 }, signingSecret);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      const confirmationToken = await signActionPayload({
+        user_id: _user.id,
+        action: actionName,
+        args: actionArgs,
+        expires_at: expiresAt.getTime(),
+      }, signingSecret);
+      const tokenHash = await sha256Hex(confirmationToken);
+      const { error: confirmationInsertError } = await sb.from("ai_action_confirmations").insert({
+        user_id: _user.id,
+        token_hash: tokenHash,
+        expires_at: expiresAt.toISOString(),
+      });
+      if (confirmationInsertError) throw new Error("Não foi possível registrar a confirmação segura");
       return new Response(JSON.stringify({
         response: description,
         pending_action: { action: actionName, args: actionArgs, description, confirmation_token: confirmationToken },
