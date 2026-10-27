@@ -16,6 +16,23 @@ WHERE id = 'documentos_vendas';
 
 DROP POLICY IF EXISTS "Documents publicly accessible" ON storage.objects;
 DROP POLICY IF EXISTS "Owners or admins read documentos_vendas" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can read" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete files" ON storage.objects;
+DROP POLICY IF EXISTS "Can upload documents" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
+
+CREATE POLICY "Authenticated users upload sales documents"
+ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'documentos_vendas');
+
+CREATE POLICY "Owners or admins delete sales documents"
+ON storage.objects
+FOR DELETE TO authenticated
+USING (
+  bucket_id = 'documentos_vendas'
+  AND (owner = auth.uid() OR public.has_role(auth.uid(), 'admin'::public.app_role))
+);
 
 CREATE POLICY "Authorized users read private sales documents"
 ON storage.objects
