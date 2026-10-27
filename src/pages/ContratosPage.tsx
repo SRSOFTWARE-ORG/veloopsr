@@ -188,6 +188,20 @@ export default function ContratosPage() {
     if (!selectedContract || !user || !signerName.trim() || !signatureData || !consent) {
       toast.error("Preencha o nome, desenhe a assinatura e confirme a declaração de ciência"); return;
     }
+    if (selectedContract.status === "assinado" || selectedContract.status === "cancelado") {
+      toast.error("Este contrato não aceita novas assinaturas"); return;
+    }
+    if (signatures.some((signature) => signature.signer_role === signRole)) {
+      toast.error("Já existe uma assinatura registrada para este papel"); return;
+    }
+    // Canvas exports PNG data URLs. Reject unexpected formats and oversized payloads
+    // before sending personal/signature data to the database.
+    if (!signatureData.startsWith("data:image/png;base64,") || signatureData.length > 1_500_000) {
+      toast.error("Assinatura inválida ou muito grande. Desenhe novamente em uma área menor."); return;
+    }
+    if (signerName.trim().length < 2 || signerName.trim().length > 180) {
+      toast.error("Informe o nome completo (até 180 caracteres)"); return;
+    }
     setSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration-owned table is not yet present in generated Supabase types.
