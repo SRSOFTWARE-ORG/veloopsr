@@ -654,14 +654,21 @@ async function _isAdmin(userId: string): Promise<boolean> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return false;
-  const params = new URLSearchParams({ user_id: `eq.${userId}`, role: "eq.admin", select: "id", limit: "1" });
+  const headers = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
   try {
-    const r = await fetch(`${supabaseUrl}/rest/v1/user_roles?${params.toString()}`, {
-      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-    });
-    if (!r.ok) return false;
-    const d = await r.json();
-    return Array.isArray(d) && d.length > 0;
+    const roleParams = new URLSearchParams({ user_id: `eq.${userId}`, role: "eq.admin", select: "id", limit: "1" });
+    const roleResponse = await fetch(`${supabaseUrl}/rest/v1/user_roles?${roleParams.toString()}`, { headers });
+    if (!roleResponse.ok) return false;
+    const roles = await roleResponse.json();
+    if (Array.isArray(roles) && roles.length > 0) return true;
+
+    // Match public.has_role(): the founder/CEO may be authorized through profiles.is_ceo
+    // even if a legacy account does not have a user_roles row with role=admin.
+    const profileParams = new URLSearchParams({ id: `eq.${userId}`, is_ceo: "eq.true", select: "id", limit: "1" });
+    const profileResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?${profileParams.toString()}`, { headers });
+    if (!profileResponse.ok) return false;
+    const profiles = await profileResponse.json();
+    return Array.isArray(profiles) && profiles.length > 0;
   } catch {
     return false;
   }
