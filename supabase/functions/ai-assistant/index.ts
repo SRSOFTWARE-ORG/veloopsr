@@ -307,6 +307,53 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
   dispositivos: ["status_seguranca", "modelo", "nome_dispositivo", "observacoes", "memoria", "imei2", "serial_number", "imei_serial"],
 };
 
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function signActionPayload(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encodedPayload));
+  const bytes = new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encodedSignature = btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return encodedPayload + "." + encodedSignature;
+}
+
+async function verifyActionToken(token: string, secret: string): Promise<Record<string, unknown> | null> {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [encodedPayload, encodedSignature] = parts;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const base64 = encodedSignature.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const signatureBytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, new TextEncoder().encode(encodedPayload));
+  if (!valid) return null;
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  } catch { return null; }
+}
+
 function sanitizeFields(table: string, fields: Record<string, any>): Record<string, any> {
   const allowed = ALLOWED_FIELDS[table] || [];
   const clean: Record<string, any> = {};
@@ -318,66 +365,82 @@ function sanitizeFields(table: string, fields: Record<string, any>): Record<stri
   return clean;
 }
 
-async function executeAction(sb: any, action: string, args: any): Promise<string> {
+async function executeAction(sb: any, action: string, args: any, actorId: string, accessToken: string): Promise<string> {
   switch (action) {
     case "update_payment_status": {
       const update: any = { status: args.status };
       if (args.status === "pago") {
         update.pago_em = new Date().toISOString();
+        update.pago_por = actorId;
       } else {
         update.pago_em = null;
         update.pago_por = null;
       }
-      const { error } = await sb.from("cobranca_pagamentos").update(update).eq("id", args.payment_id);
+      const { data, error } = await sb
+        .from("cobranca_pagamentos")
+        .update(update)
+        .eq("id", args.payment_id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Parcela não encontrada; nenhum pagamento foi alterado.";
       return `✅ Pagamento atualizado para "${args.status}"`;
     }
     case "update_client": {
       const clean = sanitizeFields("clientes", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("clientes").update(clean).eq("id", args.client_id);
+      const { data, error } = await sb.from("clientes").update(clean).eq("id", args.client_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cliente não encontrado; nenhuma alteração foi feita.";
       return `✅ Cliente atualizado: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_client": {
-      const { error } = await sb.from("clientes").delete().eq("id", args.client_id);
+      const { data, error } = await sb.from("clientes").delete().eq("id", args.client_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cliente não encontrado; nada foi excluído.";
       return `✅ Cliente excluído permanentemente`;
     }
     case "update_product": {
       const clean = sanitizeFields("produtos", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("produtos").update(clean).eq("id", args.product_id);
+      const { data, error } = await sb.from("produtos").update(clean).eq("id", args.product_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Produto não encontrado; nenhuma alteração foi feita.";
       return `✅ Produto atualizado: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_product": {
-      const { error } = await sb.from("produtos").delete().eq("id", args.product_id);
+      const { data, error } = await sb.from("produtos").delete().eq("id", args.product_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Produto não encontrado; nada foi excluído.";
       return `✅ Produto excluído permanentemente`;
     }
     case "update_sale": {
       const clean = sanitizeFields("vendas", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("vendas").update(clean).eq("id", args.sale_id);
+      const { data, error } = await sb.from("vendas").update(clean).eq("id", args.sale_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Venda não encontrada; nenhuma alteração foi feita.";
       return `✅ Venda atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_sale": {
-      await sb.from("venda_itens").delete().eq("venda_id", args.sale_id);
-      const { error } = await sb.from("vendas").delete().eq("id", args.sale_id);
+      // The venda_itens foreign key uses ON DELETE CASCADE, so deleting the sale
+      // directly avoids deleting child rows before discovering a missing sale.
+      const { data, error } = await sb.from("vendas").delete().eq("id", args.sale_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Venda não encontrada; nada foi excluído.";
       return `✅ Venda e seus itens excluídos permanentemente`;
     }
     case "update_cobranca": {
       const clean = sanitizeFields("cobrancas", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id);
+      const { data, error } = await sb.from("cobrancas").update(clean).eq("id", args.cobranca_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Cobrança não encontrada; nenhuma alteração foi feita.";
       return `✅ Cobrança atualizada: ${Object.keys(clean).join(", ")}`;
     }
     case "delete_cobranca": {
-      await sb.from("cobranca_pagamentos").delete().eq("cobranca_id", args.cobranca_id);
+      const { error: paymentsError } = await sb.from("cobranca_pagamentos").delete().eq("cobranca_id", args.cobranca_id);
+      if (paymentsError) throw paymentsError;
       const { error } = await sb.from("cobrancas").delete().eq("id", args.cobranca_id);
       if (error) throw error;
       return `✅ Cobrança e seus pagamentos excluídos permanentemente`;
@@ -418,7 +481,7 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-uazapi`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({
           telefone,
           mensagem: args.mensagem,
@@ -434,7 +497,7 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-webhook`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({
           nome_cliente: args.nome_cliente,
           telefone: args.telefone,
@@ -457,7 +520,7 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/check-payment-reminders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -485,18 +548,45 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
     case "view_whatsapp_history": {
       const dias = args.dias || 7;
       const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      let q = sb.from("envio_cobranca").select("*").gte("data_envio", since).order("data_envio", { ascending: false }).limit(50);
+      let q = sb.from("envio_cobranca").select("data_envio, cpf, tipo_envio, enviado_com_sucesso").gte("data_envio", since).order("data_envio", { ascending: false }).limit(50);
       if (args.cpf) q = q.eq("cpf", args.cpf);
       const { data, error } = await q;
       if (error) throw error;
       if (!data || data.length === 0) return "📭 Nenhum envio encontrado no período";
-      const lines = data.map((e: any) => `- ${e.data_envio} | ${e.cpf} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
+      const maskHistoryCpf = (cpf?: string | null) => {
+        if (!cpf) return "CPF não informado";
+        const digits = cpf.replace(/\D/g, "");
+        if (digits.length < 4) return "***";
+        return `***.***.***-${digits.slice(-2)}`;
+      };
+      const lines = data.map((e: any) => `- ${e.data_envio} | ${maskHistoryCpf(e.cpf)} | ${e.tipo_envio} | ${e.enviado_com_sucesso ? "✅" : "❌"}`);
       return `📋 **Histórico** (últimos ${dias} dias):\n${lines.join("\n")}`;
     }
     case "create_cobranca": {
-      const { data: adminRoles } = await sb.from("user_roles").select("user_id").eq("role", "admin").limit(1);
-      const adminId = adminRoles?.[0]?.user_id;
-      if (!adminId) return "❌ Nenhum admin encontrado";
+      const start = new Date(`${args.data_inicio}T00:00:00Z`);
+      const end = new Date(`${args.data_fim}T00:00:00Z`);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(args.data_inicio) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(args.data_fim) ||
+        !Number.isFinite(start.getTime()) ||
+        !Number.isFinite(end.getTime()) ||
+        start > end
+      ) return "❌ Período da cobrança inválido.";
+      if (typeof args.valor_parcela !== "number" || !Number.isFinite(args.valor_parcela) || args.valor_parcela <= 0) {
+        return "❌ O valor da parcela deve ser maior que zero.";
+      }
+      if (args.frequencia && !["semana", "quinzena", "mes"].includes(args.frequencia)) {
+        return "❌ Frequência da cobrança inválida.";
+      }
+      const stepDays = args.frequencia === "semana" ? 7 : args.frequencia === "quinzena" ? 15 : null;
+      let count = 0;
+      const probe = new Date(start);
+      while (probe <= end && count <= 240) {
+        count++;
+        if (stepDays) probe.setUTCDate(probe.getUTCDate() + stepDays);
+        else probe.setUTCMonth(probe.getUTCMonth() + 1);
+      }
+      if (count > 240) return "❌ O período gera mais de 240 parcelas; reduza o intervalo.";
 
       const { data: newCob, error } = await sb.from("cobrancas").insert({
         cliente_id: args.cliente_id,
@@ -506,12 +596,10 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
         data_fim: args.data_fim,
         frequencia: args.frequencia || "mes",
         observacoes: args.observacoes || null,
-        criado_por: adminId,
+        criado_por: actorId,
       }).select().single();
       if (error) throw error;
 
-      const start = new Date(`${args.data_inicio}T00:00:00Z`);
-      const end = new Date(`${args.data_fim}T00:00:00Z`);
       const payments: any[] = [];
       let current = new Date(start);
       while (current <= end) {
@@ -524,19 +612,27 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
         else if (args.frequencia === "quinzena") current = new Date(current.getTime() + 15 * 86400000);
         else current.setUTCMonth(current.getUTCMonth() + 1);
       }
-      if (payments.length > 0) await sb.from("cobranca_pagamentos").insert(payments);
+      if (payments.length > 0) {
+        const { error: paymentsError } = await sb.from("cobranca_pagamentos").insert(payments);
+        if (paymentsError) {
+          await sb.from("cobrancas").delete().eq("id", newCob.id);
+          throw paymentsError;
+        }
+      }
       return `✅ Cobrança criada para ${args.cliente_nome} com ${payments.length} parcelas de R$ ${args.valor_parcela}`;
     }
     case "delete_dispositivo": {
-      const { error } = await sb.from("dispositivos").delete().eq("id", args.dispositivo_id);
+      const { data, error } = await sb.from("dispositivos").delete().eq("id", args.dispositivo_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Dispositivo não encontrado; nada foi excluído.";
       return `✅ Dispositivo excluído permanentemente`;
     }
     case "update_dispositivo": {
       const clean = sanitizeFields("dispositivos", args.fields);
       if (Object.keys(clean).length === 0) return "⚠️ Nenhum campo válido para atualizar";
-      const { error } = await sb.from("dispositivos").update(clean).eq("id", args.dispositivo_id);
+      const { data, error } = await sb.from("dispositivos").update(clean).eq("id", args.dispositivo_id).select("id").maybeSingle();
       if (error) throw error;
+      if (!data) return "❌ Dispositivo não encontrado; nenhuma alteração foi feita.";
       return `✅ Dispositivo atualizado: ${Object.keys(clean).join(", ")}`;
     }
     default:
@@ -546,28 +642,64 @@ async function executeAction(sb: any, action: string, args: any): Promise<string
 
 
 async function _verifyAuth(req: Request) {
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) return null;
-  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY")! },
-  });
-  if (!r.ok) return null;
-  return await r.json();
+  const authorization = req.headers.get("Authorization") || "";
+  const match = /^Bearer\s+([^\s]+)$/i.exec(authorization);
+  if (!match) return null;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return null;
+  try {
+    const r = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${match[1]}`, apikey: anonKey },
+    });
+    if (!r.ok) return null;
+    const user = await r.json();
+    return typeof user?.id === "string" ? user : null;
+  } catch {
+    return null;
+  }
 }
-async function _isAdmin(userId: string): Promise<boolean> {
-  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=id`, {
-    headers: { apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}` },
-  });
-  if (!r.ok) return false;
-  const d = await r.json();
-  return Array.isArray(d) && d.length > 0;
+async function _isAdmin(userId: string, email?: string): Promise<boolean> {
+  if (email?.toLowerCase() === "srcj9975@gmail.com") return true;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return false;
+  const headers = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
+  try {
+    const roleParams = new URLSearchParams({ user_id: `eq.${userId}`, role: "eq.admin", select: "id", limit: "1" });
+    const roleResponse = await fetch(`${supabaseUrl}/rest/v1/user_roles?${roleParams.toString()}`, { headers });
+    if (!roleResponse.ok) return false;
+    const roles = await roleResponse.json();
+    if (Array.isArray(roles) && roles.length > 0) return true;
+
+    // Match public.has_role(): the founder/CEO may be authorized through profiles.is_ceo
+    // even if a legacy account does not have a user_roles row with role=admin.
+    const profileParams = new URLSearchParams({ id: `eq.${userId}`, is_ceo: "eq.true", select: "id", limit: "1" });
+    const profileResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?${profileParams.toString()}`, { headers });
+    if (!profileResponse.ok) return false;
+    const profiles = await profileResponse.json();
+    return Array.isArray(profiles) && profiles.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
+  const declaredLength = Number(req.headers.get("content-length") || "0");
+  if (Number.isFinite(declaredLength) && declaredLength > 64 * 1024) {
+    return new Response(JSON.stringify({ error: "Requisição muito grande." }), {
+      status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const _user = await _verifyAuth(req);
   if (!_user?.id) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  if (!(await _isAdmin(_user.id))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (!(await _isAdmin(_user.id, _user.email))) return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -577,12 +709,101 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { query, type, confirm_action, history } = await req.json();
+    let requestBody: any;
+    try {
+      const rawBody = await req.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 64 * 1024) {
+        return new Response(JSON.stringify({ error: "Requisição muito grande." }), {
+          status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      requestBody = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "Corpo JSON inválido." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { query, type, confirm_action, history } = requestBody ?? {};
 
-    // Execute confirmed action
-    if (confirm_action) {
-      const { action, args } = confirm_action;
-      const result = await executeAction(sb, action, args);
+    if (confirm_action !== undefined && confirm_action !== null) {
+      const action = confirm_action?.action;
+      const args = confirm_action?.args;
+      const confirmationToken = confirm_action?.confirmation_token;
+      const signingSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (typeof confirmationToken !== "string" || !signingSecret) {
+        return new Response(JSON.stringify({ error: "Confirmação inválida ou expirada. Solicite a ação novamente." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const signedPayload = await verifyActionToken(confirmationToken, signingSecret);
+      if (!signedPayload || signedPayload.user_id !== _user.id || signedPayload.action !== action || typeof signedPayload.expires_at !== "number" || signedPayload.expires_at < Date.now() || JSON.stringify(signedPayload.args) !== JSON.stringify(args)) {
+        return new Response(JSON.stringify({ error: "Confirmação inválida ou expirada. Solicite a ação novamente." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const tool = actionTools.find((item: any) => item.function.name === action);
+      if (!tool || !args || typeof args !== "object" || Array.isArray(args)) {
+        return new Response(JSON.stringify({ error: "Ação de confirmação inválida." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const schema = tool.function.parameters;
+      const required = schema.required || [];
+      if (required.some((key: string) => args[key] === undefined || args[key] === null || args[key] === "")) {
+        return new Response(JSON.stringify({ error: "A ação está incompleta; revise os dados antes de confirmar." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Enforce declared top-level argument types/enums on the server, not just in the model UI.
+      const properties = schema.properties || {};
+      for (const key of Object.keys(args)) {
+        const rule = properties[key];
+        if (!rule) {
+          return new Response(JSON.stringify({ error: `Parâmetro não permitido: ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const value = args[key];
+        if (rule.type === "string" && typeof value !== "string") {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.type === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.type === "object" && (typeof value !== "object" || value === null || Array.isArray(value))) {
+          return new Response(JSON.stringify({ error: `Tipo inválido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (rule.enum && !rule.enum.includes(value)) {
+          return new Response(JSON.stringify({ error: `Valor não permitido para ${key}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      if (JSON.stringify(args).length > 16 * 1024) {
+        return new Response(JSON.stringify({ error: "Parâmetros da ação excedem o limite permitido." }), {
+          status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const tokenHash = await sha256Hex(confirmationToken);
+      const { data: consumedConfirmation, error: consumeError } = await sb
+        .from("ai_action_confirmations")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("token_hash", tokenHash)
+        .eq("user_id", _user.id)
+        .is("consumed_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .select("id")
+        .maybeSingle();
+      if (consumeError || !consumedConfirmation) {
+        return new Response(JSON.stringify({ error: "Esta confirmação já foi usada ou expirou. Solicite a ação novamente." }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const result = await executeAction(sb, action, args, _user.id, match[1]);
       return new Response(JSON.stringify({ response: result, action_executed: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -597,7 +818,7 @@ serve(async (req) => {
       sb.from("cobrancas").select("id, cliente_nome, valor_parcela, data_inicio, data_fim, frequencia, cliente_id, observacoes").limit(100),
       sb.from("cobranca_pagamentos").select("id, cobranca_id, data_vencimento, status, pago_em, tipo_pagamento").limit(500),
       sb.from("produtos").select("id, nome, preco_venda, preco_custo, estoque_atual, categoria").limit(200),
-      sb.from("dispositivos").select("id, imei_serial, modelo, nome_dispositivo, status_seguranca, cliente_nome, memoria").limit(100),
+      sb.from("dispositivos").select("id, modelo, nome_dispositivo, status_seguranca, cliente_nome, memoria").limit(100),
     ]);
 
     // ── Minimização de dados (PII) antes de enviar ao gateway de IA ──
@@ -650,8 +871,7 @@ update_sale, delete_sale, update_cobranca, delete_cobranca, create_payment_recor
 delete_payment_record, send_webhook, trigger_payment_reminders, send_notification,
 view_whatsapp_history, create_cobranca, delete_dispositivo, update_dispositivo
 
-PRIVACIDADE: CPF e telefone vêm mascarados (cpf_mask, telefone_mask). Se precisar
-do dado completo para uma ação específica, busque pelo id do cliente via ferramenta.
+PRIVACIDADE: CPF e telefone vêm mascarados (cpf_mask, telefone_mask). Não invente nem exponha dados pessoais completos que não estejam disponíveis no contexto.
 
 DADOS DO SISTEMA:
 - ${context.clientes.length} clientes | ${context.vendas.length} vendas | ${context.cobrancas.length} cobranças
@@ -676,13 +896,29 @@ REGRAS:
     // Build messages with history
     const aiMessages: any[] = [{ role: "system", content: systemPrompt }];
 
-    // Add conversation history
-    if (history && Array.isArray(history)) {
+    // Client-supplied history is untrusted: do not allow system/developer role injection.
+    if (history !== undefined && !Array.isArray(history)) {
+      return new Response(JSON.stringify({ error: "Histórico de conversa inválido." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (Array.isArray(history)) {
       for (const msg of history.slice(-8)) {
-        aiMessages.push({ role: msg.role, content: msg.content });
+        if (msg && (msg.role === "user" || msg.role === "assistant") &&
+            typeof msg.content === "string" && msg.content.length <= 4000) {
+          aiMessages.push({ role: msg.role, content: msg.content });
+        }
+      }
+      if (typeof query === "string" && query.trim() && query.length <= 4000) {
+        aiMessages.push({ role: "user", content: query.trim() });
       }
     } else {
-      aiMessages.push({ role: "user", content: query });
+      if (typeof query !== "string" || !query.trim() || query.length > 4000) {
+        return new Response(JSON.stringify({ error: "Consulta inválida ou excede o limite de tamanho." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      aiMessages.push({ role: "user", content: query.trim() });
     }
 
     const body: any = {
@@ -726,9 +962,25 @@ REGRAS:
 
       let description = message.content || describeAction(actionName, actionArgs, context);
 
+      const signingSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!signingSecret) throw new Error("Confirmação segura indisponível");
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      const confirmationToken = await signActionPayload({
+        user_id: _user.id,
+        action: actionName,
+        args: actionArgs,
+        expires_at: expiresAt.getTime(),
+      }, signingSecret);
+      const tokenHash = await sha256Hex(confirmationToken);
+      const { error: confirmationInsertError } = await sb.from("ai_action_confirmations").insert({
+        user_id: _user.id,
+        token_hash: tokenHash,
+        expires_at: expiresAt.toISOString(),
+      });
+      if (confirmationInsertError) throw new Error("Não foi possível registrar a confirmação segura");
       return new Response(JSON.stringify({
         response: description,
-        pending_action: { action: actionName, args: actionArgs, description },
+        pending_action: { action: actionName, args: actionArgs, description, confirmation_token: confirmationToken },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

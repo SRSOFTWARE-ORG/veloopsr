@@ -36,6 +36,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Sending customer messages is privileged; authorize from the authenticated account.
+    const { data: adminRole, error: roleError } = await supabase
+      .from("user_roles").select("id").eq("user_id", user.id).eq("role", "admin").limit(1).maybeSingle();
+    if (roleError) throw roleError;
+    let isCeo = false;
+    if (!adminRole) {
+      const { data: ceoProfile, error: profileError } = await supabase
+        .from("profiles").select("id").eq("id", user.id).eq("is_ceo", true).limit(1).maybeSingle();
+      if (profileError) throw profileError;
+      isCeo = !!ceoProfile;
+    }
+    if (!adminRole && !isCeo) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Acesso restrito a administradores" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body = await req.json();
 
     // Healthcheck mode

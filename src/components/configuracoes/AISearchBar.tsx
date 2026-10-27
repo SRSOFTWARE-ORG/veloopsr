@@ -8,8 +8,9 @@ import ReactMarkdown from "react-markdown";
 
 interface PendingAction {
   action: string;
-  args: any;
+  args: Record<string, unknown>;
   description: string;
+  confirmation_token: string;
 }
 
 interface ChatMessage {
@@ -56,8 +57,8 @@ const AISearchBar = () => {
       if (data?.pending_action) {
         setPendingAction(data.pending_action);
       }
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao consultar IA");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao consultar IA");
     } finally {
       setLoading(false);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -69,7 +70,7 @@ const AISearchBar = () => {
     setExecuting(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { confirm_action: { action: pendingAction.action, args: pendingAction.args } },
+        body: { confirm_action: { action: pendingAction.action, args: pendingAction.args, confirmation_token: pendingAction.confirmation_token } },
       });
       if (error) throw error;
       if (data?.error) {
@@ -80,8 +81,8 @@ const AISearchBar = () => {
       setMessages((prev) => [...prev, { role: "assistant", content: result }]);
       setPendingAction(null);
       toast.success("Ação executada com sucesso!");
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao executar ação");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao executar ação");
     } finally {
       setExecuting(false);
     }
