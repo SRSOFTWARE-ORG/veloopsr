@@ -146,8 +146,52 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Função interna de cron — sem segredos do usuário, sem entrada externa.
-    // Auth guard removido: chamada apenas por pg_cron interno via net.http_post.
+    // Accept trusted scheduled calls using the service-role secret, or authenticated
+    // admin/CEO calls from the application. Never expose this automation to anonymous callers.
+    const authorization = req.headers.get("authorization") || "";
+    const bearer = /^Bearer\s+([^\s]+)$/i.exec(authorization)?.[1];
+    if (!bearer) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let authorized = bearer === serviceRoleKey;
+    if (!authorized) {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+      if (!anonKey) {
+        return new Response(JSON.stringify({ error: "Autenticação indisponível" }), {
+          status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey);
+      const { data: role, error: roleError } = await adminClient
+        .from("user_roles").select("id").eq("user_id", user.id).eq("role", "admin").limit(1).maybeSingle();
+      if (roleError) throw roleError;
+      let isCeo = false;
+      if (!role) {
+        const { data: profile, error: profileError } = await adminClient
+          .from("profiles").select("id").eq("id", user.id).eq("is_ceo", true).limit(1).maybeSingle();
+        if (profileError) throw profileError;
+        isCeo = !!profile;
+      }
+      authorized = !!role || isCeo;
+    }
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Acesso restrito a administradores" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
