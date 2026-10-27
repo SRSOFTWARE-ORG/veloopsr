@@ -31,6 +31,7 @@ USING (
 );
 
 DROP POLICY IF EXISTS "Documentos viewable" ON public.documentos;
+DROP POLICY IF EXISTS "Owners or admins view documentos" ON public.documentos;
 CREATE POLICY "Admins and sale owners view sale documents"
 ON public.documentos
 FOR SELECT
@@ -49,6 +50,7 @@ USING (
 );
 
 DROP POLICY IF EXISTS "Checklist viewable" ON public.checklist_entrega;
+DROP POLICY IF EXISTS "Owners or admins view checklist" ON public.checklist_entrega;
 CREATE POLICY "Admins and sale owners view delivery checklist"
 ON public.checklist_entrega
 FOR SELECT
@@ -145,6 +147,7 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "Can update checklist" ON public.checklist_entrega;
+DROP POLICY IF EXISTS "Owners or admins update checklist" ON public.checklist_entrega;
 CREATE POLICY "Admins and sale owners update checklist"
 ON public.checklist_entrega
 FOR UPDATE TO authenticated
