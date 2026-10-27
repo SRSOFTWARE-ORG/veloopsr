@@ -87,7 +87,8 @@ Deno.serve(async (req) => {
       typeof data_vencimento !== "string" ||
       !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(data_vencimento) ||
       !Number.isFinite(Date.parse(`${data_vencimento}T00:00:00.000Z`)) ||
-      new Date(`${data_vencimento}T00:00:00.000Z`).toISOString().slice(0, 10) !== data_vencimento    ) {
+      new Date(`${data_vencimento}T00:00:00.000Z`).toISOString().slice(0, 10) !== data_vencimento
+    ) {
       return new Response(JSON.stringify({ error: "Identificador ou data de vencimento inválidos" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
