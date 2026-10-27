@@ -8,6 +8,7 @@ SET search_path = public
 AS $$
 BEGIN
   IF NEW.is_ceo IS DISTINCT FROM OLD.is_ceo
+     AND auth.uid() IS NOT NULL
      AND NOT public.has_role(auth.uid(), 'admin') THEN
     RAISE EXCEPTION 'Only an administrator can change the CEO profile flag'
       USING ERRCODE = '42501';
