@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { cobranca_id, data_vencimento, cliente_nome, cliente_id } = body;
+    const { cobranca_id, data_vencimento } = body;
 
     if (
       typeof cobranca_id !== "string" ||
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
       await supabase.from("pix_payments").insert({
         cobranca_id,
         data_vencimento,
-        cliente_id: cliente_id || null,
+        cliente_id: cobranca.cliente_id || null,
         valor,
         mp_payment_id: String(mpData.id),
         mp_qr_code_base64: qrCodeBase64,
