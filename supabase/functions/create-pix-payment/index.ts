@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,11 +36,34 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Método não permitido" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", "Allow": "POST, OPTIONS" },
+    });
+  }
 
   try {
     const MP_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
 
-    const body = await req.json().catch(() => ({}));
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 16 * 1024) {
+      return new Response(JSON.stringify({ error: "Solicitação muito grande" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "JSON inválido" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "Corpo inválido" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Healthcheck mode: just report whether the token is configured
     if (body?.health === true) {
@@ -175,7 +199,7 @@ Deno.serve(async (req) => {
       const userError = mpMsg.includes("key enabled for QR")
         ? "A conta Mercado Pago não possui chave PIX cadastrada. Entre em contato com o vendedor."
         : "Erro ao gerar pagamento PIX. Tente novamente em instantes.";
-      return new Response(JSON.stringify({ error: userError, mp_error: mpMsg }), {
+      return new Response(JSON.stringify({ error: userError }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -227,7 +251,8 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("create-pix-payment failed:", error instanceof Error ? error.message : "unknown error");
+    return new Response(JSON.stringify({ error: "Não foi possível processar o pagamento agora." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
