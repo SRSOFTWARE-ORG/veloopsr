@@ -68,8 +68,10 @@ function withSignatureEvidence(html: string, signatures: Signature[], hash: stri
   if (!signatures.length) return html;
   const roleLabels: Record<string, string> = { vendedor: "Vendedor", comprador: "Comprador", testemunha_1: "Testemunha 1", testemunha_2: "Testemunha 2" };
   const rows = signatures.map((s) => {
-    const safeImage = s.signature_image_data && /^data:image\\/png;base64,[A-Za-z0-9+/=]+$/.test(s.signature_image_data)
+    const prefix = "data:image/png;base64,";
+    const safeImage = s.signature_image_data && s.signature_image_data.startsWith(prefix) && /^[A-Za-z0-9+/=]+$/.test(s.signature_image_data.slice(prefix.length))
       ? `<img alt="Assinatura de ${esc(s.signer_name)}" src="${s.signature_image_data}" style="display:block;max-width:260px;max-height:90px;margin:8px auto;object-fit:contain">`
+      : "<p>Assinatura manuscrita digital não disponível</p>";
       : "<p>Assinatura manuscrita digital não disponível</p>";
     return `<div style="border:1px solid #bbb;border-radius:6px;padding:12px;margin:12px 0;text-align:center"><b>${esc(roleLabels[s.signer_role] || s.signer_role)}</b>${safeImage}<div>${esc(s.signer_name)}</div><small>Registrado em ${esc(new Date(s.signed_at).toLocaleString("pt-BR"))}</small></div>`;
   }).join("");
